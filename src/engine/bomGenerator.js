@@ -189,3 +189,23 @@ export function generateBOM(config, calcs) {
 export function calculateSquareFootage(widthIn, depthIn) {
   return Math.round((widthIn / 12) * (depthIn / 12));
 }
+
+/** Merge BOMs from multiple sections, combining identical items */
+export function mergeBOMs(bomArrays) {
+  const merged = {};
+
+  bomArrays.forEach((bom, sectionIndex) => {
+    bom.forEach((item) => {
+      // Key by description + size + length for deduplication
+      const key = `${item.description}|${item.size}|${item.length || ''}`;
+      if (merged[key]) {
+        merged[key].quantity += item.quantity;
+      } else {
+        merged[key] = { ...item, id: `${item.id}-merged` };
+      }
+    });
+  });
+
+  return Object.values(merged);
+}
+

@@ -54,18 +54,56 @@ function SelectField({ id, label, value, options, onChange }) {
 }
 
 export default function PropertiesPanel({ isMobile }) {
-  const deck = useDeckStore((s) => s.deck);
-  const calcs = useDeckStore((s) => s.calcs);
+  const deck = useDeckStore((s) => {
+    const sec = s.sections.find((x) => x.id === s.selectedSectionId) || s.sections[0];
+    return { ...s.materials, ...sec };
+  });
+  const calcs = useDeckStore((s) => s.sectionCalcs[s.selectedSectionId] || Object.values(s.sectionCalcs)[0]);
+  const sections = useDeckStore((s) => s.sections);
+  const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
   const setDimension = useDeckStore((s) => s.setDimension);
   const updateDeck = useDeckStore((s) => s.updateDeck);
+  const selectSection = useDeckStore((s) => s.selectSection);
+  const removeSection = useDeckStore((s) => s.removeSection);
+  const toggleRailing = useDeckStore((s) => s.toggleRailing);
+  const attachStairs = useDeckStore((s) => s.attachStairs);
 
-  // Check if span is exceeded
+  if (!calcs) return null;
   const joistSpanOk = calcs.joists.maxSpan >= deck.depth;
+  const sectionIndex = sections.findIndex((s) => s.id === selectedSectionId);
+  const currentSection = sections[sectionIndex] || sections[0];
 
   const Tag = isMobile ? 'div' : 'aside';
 
   return (
     <Tag className={`props-panel ${isMobile ? 'props-panel--mobile' : 'animate-slide-right'}`} id="properties-panel" role="complementary" aria-label="Deck properties">
+      {/* Section Selector */}
+      {sections.length > 1 && (
+        <div className="props-panel__section">
+          <div className="props-panel__section-nav">
+            <h3 className="props-panel__heading" style={{ margin: 0 }}>
+              Section {sectionIndex + 1} of {sections.length}
+            </h3>
+            <button
+              className="btn btn--ghost btn--sm"
+              style={{ color: '#ef4444', fontSize: '11px' }}
+              onClick={() => removeSection(selectedSectionId)}
+            >✕ Delete</button>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+            {sections.map((sec, i) => (
+              <button
+                key={sec.id}
+                className={`btn btn--sm ${sec.id === selectedSectionId ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => selectSection(sec.id)}
+                style={{ minWidth: '36px' }}
+              >{i + 1}</button>
+            ))}
+          </div>
+          <div className="divider" />
+        </div>
+      )}
+
       {/* Dimensions */}
       <div className="props-panel__section">
         <h3 className="props-panel__heading">Dimensions</h3>
@@ -177,6 +215,41 @@ export default function PropertiesPanel({ isMobile }) {
             {deck.ledgerAttached ? '✓ Attached to house' : '✗ Freestanding deck'}
           </button>
         </div>
+      </div>
+
+      <div className="divider" />
+
+      {/* Railings & Stairs */}
+      <div className="props-panel__section">
+        <h3 className="props-panel__heading">Railings & Stairs</h3>
+        <div className="prop-field">
+          <label className="label">Railings</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+            {['n', 's', 'e', 'w'].map((edge) => (
+              <button
+                key={edge}
+                className={`btn btn--sm ${currentSection.railings[edge] ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => toggleRailing(selectedSectionId, edge)}
+                style={{ textTransform: 'capitalize' }}
+              >
+                {{ n: '↑ North', s: '↓ South', e: '→ East', w: '← West' }[edge]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <SelectField
+          id="sel-stairs"
+          label="Stairs"
+          value={currentSection.stairs || 'none'}
+          options={[
+            { value: 'none', label: 'None' },
+            { value: 'n', label: '↑ North Edge' },
+            { value: 's', label: '↓ South Edge' },
+            { value: 'e', label: '→ East Edge' },
+            { value: 'w', label: '← West Edge' },
+          ]}
+          onChange={(v) => attachStairs(selectedSectionId, v === 'none' ? null : v)}
+        />
       </div>
 
       <div className="divider" />

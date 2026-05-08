@@ -6,7 +6,10 @@ import './Toolbar.css';
 function exportPDF() {
   import('jspdf').then(({ jsPDF }) => {
     const state = useDeckStore.getState();
-    const { deck, calcs, bom, sqft } = state;
+    const sec = state.sections.find((s) => s.id === state.selectedSectionId) || state.sections[0];
+    const deck = { ...state.materials, ...sec };
+    const calcs = state.sectionCalcs[sec.id];
+    const { bom, sqft } = state;
     const doc = new jsPDF('p', 'mm', 'letter');
 
     doc.setFillColor(10, 22, 40);
@@ -151,8 +154,12 @@ export default function Toolbar({ isMobile }) {
   const redo = useDeckStore((s) => s.redo);
   const historyIndex = useDeckStore((s) => s.historyIndex);
   const historyLength = useDeckStore((s) => s.history.length);
-  const deck = useDeckStore((s) => s.deck);
+  const deck = useDeckStore((s) => {
+    const sec = s.sections.find((x) => x.id === s.selectedSectionId) || s.sections[0];
+    return { ...s.materials, ...sec };
+  });
   const sqft = useDeckStore((s) => s.sqft);
+  const sectionCount = useDeckStore((s) => s.sections.length);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e) => {

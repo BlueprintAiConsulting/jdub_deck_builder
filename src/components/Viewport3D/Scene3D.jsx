@@ -124,14 +124,22 @@ function GroundPlane() {
 }
 
 export default function Scene3D() {
-  const deck = useDeckStore((s) => s.deck);
-  const calcs = useDeckStore((s) => s.calcs);
+  const sections = useDeckStore((s) => s.sections);
+  const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
+  const materials = useDeckStore((s) => s.materials);
 
-  const cameraTarget = useMemo(() => [
-    deck.width / 2 * IN,
-    0,
-    deck.depth / 2 * IN,
-  ], [deck.width, deck.depth]);
+  // Center camera on bounding box of all sections
+  const bounds = useMemo(() => {
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxH = 0;
+    sections.forEach((s) => {
+      minX = Math.min(minX, s.x); minZ = Math.min(minZ, s.y);
+      maxX = Math.max(maxX, s.x + s.width); maxZ = Math.max(maxZ, s.y + s.depth);
+      maxH = Math.max(maxH, s.height);
+    });
+    return { cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, w: maxX - minX, d: maxZ - minZ, h: maxH };
+  }, [sections]);
+
+  const cameraTarget = useMemo(() => [bounds.cx * IN, 0, bounds.cz * IN], [bounds]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -139,56 +147,34 @@ export default function Scene3D() {
         <PerspectiveCamera
           makeDefault
           position={[
-            deck.width * IN * 1.5,
-            deck.height * IN * 3,
-            deck.depth * IN * 1.5,
+            (bounds.cx + bounds.w) * IN * 1.2,
+            bounds.h * IN * 3,
+            (bounds.cz + bounds.d) * IN * 1.2,
           ]}
           fov={50}
         />
         <OrbitControls target={cameraTarget} enableDamping dampingFactor={0.1} />
 
-        {/* Lighting */}
         <ambientLight intensity={0.45} />
-        <directionalLight
-          position={[20, 30, 20]}
-          intensity={1.1}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-        />
+        <directionalLight position={[20, 30, 20]} intensity={1.1} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
         <directionalLight position={[-10, 15, -10]} intensity={0.3} color="#8888cc" />
         <hemisphereLight intensity={0.15} color="#aaddff" groundColor="#332200" />
 
-        {/* Sky color */}
         <color attach="background" args={['#0a1628']} />
         <fog attach="fog" args={['#0a1628', 40, 120]} />
 
-        {/* Deck */}
-        <group>
-          <DeckBoards
-            width={deck.width}
-            depth={deck.depth}
-            species={deck.species}
-            deckBoardSize={deck.deckBoardSize}
-          />
-          <Joists
-            positions={calcs.joists.positions}
-            depth={deck.depth}
-            joistSize={deck.joistSize}
-          />
-          <Beams
-            beamPositions={calcs.beams.positions}
-            width={deck.width}
-            beamConfig={deck.beamConfig}
-            joistSize={deck.joistSize}
-          />
-          <Posts
-            posts={calcs.posts.posts}
-            postSize={deck.postSize}
-            joistSize={deck.joistSize}
-            beamConfig={deck.beamConfig}
-          />
-        </group>
+        {sections.map((sec) => {
+          const calcs = sectionCalcs[sec.id];
+          if (!calcs) return null;
+          return (
+            <group key={sec.id} position={[sec.x * IN, 0, sec.y * IN]}>
+              <DeckBoards width={sec.width} depth={sec.depth} species={materials.species} deckBoardSize={materials.deckBoardSize} />
+              <Joists positions={calcs.joists.positions} depth={sec.depth} joistSize={materials.joistSize} />
+              <Beams beamPositions={calcs.beams.positions} width={sec.width} beamConfig={materials.beamConfig} joistSize={materials.joistSize} />
+              <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+            </group>
+          );
+        })}
 
         <GroundPlane />
         <gridHelper args={[100, 100, '#1a2a4a', '#111828']} position={[0, -4.99, 0]} />
