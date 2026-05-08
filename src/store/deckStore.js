@@ -123,17 +123,6 @@ export const useDeckStore = create((set, get) => ({
   bom: initialResults.bom,
   sqft: initialResults.sqft,
 
-  // --- Legacy compatibility (for components still reading deck/calcs) ---
-  get deck() {
-    const state = get();
-    const sec = state.sections.find((s) => s.id === state.selectedSectionId) || state.sections[0];
-    return { ...state.materials, ...sec };
-  },
-  get calcs() {
-    const state = get();
-    return state.sectionCalcs[state.selectedSectionId] || Object.values(state.sectionCalcs)[0];
-  },
-
   // --- History ---
   history: [{ sections: [{ ...initialSection }], materials: { ...DEFAULT_MATERIALS } }],
   historyIndex: 0,
