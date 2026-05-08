@@ -18,6 +18,6 @@ export default defineConfig({
       },
     },
   },
-  // Use relative paths so file:// works
-  base: './',
+  // GitHub Pages base path
+  base: '/jdub_deck_builder/',
 });
