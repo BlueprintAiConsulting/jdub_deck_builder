@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { useDeckStore } from '../../store/deckStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatDimension } from '../../utils/units';
 import './Toolbar.css';
 
@@ -154,10 +155,10 @@ export default function Toolbar({ isMobile }) {
   const redo = useDeckStore((s) => s.redo);
   const historyIndex = useDeckStore((s) => s.historyIndex);
   const historyLength = useDeckStore((s) => s.history.length);
-  const deck = useDeckStore((s) => {
+  const deck = useDeckStore(useShallow((s) => {
     const sec = s.sections.find((x) => x.id === s.selectedSectionId) || s.sections[0];
     return { ...s.materials, ...sec };
-  });
+  }));
   const sqft = useDeckStore((s) => s.sqft);
   const sectionCount = useDeckStore((s) => s.sections.length);
 

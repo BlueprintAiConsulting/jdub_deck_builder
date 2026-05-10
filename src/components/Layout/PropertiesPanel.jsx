@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDeckStore } from '../../store/deckStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatDimension } from '../../utils/units';
 import {
   SPECIES_OPTIONS, JOIST_SIZES, JOIST_SPACINGS,
@@ -54,11 +55,11 @@ function SelectField({ id, label, value, options, onChange }) {
 }
 
 export default function PropertiesPanel({ isMobile }) {
-  const deck = useDeckStore((s) => {
+  const deck = useDeckStore(useShallow((s) => {
     const sec = s.sections.find((x) => x.id === s.selectedSectionId) || s.sections[0];
     return { ...s.materials, ...sec };
-  });
-  const calcs = useDeckStore((s) => s.sectionCalcs[s.selectedSectionId] || Object.values(s.sectionCalcs)[0]);
+  }));
+  const calcs = useDeckStore(useShallow((s) => s.sectionCalcs[s.selectedSectionId] || Object.values(s.sectionCalcs)[0]));
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
   const setDimension = useDeckStore((s) => s.setDimension);
