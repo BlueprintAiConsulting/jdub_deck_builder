@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useDeckStore } from '../../store/deckStore';
 import { WOOD_COLORS } from '../Materials/materialData';
-import { LUMBER_ACTUAL } from '../../engine/spanTables';
+import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTables';
 
 const IN = 1 / 12; // inches to scene units (feet)
 
@@ -55,15 +55,13 @@ function Beams({ beamPositions, width, beamConfig, joistSize }) {
   const actual = LUMBER_ACTUAL[beamSize] || { width: 1.5, depth: 9.25 };
   const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
   const ply = parseInt(beamConfig.split('-')[0]) || 2;
-  // Beams sit directly below joists
   const beamTopY = -joistActual.depth;
-  
+
   return (
     <group>
       {beamPositions.map((zIn, i) => (
         <group key={`beam-${i}`}>
           {Array.from({ length: ply }, (_, p) => {
-            // Offset each ply board sideways
             const offset = (p - (ply - 1) / 2) * actual.width;
             return (
               <mesh
@@ -91,7 +89,7 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
   const beamActual = LUMBER_ACTUAL[beamSize] || { depth: 9.25 };
   const topOfPost = -(joistActual.depth + beamActual.depth);
-  
+
   return (
     <group>
       {posts.map((post, i) => {
@@ -111,6 +109,181 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
         );
       })}
     </group>
+  );
+}
+
+/* ── Railings (3D) ── */
+function Railings({ railings, width, depth, height }) {
+  const guardHeight = RAILING_RULES.guardMinHeight; // 36"
+  const postWidth = 3.5; // 4x4 railing post actual size
+  const railWidth = 1.5;
+  const balusterSpacing = RAILING_RULES.balusterMaxSpacing; // 4"
+  const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0) * IN;
+
+  const edges = useMemo(() => {
+    const result = [];
+    const entries = Object.entries(railings);
+    entries.forEach(([edge, on]) => {
+      if (!on) return;
+      let x1, z1, x2, z2;
+      if (edge === 'n') { x1 = 0; z1 = 0; x2 = width; z2 = 0; }
+      else if (edge === 's') { x1 = 0; z1 = depth; x2 = width; z2 = depth; }
+      else if (edge === 'w') { x1 = 0; z1 = 0; x2 = 0; z2 = depth; }
+      else if (edge === 'e') { x1 = width; z1 = 0; x2 = width; z2 = depth; }
+      result.push({ edge, x1, z1, x2, z2 });
+    });
+    return result;
+  }, [railings, width, depth]);
+
+  return (
+    <group>
+      {edges.map(({ edge, x1, z1, x2, z2 }) => {
+        const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
+        const midX = (x1 + x2) / 2;
+        const midZ = (z1 + z2) / 2;
+        const isHorizontal = edge === 'n' || edge === 's';
+        const rotY = isHorizontal ? 0 : Math.PI / 2;
+
+        // Railing posts at corners
+        const cornerPosts = [
+          { x: x1, z: z1 },
+          { x: x2, z: z2 },
+        ];
+
+        // Balusters
+        const numBalusters = Math.max(0, Math.floor(length / (balusterSpacing + 1.5)) - 1);
+        const balusters = [];
+        for (let i = 1; i <= numBalusters; i++) {
+          const frac = i / (numBalusters + 1);
+          balusters.push({
+            x: x1 + (x2 - x1) * frac,
+            z: z1 + (z2 - z1) * frac,
+          });
+        }
+
+        return (
+          <group key={`railing-${edge}`}>
+            {/* Corner posts */}
+            {cornerPosts.map((p, i) => (
+              <mesh key={`rpost-${edge}-${i}`} position={[p.x * IN, deckTopY + guardHeight / 2 * IN, p.z * IN]}>
+                <boxGeometry args={[postWidth * IN, guardHeight * IN, postWidth * IN]} />
+                <meshStandardMaterial color="#5a8a3a" roughness={0.7} />
+              </mesh>
+            ))}
+
+            {/* Top rail */}
+            <mesh position={[midX * IN, deckTopY + guardHeight * IN, midZ * IN]} rotation={[0, rotY, 0]}>
+              <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
+              <meshStandardMaterial color="#4a7a2a" roughness={0.65} />
+            </mesh>
+
+            {/* Bottom rail */}
+            <mesh position={[midX * IN, deckTopY + 4 * IN, midZ * IN]} rotation={[0, rotY, 0]}>
+              <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
+              <meshStandardMaterial color="#4a7a2a" roughness={0.65} />
+            </mesh>
+
+            {/* Balusters */}
+            {balusters.map((b, i) => (
+              <mesh key={`bal-${edge}-${i}`} position={[b.x * IN, deckTopY + guardHeight / 2 * IN, b.z * IN]}>
+                <boxGeometry args={[1 * IN, (guardHeight - 2) * IN, 1 * IN]} />
+                <meshStandardMaterial color="#5a9a4a" roughness={0.75} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+/* ── Stairs (3D) ── */
+function Stairs({ stairEdge, stairCalcs, width, depth }) {
+  if (!stairEdge || !stairCalcs) return null;
+
+  const { numRisers, numTreads, riserHeight, totalRun } = stairCalcs;
+  const treadDepth = STAIR_RULES.idealTreadDepth;
+  const stairWidth = STAIR_RULES.maxStairWidth; // 36"
+  const treadThickness = 1.0; // 5/4 deck board
+  const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
+
+  // Determine stair starting position and direction
+  let startX, startZ, dirX, dirZ, rotY;
+  if (stairEdge === 's') {
+    startX = width / 2 - stairWidth / 2; startZ = depth;
+    dirX = 0; dirZ = 1; rotY = 0;
+  } else if (stairEdge === 'n') {
+    startX = width / 2 - stairWidth / 2; startZ = 0;
+    dirX = 0; dirZ = -1; rotY = Math.PI;
+  } else if (stairEdge === 'e') {
+    startX = width; startZ = depth / 2 - stairWidth / 2;
+    dirX = 1; dirZ = 0; rotY = -Math.PI / 2;
+  } else {
+    startX = 0; startZ = depth / 2 - stairWidth / 2;
+    dirX = -1; dirZ = 0; rotY = Math.PI / 2;
+  }
+
+  const treads = [];
+  for (let i = 0; i < numTreads; i++) {
+    const rise = deckTopY - (i + 1) * riserHeight;
+    const run = (i + 0.5) * treadDepth;
+    treads.push({
+      x: startX + dirX * run,
+      y: rise,
+      z: startZ + dirZ * run,
+    });
+  }
+
+  // Stringers (side supports)
+  const stringerLength = Math.sqrt(totalRun ** 2 + (deckTopY + numRisers * riserHeight) ** 2);
+  const stringerAngle = Math.atan2(numRisers * riserHeight, totalRun);
+
+  const isVertical = stairEdge === 'n' || stairEdge === 's';
+  const treadW = isVertical ? stairWidth : treadDepth;
+  const treadD = isVertical ? treadDepth : stairWidth;
+
+  return (
+    <group>
+      {/* Treads */}
+      {treads.map((t, i) => (
+        <mesh key={`tread-${i}`} position={[t.x * IN, t.y * IN, t.z * IN]}>
+          <boxGeometry args={[treadW * IN, treadThickness * IN, treadD * IN]} />
+          <meshStandardMaterial color="#d4956b" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* Risers */}
+      {treads.map((t, i) => (
+        <mesh
+          key={`riser-${i}`}
+          position={[
+            t.x * IN,
+            (t.y + riserHeight / 2) * IN,
+            (t.z + dirZ * treadDepth / 2) * IN + (isVertical ? 0 : dirX * treadDepth / 2 * IN),
+          ]}
+        >
+          <boxGeometry args={[
+            (isVertical ? stairWidth : 0.75) * IN,
+            riserHeight * IN,
+            (isVertical ? 0.75 : stairWidth) * IN,
+          ]} />
+          <meshStandardMaterial color="#b07850" roughness={0.8} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/* ── House Wall (ledger) ── */
+function HouseWall({ width, height }) {
+  const wallHeight = Math.max(height, 96); // At least 8ft
+  const wallThick = 6;
+  const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
+  return (
+    <mesh position={[width / 2 * IN, (deckTopY + wallHeight / 2) * IN, -wallThick / 2 * IN]}>
+      <boxGeometry args={[(width + 24) * IN, wallHeight * IN, wallThick * IN]} />
+      <meshStandardMaterial color="#3a3a4a" roughness={0.9} metalness={0.05} />
+    </mesh>
   );
 }
 
@@ -172,6 +345,12 @@ export default function Scene3D() {
               <Joists positions={calcs.joists.positions} depth={sec.depth} joistSize={materials.joistSize} />
               <Beams beamPositions={calcs.beams.positions} width={sec.width} beamConfig={materials.beamConfig} joistSize={materials.joistSize} />
               <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+              {/* Railings — synced from 2D */}
+              <Railings railings={sec.railings} width={sec.width} depth={sec.depth} height={sec.height} />
+              {/* Stairs — synced from 2D */}
+              <Stairs stairEdge={sec.stairs} stairCalcs={calcs.stairs} width={sec.width} depth={sec.depth} />
+              {/* House wall for ledger-attached decks */}
+              {sec.ledgerAttached && <HouseWall width={sec.width} height={sec.height} />}
             </group>
           );
         })}
