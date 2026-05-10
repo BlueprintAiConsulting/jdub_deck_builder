@@ -249,13 +249,27 @@ export default function Canvas2D({ isMobile }) {
     const ox = size.w / 2 + panOffset.x;
     const oy = size.h / 2 + panOffset.y;
 
-    // Grid
+    // Background vignette
+    const vg = ctx.createRadialGradient(size.w/2, size.h/2, size.w*0.1, size.w/2, size.h/2, size.w*0.8);
+    vg.addColorStop(0, 'rgba(12, 18, 33, 0)');
+    vg.addColorStop(1, 'rgba(4, 6, 12, 0.5)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, size.w, size.h);
+
+    // Grid — minor (1ft) + major (4ft)
     if (showGrid) {
-      ctx.strokeStyle = 'rgba(30, 42, 74, 0.4)';
-      ctx.lineWidth = 0.5;
       const gs = 12 * S;
+      // Minor gridlines (1ft)
+      ctx.strokeStyle = 'rgba(30, 50, 90, 0.15)';
+      ctx.lineWidth = 0.5;
       for (let x = ox % gs; x < size.w; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size.h); ctx.stroke(); }
       for (let y = oy % gs; y < size.h; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size.w, y); ctx.stroke(); }
+      // Major gridlines (4ft)
+      const gs4 = 48 * S;
+      ctx.strokeStyle = 'rgba(50, 80, 140, 0.25)';
+      ctx.lineWidth = 1;
+      for (let x = ox % gs4; x < size.w; x += gs4) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size.h); ctx.stroke(); }
+      for (let y = oy % gs4; y < size.h; y += gs4) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size.w, y); ctx.stroke(); }
     }
 
     // Draw each section
@@ -365,7 +379,7 @@ export default function Canvas2D({ isMobile }) {
       }
 
       // Dimension labels
-      ctx.fillStyle = '#f1f5f9';
+      ctx.fillStyle = '#e8edf5';
       ctx.font = '600 11px "JetBrains Mono"';
       ctx.textAlign = 'center';
       ctx.fillText(formatDimension(sec.width), sx + sw / 2, sy - 8);
@@ -374,6 +388,18 @@ export default function Canvas2D({ isMobile }) {
       ctx.rotate(Math.PI / 2);
       ctx.fillText(formatDimension(sec.depth), 0, 0);
       ctx.restore();
+
+      // Section number badge
+      const secIdx = sections.indexOf(sec);
+      const badgeX = sx + 10, badgeY = sy + 10;
+      ctx.fillStyle = isSelected ? '#4e8ef7' : 'rgba(78, 142, 247, 0.6)';
+      ctx.beginPath(); ctx.arc(badgeX + 10, badgeY + 10, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px Inter';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(secIdx + 1), badgeX + 10, badgeY + 10);
+      ctx.textBaseline = 'alphabetic';
 
       // Resize handles (selected only)
       if (isSelected && selectedTool === 'select') {
@@ -408,21 +434,21 @@ export default function Canvas2D({ isMobile }) {
       }
     }
 
-    // Legend
-    const lx = 16, ly = size.h - 100;
+    // Legend (with roundRect polyfill)
+    const lx = 16, ly = size.h - 106;
     ctx.font = '500 10px Inter';
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(10, 22, 40, 0.75)';
-    ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 110, 92, 6); ctx.fill();
-    ctx.strokeStyle = 'rgba(30, 42, 74, 0.6)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(8, 14, 28, 0.85)';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 98, 8); ctx.fill(); ctx.strokeStyle = 'rgba(78, 142, 247, 0.12)'; ctx.lineWidth = 1; ctx.stroke(); }
+    else { ctx.fillRect(lx - 8, ly - 8, 114, 98); ctx.strokeStyle = 'rgba(78, 142, 247, 0.12)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 98); }
     const legendItems = [
-      { color: '#3b82f6', label: 'Joists' }, { color: '#f59e0b', label: 'Beams' },
-      { color: '#ef4444', label: 'Posts' }, { color: '#22c55e', label: 'Railings' },
-      { color: '#ec4899', label: 'Stairs' },
+      { color: '#4e8ef7', label: 'Joists' }, { color: '#f5a623', label: 'Beams' },
+      { color: '#f87171', label: 'Posts' }, { color: '#34d399', label: 'Railings' },
+      { color: '#f472b6', label: 'Stairs' },
     ];
     legendItems.forEach((item, i) => {
-      ctx.fillStyle = item.color; ctx.fillRect(lx, ly + i * 16, 12, 3);
-      ctx.fillStyle = '#94a3b8'; ctx.fillText(item.label, lx + 18, ly + i * 16 + 5);
+      ctx.fillStyle = item.color; ctx.fillRect(lx, ly + i * 17, 14, 3);
+      ctx.fillStyle = '#8b9dc3'; ctx.fillText(item.label, lx + 20, ly + i * 17 + 5);
     });
 
     // Tool hint
@@ -444,12 +470,33 @@ export default function Canvas2D({ isMobile }) {
     interaction.mode === 'resizing' ? 'nwse-resize' :
     selectedTool === 'rectangle' ? 'crosshair' : 'default';
 
+  const zoomIn = useCallback(() => setZoomScale((z) => Math.min(4, z * 1.25)), []);
+  const zoomOut = useCallback(() => setZoomScale((z) => Math.max(0.2, z / 1.25)), []);
+  const zoomReset = useCallback(() => { setZoomScale(1); setPanOffset({ x: 0, y: 0 }); }, []);
+
+  // Scroll wheel zoom
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    setZoomScale((z) => Math.min(4, Math.max(0.2, z * (e.deltaY > 0 ? 0.92 : 1.08))));
+  }, []);
+
   return (
     <div ref={containerRef} className="canvas-2d"
       onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      onWheel={handleWheel}
       style={{ cursor, touchAction: 'none' }}>
       <canvas ref={canvasRef} className="canvas-2d__canvas" />
+      {/* Zoom Controls */}
+      {!isMobile && (
+        <div className="zoom-controls" id="zoom-controls">
+          <button className="zoom-controls__btn" onClick={zoomOut} aria-label="Zoom out" data-tooltip="Zoom Out">−</button>
+          <div className="zoom-controls__divider" />
+          <span className="zoom-controls__pct" onClick={zoomReset} title="Reset zoom">{Math.round(zoomScale * 100)}%</span>
+          <div className="zoom-controls__divider" />
+          <button className="zoom-controls__btn" onClick={zoomIn} aria-label="Zoom in" data-tooltip="Zoom In">+</button>
+        </div>
+      )}
     </div>
   );
 }

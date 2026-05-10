@@ -1,9 +1,11 @@
-/* BOM Bar */
+/* BOM Bar — Premium summary bar */
 .bom-bar {
-  background: var(--bg-secondary);
+  background: var(--glass-bg-solid);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-default);
   z-index: 100;
-  transition: max-height var(--transition-smooth);
+  transition: max-height 400ms cubic-bezier(0.4, 0, 0.2, 1);
   max-height: var(--bom-height);
   overflow: hidden;
 }
@@ -24,7 +26,7 @@
   outline: none;
 }
 .bom-bar__summary:hover {
-  background: var(--bg-hover);
+  background: rgba(78, 142, 247, 0.04);
 }
 .bom-bar__summary:focus-visible {
   box-shadow: inset 0 0 0 2px var(--accent-primary);
@@ -38,7 +40,7 @@
 }
 .bom-bar__title {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
 }
 .bom-bar__parts-count {
@@ -56,10 +58,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-2);
+  padding: 3px var(--space-2);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   border-radius: 99px;
+  transition: all var(--transition-base);
+}
+.bom-bar__chip:hover {
+  border-color: var(--border-glow);
 }
 .bom-bar__chip-label {
   font-size: var(--text-xs);
@@ -80,15 +86,15 @@
 .bom-bar__sqft {
   font-size: var(--text-sm);
   color: var(--accent-primary);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Category badge colors */
-.badge--framing { background: rgba(59, 130, 246, 0.12); color: #60a5fa; border-color: rgba(59, 130, 246, 0.25); }
-.badge--decking { background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-color: rgba(245, 158, 11, 0.25); }
-.badge--foundation { background: rgba(139, 92, 246, 0.12); color: #a78bfa; border-color: rgba(139, 92, 246, 0.25); }
-.badge--hardware { background: rgba(34, 197, 94, 0.12); color: #4ade80; border-color: rgba(34, 197, 94, 0.25); }
-.badge--stairs { background: rgba(236, 72, 153, 0.12); color: #f472b6; border-color: rgba(236, 72, 153, 0.25); }
+.badge--framing { background: rgba(78, 142, 247, 0.1); color: #6da3ff; border: 1px solid rgba(78, 142, 247, 0.2); }
+.badge--decking { background: rgba(245, 166, 35, 0.1); color: #ffc552; border: 1px solid rgba(245, 166, 35, 0.2); }
+.badge--foundation { background: rgba(155, 109, 255, 0.1); color: #b794ff; border: 1px solid rgba(155, 109, 255, 0.2); }
+.badge--hardware { background: rgba(52, 211, 153, 0.1); color: #5ee8b7; border: 1px solid rgba(52, 211, 153, 0.2); }
+.badge--stairs { background: rgba(244, 114, 182, 0.1); color: #f9a8d4; border: 1px solid rgba(244, 114, 182, 0.2); }
 .badge--sm { font-size: 9px; padding: 1px 6px; }
 
 /* BOM Table */
@@ -117,20 +123,28 @@
   padding: var(--space-2) var(--space-2);
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--transition-fast);
 }
 .bom-bar__table tr:hover td {
-  background: var(--bg-hover);
+  background: rgba(78, 142, 247, 0.04);
 }
 .bom-bar__qty {
   color: var(--accent-warm) !important;
   font-weight: 700;
   text-align: right;
+  font-family: var(--font-mono);
 }
 .bom-bar__total-row td {
   border-top: 2px solid var(--border-default);
   border-bottom: none;
   padding-top: var(--space-3);
   color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+/* Copy button */
+.bom-bar__copy-btn {
+  margin-left: auto;
 }
 
 /* ===== MOBILE BOM ===== */
@@ -168,6 +182,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  transition: border-color var(--transition-base);
+}
+.bom-card:hover {
+  border-color: var(--border-glow);
 }
 .bom-card__header {
   display: flex;
@@ -178,6 +196,7 @@
   font-size: var(--text-lg);
   font-weight: 800;
   color: var(--accent-warm);
+  font-family: var(--font-mono);
 }
 .bom-card__desc {
   font-size: var(--text-sm);
