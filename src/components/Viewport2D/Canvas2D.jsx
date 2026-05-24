@@ -445,6 +445,18 @@ export default function Canvas2D({ isMobile }) {
       ctx.fillText(String(secIdx + 1), badgeX + 10, badgeY + 10);
       ctx.textBaseline = 'alphabetic';
 
+      // Section height label
+      ctx.fillStyle = isLightTheme ? 'rgba(15, 23, 42, 0.65)' : 'rgba(232, 237, 245, 0.65)';
+      ctx.font = '600 11px "JetBrains Mono"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (sec.type === 'landing') {
+        ctx.fillText(`H: ${sec.height}"`, sx + sw / 2, sy + sd / 2 + 14);
+      } else {
+        ctx.fillText(`H: ${sec.height}"`, sx + sw / 2, sy + sd / 2);
+      }
+      ctx.textBaseline = 'alphabetic';
+
       // Resize handles (selected only)
       if (isSelected && selectedTool === 'select') {
         const handles = getHandlePositions(sec, S);

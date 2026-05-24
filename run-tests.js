@@ -253,6 +253,34 @@ test('5. Theme state toggle: defaults to dark, persists to localStorage and rest
   assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
 });
 
+test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip', () => {
+  const sections = [
+    {
+      id: 'sec-deck-low',
+      x: 0, y: 0, width: 144, depth: 144, height: 36,
+      type: 'deck'
+    },
+    {
+      id: 'sec-deck-high',
+      x: 144, y: 0, width: 144, depth: 144, height: 60,
+      type: 'deck'
+    }
+  ];
+  const materials = { species: 'Pine' };
+
+  // Round-trip
+  const serialized = serializeProject('Multi Height Test', sections, materials);
+  validateProjectData(serialized);
+
+  // Assert both section heights survived
+  const restoredLow = serialized.sections.find(s => s.id === 'sec-deck-low');
+  const restoredHigh = serialized.sections.find(s => s.id === 'sec-deck-high');
+  assert.ok(restoredLow, 'Low section should exist');
+  assert.ok(restoredHigh, 'High section should exist');
+  assert.strictEqual(restoredLow.height, 36, 'Low section height (36) should survive');
+  assert.strictEqual(restoredHigh.height, 60, 'High section height (60) should survive');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

@@ -93,7 +93,8 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   return (
     <group>
       {posts.map((post, i) => {
-        const postHeight = post.height + Math.abs(topOfPost);
+        // Stretch post from section vertical height down to ground level (Y = -5 ft = -60 inches)
+        const postHeight = post.height + 60 + topOfPost;
         return (
           <mesh
             key={`post-${i}`}
@@ -345,7 +346,7 @@ export default function Scene3D() {
           const calcs = sectionCalcs[sec.id];
           if (!calcs) return null;
           return (
-            <group key={sec.id} position={[sec.x * IN, 0, sec.y * IN]}>
+            <group key={sec.id} position={[sec.x * IN, sec.height * IN, sec.y * IN]}>
               <DeckBoards width={sec.width} depth={sec.depth} species={materials.species} deckBoardSize={materials.deckBoardSize} />
               <Joists positions={calcs.joists.positions} depth={sec.depth} joistSize={materials.joistSize} />
               <Beams beamPositions={calcs.beams.positions} width={sec.width} beamConfig={materials.beamConfig} joistSize={materials.joistSize} />
