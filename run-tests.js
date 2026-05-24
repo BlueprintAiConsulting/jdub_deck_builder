@@ -52,10 +52,10 @@ global.document = {
   }
 };
 
-// ─── IMPORT TARGET MODULES ───
 const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
+const { isPointInPolygon, hitTestSection } = await import('./src/components/Viewport2D/Canvas2D.jsx');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -571,6 +571,79 @@ test('14. Save/load round-trip validation with new vertices array and schema ver
   // Verify complete structural preservation
   assert.deepStrictEqual(serialized.sections, sections, 'Serialized sections must deeply match original input');
   assert.deepStrictEqual(serialized.materials, materials, 'Serialized materials must deeply match original input');
+});
+
+test('15. Point-in-polygon selection: hit-testing successfully validates points inside polygon and rejects points outside', () => {
+  const triangleVertices = [
+    { x: 0, y: 0 },
+    { x: 120, y: 0 },
+    { x: 60, y: 120 }
+  ];
+  
+  // Point (60, 50) is inside the triangle
+  assert.strictEqual(isPointInPolygon(60, 50, triangleVertices), true, 'Point (60, 50) should be inside the triangle');
+  
+  // Point (10, 100) is outside the triangle (under the bottom-left diagonal edge) but inside its bounding box (0,0 to 120,120)
+  assert.strictEqual(isPointInPolygon(10, 100, triangleVertices), false, 'Point (10, 100) should be outside the triangle (under hypotenuse)');
+  
+  // Point (110, 100) is outside the triangle (under the bottom-right diagonal edge)
+  assert.strictEqual(isPointInPolygon(110, 100, triangleVertices), false, 'Point (110, 100) should be outside the triangle');
+
+  // Let's test hitTestSection using a mock list of sections
+  const mockSections = [
+    {
+      id: 'tri-deck',
+      x: 0, y: 0, width: 120, depth: 120,
+      vertices: triangleVertices
+    }
+  ];
+
+  // Point (60, 50) inside the triangle in layout coordinates should select tri-deck
+  const hit1 = hitTestSection(60, 50, mockSections, 1, 0, 0, 0, 0);
+  assert.strictEqual(hit1, 'tri-deck', 'Clicking inside the polygon should select it');
+
+  // Point (10, 100) outside the triangle but inside the bounding box should return null (not selected)
+  const hit2 = hitTestSection(10, 100, mockSections, 1, 0, 0, 0, 0);
+  assert.strictEqual(hit2, null, 'Clicking outside the polygon path (but inside the bounding box) should NOT select it');
+});
+
+test('16. Rigid body dragging: moving a section rigidly shifts all vertices by the displacement delta', () => {
+  const store = useDeckStore.getState();
+  const triangleVertices = [
+    { x: 0, y: 0 },
+    { x: 120, y: 0 },
+    { x: 60, y: 120 }
+  ];
+  const customSection = {
+    id: 'poly-drag-test',
+    x: 0, y: 0, width: 120, depth: 120, height: 36,
+    ledgerAttached: true,
+    railings: { n: false, s: false, e: false, w: false },
+    stairs: null,
+    type: 'deck',
+    vertices: triangleVertices
+  };
+  
+  useDeckStore.getState().loadProject([customSection], { species: 'SYP' });
+  
+  const loaded = useDeckStore.getState().sections.find(s => s.id === 'poly-drag-test');
+  assert.ok(loaded, 'Loaded custom section should exist');
+  assert.deepStrictEqual(loaded.vertices, triangleVertices, 'Vertices should match starting state');
+
+  // Drag it by dx = 24, dy = 48
+  useDeckStore.getState().moveSection('poly-drag-test', 24, 48);
+  
+  const moved = useDeckStore.getState().sections.find(s => s.id === 'poly-drag-test');
+  assert.strictEqual(moved.x, 24, 'Base X coordinate must be updated to 24');
+  assert.strictEqual(moved.y, 48, 'Base Y coordinate must be updated to 48');
+  
+  // Verify vertices shifted rigidly (no distortion)
+  const expectedVertices = [
+    { x: 0 + 24, y: 0 + 48 },
+    { x: 120 + 24, y: 0 + 48 },
+    { x: 60 + 24, y: 120 + 48 }
+  ];
+  assert.deepStrictEqual(moved.vertices, expectedVertices, 'Vertices must shift rigidly by translation delta (+24, +48)');
 });
 
 // ─── EXECUTE ALL TESTS ───

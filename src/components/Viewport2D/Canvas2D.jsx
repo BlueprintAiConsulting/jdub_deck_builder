@@ -51,13 +51,27 @@ function hitTestHandles(mx, my, sec, S, panX, panY, cw, ch) {
   return null;
 }
 
-function hitTestSection(mx, my, sections, S, panX, panY, cw, ch) {
+export function isPointInPolygon(px, py, vertices) {
+  if (!vertices || vertices.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const xi = vertices[i].x, yi = vertices[i].y;
+    const xj = vertices[j].x, yj = vertices[j].y;
+
+    const intersect = ((yi > py) !== (yj > py))
+        && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
+  const lx = (mx - ox) / S;
+  const ly = (my - oy) / S;
   for (let i = sections.length - 1; i >= 0; i--) {
     const sec = sections[i];
-    const sx = sec.x * S + ox, sy = sec.y * S + oy;
-    const sw = sec.width * S, sd = sec.depth * S;
-    if (mx >= sx && mx <= sx + sw && my >= sy && my <= sy + sd) return sec.id;
+    if (isPointInPolygon(lx, ly, sec.vertices)) return sec.id;
   }
   return null;
 }

@@ -256,19 +256,24 @@ export const useDeckStore = create((set, get) => ({
     const state = get();
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
-      const moved = { ...s, x: snapToGrid(newX), y: snapToGrid(newY) };
+      const moved = { ...s };
+      moved.x = snapToGrid(newX);
+      moved.y = snapToGrid(newY);
+
       // Edge snap
       const snaps = findEdgeSnap(moved, state.sections);
       if (snaps.x !== null) moved.x = snaps.x;
       if (snaps.y !== null) moved.y = snaps.y;
 
-      // Update vertices
-      moved.vertices = [
-        { x: moved.x, y: moved.y },
-        { x: moved.x + moved.width, y: moved.y },
-        { x: moved.x + moved.width, y: moved.y + moved.depth },
-        { x: moved.x, y: moved.y + moved.depth }
-      ];
+      // Calculate translation delta
+      const dx = moved.x - s.x;
+      const dy = moved.y - s.y;
+
+      // Move all vertices rigidly by the displacement delta
+      moved.vertices = s.vertices.map((v) => ({
+        x: v.x + dx,
+        y: v.y + dy
+      }));
       return moved;
     });
     // No recalculate needed for position-only moves (structure unchanged)
