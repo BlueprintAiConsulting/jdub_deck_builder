@@ -1,7 +1,16 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useDeckStore } from '../../store/deckStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatDimension } from '../../utils/units';
+import {
+  downloadProjectFile,
+  saveProjectToLocalStorage,
+  loadProjectFromLocalStorage,
+  deleteProjectFromLocalStorage,
+  listRecentProjects,
+  parseDeckFile
+} from '../../lib/projectIO';
 import './Toolbar.css';
 
 function exportPDF() {
@@ -167,26 +176,196 @@ export default function Toolbar({ isMobile }) {
     return { joists: c.joists.count, beams: c.beams.count, posts: c.posts.posts.length };
   }));
 
+  // Project save/load states
+  const [currentProjectName, setCurrentProjectName] = useState('');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showOpenModal, setShowOpenModal] = useState(false);
+  const [tempProjectName, setTempProjectName] = useState('');
+  const [recentProjects, setRecentProjects] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const sections = useDeckStore((s) => s.sections);
+  const materials = useDeckStore((s) => s.materials);
+  const loadProject = useDeckStore((s) => s.loadProject);
+
+  const confirmSaveAs = () => {
+    const trimmed = tempProjectName.trim();
+    if (!trimmed) return;
+    
+    setCurrentProjectName(trimmed);
+    setShowSaveModal(false);
+    
+    // Save to local file & localStorage
+    downloadProjectFile(trimmed, sections, materials);
+    saveProjectToLocalStorage(trimmed, sections, materials);
+  };
+
+  const handleSaveAsClick = useCallback(() => {
+    setTempProjectName(currentProjectName || 'My Deck Project');
+    setShowSaveModal(true);
+  }, [currentProjectName]);
+
+  const handleSaveClick = useCallback(() => {
+    if (!currentProjectName) {
+      handleSaveAsClick();
+    } else {
+      downloadProjectFile(currentProjectName, sections, materials);
+      saveProjectToLocalStorage(currentProjectName, sections, materials);
+    }
+  }, [currentProjectName, sections, materials, handleSaveAsClick]);
+
+  const handleOpenClick = () => {
+    setRecentProjects(listRecentProjects());
+    setShowOpenModal(true);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = await parseDeckFile(file);
+      loadProject(data.sections, data.materials);
+      setCurrentProjectName(data.projectName || file.name.replace(/\.deck$/, ''));
+      setShowOpenModal(false);
+    } catch (err) {
+      alert(err.message || 'Error loading project file.');
+    }
+    e.target.value = '';
+  };
+
+  const handleLoadRecent = (name) => {
+    try {
+      const data = loadProjectFromLocalStorage(name);
+      loadProject(data.sections, data.materials);
+      setCurrentProjectName(name);
+      setShowOpenModal(false);
+    } catch (err) {
+      alert(err.message || 'Error loading project.');
+    }
+  };
+
+  const handleDeleteRecent = (e, name) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+      deleteProjectFromLocalStorage(name);
+      setRecentProjects(listRecentProjects());
+    }
+  };
+
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e) => {
     const isMeta = e.metaKey || e.ctrlKey;
     if (isMeta && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     if (isMeta && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
     if (isMeta && e.key === 'y') { e.preventDefault(); redo(); }
+    if (isMeta && e.key === 's') { e.preventDefault(); handleSaveClick(); }
     if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('2d');
     if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('3d');
-  }, [undo, redo, setViewMode]);
+  }, [undo, redo, setViewMode, handleSaveClick]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  const renderModals = () => {
+    return createPortal(
+      <>
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".deck"
+          style={{ display: 'none' }}
+        />
+
+        {/* Save Modal */}
+        {showSaveModal && (
+          <div className="toolbar-modal__backdrop" onClick={() => setShowSaveModal(false)}>
+            <div className="toolbar-modal__card" onClick={(e) => e.stopPropagation()}>
+              <h3 className="toolbar-modal__title">Save Project As</h3>
+              <div className="toolbar-modal__body">
+                <label htmlFor="modalProjectName" className="label">Project Name</label>
+                <input
+                  id="modalProjectName"
+                  className="input"
+                  type="text"
+                  value={tempProjectName}
+                  onChange={(e) => setTempProjectName(e.target.value)}
+                  placeholder="Enter project name..."
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      confirmSaveAs();
+                    }
+                  }}
+                />
+              </div>
+              <div className="toolbar-modal__actions">
+                <button className="btn btn--ghost" onClick={() => setShowSaveModal(false)}>Cancel</button>
+                <button className="btn btn--primary" onClick={confirmSaveAs} disabled={!tempProjectName.trim()}>Save</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Open Modal */}
+        {showOpenModal && (
+          <div className="toolbar-modal__backdrop" onClick={() => setShowOpenModal(false)}>
+            <div className="toolbar-modal__card" onClick={(e) => e.stopPropagation()}>
+              <h3 className="toolbar-modal__title">Open Project</h3>
+              <div className="toolbar-modal__body">
+                <button className="btn btn--primary btn--full" onClick={() => fileInputRef.current?.click()} style={{ marginBottom: '16px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  Upload .deck File
+                </button>
+
+                <h4 className="toolbar-modal__subtitle">Recent Projects</h4>
+                {recentProjects.length === 0 ? (
+                  <p className="toolbar-modal__empty">No recent projects found on this device.</p>
+                ) : (
+                  <div className="toolbar-modal__recents-list">
+                    {recentProjects.map((name) => (
+                      <div key={name} className="toolbar-modal__recent-item" onClick={() => handleLoadRecent(name)}>
+                        <span className="toolbar-modal__recent-name">{name}</span>
+                        <button
+                          className="btn btn--ghost btn--sm btn--icon toolbar-modal__delete-btn"
+                          onClick={(e) => handleDeleteRecent(e, name)}
+                          aria-label={`Delete ${name}`}
+                          title="Delete project"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="toolbar-modal__actions">
+                <button className="btn btn--ghost" onClick={() => setShowOpenModal(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>,
+      document.body
+    );
+  };
+
   if (isMobile) {
     return (
       <header className="toolbar toolbar--mobile" id="main-toolbar">
         <div className="toolbar__brand toolbar__brand--mobile">
-          <span className="toolbar__title toolbar__title--mobile">DeckForge</span>
+          <span className="toolbar__title toolbar__title--mobile">
+            DeckForge
+            {currentProjectName && <span className="toolbar__project-name-mobile"> | {currentProjectName}</span>}
+          </span>
         </div>
 
         <div className="toolbar__view-toggle toolbar__view-toggle--mobile">
@@ -220,6 +399,18 @@ export default function Toolbar({ isMobile }) {
           </svg>
         </button>
 
+        {/* Mobile Open & Save */}
+        <button className="btn btn--ghost btn--icon" onClick={handleOpenClick} aria-label="Open Project" id="btn-open-mobile">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+        </button>
+        <button className="btn btn--ghost btn--icon" onClick={handleSaveClick} aria-label="Save Project" id="btn-save-mobile">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          </svg>
+        </button>
+
         <button className="btn btn--primary btn--icon toolbar__export-mobile" onClick={exportPDF} aria-label="Export PDF" id="btn-export">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -227,6 +418,7 @@ export default function Toolbar({ isMobile }) {
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
         </button>
+        {renderModals()}
       </header>
     );
   }
@@ -252,7 +444,10 @@ export default function Toolbar({ isMobile }) {
             <rect x="6" y="10" width="52" height="4" rx="1" fill="#f5a623" opacity="0.5"/>
           </svg>
         </div>
-        <span className="toolbar__title">DeckForge</span>
+        <span className="toolbar__title">
+          DeckForge
+          {currentProjectName && <span className="toolbar__project-name"> | {currentProjectName}</span>}
+        </span>
       </div>
 
       <div className="toolbar__group">
@@ -305,11 +500,36 @@ export default function Toolbar({ isMobile }) {
       <div style={{ flex: 1 }} />
 
       <div className="toolbar__group">
+        {/* Save & Load controls */}
+        <button className="btn btn--secondary btn--icon" onClick={handleOpenClick} aria-label="Open design" data-tooltip="Open Design" id="btn-open">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          Open
+        </button>
+        <button className="btn btn--secondary btn--icon" onClick={handleSaveClick} aria-label="Save design" data-tooltip="Save Design" id="btn-save">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save
+        </button>
+        <button className="btn btn--secondary btn--icon" onClick={handleSaveAsClick} aria-label="Save design as" data-tooltip="Save Design As" id="btn-save-as">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Save As
+        </button>
+        
         <button className="btn btn--primary" id="btn-export" onClick={exportPDF} aria-label="Export PDF report" data-tooltip="Export PDF Report">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export PDF
         </button>
       </div>
+      {renderModals()}
     </header>
   );
 }

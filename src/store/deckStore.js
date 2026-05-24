@@ -345,4 +345,28 @@ export const useDeckStore = create((set, get) => ({
       historyIndex: 0,
     });
   },
+
+  loadProject: (sections, materials) => {
+    const results = recalculateAll(sections, materials);
+    
+    // Dynamically update nextId to avoid conflicts with existing section IDs
+    let maxId = 0;
+    sections.forEach((s) => {
+      const match = s.id.match(/^sec-(\d+)$/);
+      if (match) {
+        const idNum = parseInt(match[1]);
+        if (idNum > maxId) maxId = idNum;
+      }
+    });
+    nextId = maxId + 1;
+
+    set({
+      sections: sections.map((s) => ({ ...s })),
+      selectedSectionId: sections[0]?.id || null,
+      materials: { ...materials },
+      ...results,
+      history: [{ sections: sections.map((s) => ({ ...s })), materials: { ...materials } }],
+      historyIndex: 0,
+    });
+  },
 }));
