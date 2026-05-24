@@ -31,7 +31,7 @@ const DEFAULT_MATERIALS = {
 };
 
 function createSection(overrides = {}) {
-  return {
+  const base = {
     id: uid(),
     x: 0,           // position in inches (canvas origin)
     y: 0,
@@ -42,8 +42,17 @@ function createSection(overrides = {}) {
     railings: { n: false, s: false, e: false, w: false },
     stairs: null,    // null | 'n' | 's' | 'e' | 'w'
     type: 'deck',    // 'deck' | 'landing'
-    ...overrides,
   };
+  const merged = { ...base, ...overrides };
+  if (!merged.vertices) {
+    merged.vertices = [
+      { x: merged.x, y: merged.y },
+      { x: merged.x + merged.width, y: merged.y },
+      { x: merged.x + merged.width, y: merged.y + merged.depth },
+      { x: merged.x, y: merged.y + merged.depth }
+    ];
+  }
+  return merged;
 }
 
 function recalculateSection(section, materials) {
@@ -201,6 +210,14 @@ export const useDeckStore = create((set, get) => ({
     if (snaps.x !== null) sec.x = snaps.x;
     if (snaps.y !== null) sec.y = snaps.y;
 
+    // Recalculate vertices with final position
+    sec.vertices = [
+      { x: sec.x, y: sec.y },
+      { x: sec.x + sec.width, y: sec.y },
+      { x: sec.x + sec.width, y: sec.y + sec.depth },
+      { x: sec.x, y: sec.y + sec.depth }
+    ];
+
     const newSections = [...state.sections, sec];
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
@@ -244,6 +261,14 @@ export const useDeckStore = create((set, get) => ({
       const snaps = findEdgeSnap(moved, state.sections);
       if (snaps.x !== null) moved.x = snaps.x;
       if (snaps.y !== null) moved.y = snaps.y;
+
+      // Update vertices
+      moved.vertices = [
+        { x: moved.x, y: moved.y },
+        { x: moved.x + moved.width, y: moved.y },
+        { x: moved.x + moved.width, y: moved.y + moved.depth },
+        { x: moved.x, y: moved.y + moved.depth }
+      ];
       return moved;
     });
     // No recalculate needed for position-only moves (structure unchanged)
@@ -266,12 +291,22 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
       const minSize = s.type === 'landing' ? 36 : 48;
+      const x = updates.x !== undefined ? snapToGrid(updates.x) : s.x;
+      const y = updates.y !== undefined ? snapToGrid(updates.y) : s.y;
+      const width = Math.max(minSize, snapToGrid(updates.width !== undefined ? updates.width : s.width));
+      const depth = Math.max(minSize, snapToGrid(updates.depth !== undefined ? updates.depth : s.depth));
       return {
         ...s,
-        x: updates.x !== undefined ? snapToGrid(updates.x) : s.x,
-        y: updates.y !== undefined ? snapToGrid(updates.y) : s.y,
-        width: Math.max(minSize, snapToGrid(updates.width !== undefined ? updates.width : s.width)),
-        depth: Math.max(minSize, snapToGrid(updates.depth !== undefined ? updates.depth : s.depth)),
+        x,
+        y,
+        width,
+        depth,
+        vertices: [
+          { x, y },
+          { x: x + width, y },
+          { x: x + width, y: y + depth },
+          { x, y: y + depth }
+        ]
       };
     });
     const results = recalculateAll(newSections, state.materials);
@@ -363,7 +398,14 @@ export const useDeckStore = create((set, get) => ({
     const newMaterials = { ...state.materials, ...materialUpdates };
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
-      return { ...s, ...sectionUpdates };
+      const updated = { ...s, ...sectionUpdates };
+      updated.vertices = [
+        { x: updated.x, y: updated.y },
+        { x: updated.x + updated.width, y: updated.y },
+        { x: updated.x + updated.width, y: updated.y + updated.depth },
+        { x: updated.x, y: updated.y + updated.depth }
+      ];
+      return updated;
     });
 
     const results = recalculateAll(newSections, newMaterials);
@@ -442,10 +484,17 @@ export const useDeckStore = create((set, get) => ({
           direction: stairObj,
         };
       }
+      const vertices = s.vertices || [
+        { x: s.x, y: s.y },
+        { x: s.x + s.width, y: s.y },
+        { x: s.x + s.width, y: s.y + s.depth },
+        { x: s.x, y: s.y + s.depth }
+      ];
       return {
         ...s,
         type,
-        stairs: stairObj
+        stairs: stairObj,
+        vertices
       };
     });
 

@@ -3,7 +3,7 @@
  * Handles serialization, file download (.deck), validation, and localStorage storage.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * Serialize a project state to a standard JS object.
@@ -119,6 +119,25 @@ export function validateProjectData(data) {
   }
   if (!data.schemaVersion) {
     throw new Error('Invalid project file: schemaVersion is missing.');
+  }
+  if (data.schemaVersion === 1) {
+    if (Array.isArray(data.sections)) {
+      data.sections.forEach((sec) => {
+        if (!sec.vertices) {
+          const x = sec.x !== undefined ? sec.x : 0;
+          const y = sec.y !== undefined ? sec.y : 0;
+          const width = sec.width !== undefined ? sec.width : 192;
+          const depth = sec.depth !== undefined ? sec.depth : 144;
+          sec.vertices = [
+            { x, y },
+            { x: x + width, y },
+            { x: x + width, y: y + depth },
+            { x, y: y + depth }
+          ];
+        }
+      });
+    }
+    data.schemaVersion = 2;
   }
   if (data.schemaVersion !== SCHEMA_VERSION) {
     throw new Error(`Unsupported schemaVersion. Found: ${data.schemaVersion}, Expected: ${SCHEMA_VERSION}.`);

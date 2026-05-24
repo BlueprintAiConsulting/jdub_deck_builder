@@ -254,7 +254,7 @@ test('5. Theme state toggle: defaults to dark, persists to localStorage and rest
   assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
 });
 
-test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip with schemaVersion 1', () => {
+test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip with schemaVersion 2', () => {
   const sections = [
     {
       id: 'sec-deck-low',
@@ -272,8 +272,8 @@ test('6. Multi-level heights check: multiple sections with different heights sur
   // Round-trip
   const serialized = serializeProject('Multi Height Test', sections, materials);
 
-  // Assert schemaVersion remains exactly 1 and multi-level did not alter serialization schema version
-  assert.strictEqual(serialized.schemaVersion, 1, 'schemaVersion must remain exactly 1 after multi-level implementation');
+  // Assert schemaVersion is 2
+  assert.strictEqual(serialized.schemaVersion, 2, 'schemaVersion must be 2 after polygon phase 1');
 
   validateProjectData(serialized);
 
@@ -340,6 +340,125 @@ test('8. Post-length calculation: a taller section yields longer posts in struct
 
   // Assert post height is taller
   assert.ok(post60Height > post36Height, 'Taller deck sections must yield longer posts');
+});
+
+test('9. Vertices initialization and synchronization: store sections must contain correct 4-corner vertices loop', () => {
+  const store = useDeckStore.getState();
+  
+  // Verify initial section has vertices
+  const initialSec = store.sections[0];
+  assert.ok(Array.isArray(initialSec.vertices), 'Initial section must have vertices array');
+  assert.strictEqual(initialSec.vertices.length, 4, 'Vertices array must have 4 corners');
+  
+  // Verify correct loop: [ {x, y}, {x+width, y}, {x+width, y+depth}, {x, y+depth} ]
+  const expectedVertices = [
+    { x: initialSec.x, y: initialSec.y },
+    { x: initialSec.x + initialSec.width, y: initialSec.y },
+    { x: initialSec.x + initialSec.width, y: initialSec.y + initialSec.depth },
+    { x: initialSec.x, y: initialSec.y + initialSec.depth }
+  ];
+  assert.deepStrictEqual(initialSec.vertices, expectedVertices, 'Vertices must match the rectangular bounding box');
+
+  // Verify updates in resizeSection
+  useDeckStore.getState().resizeSection(initialSec.id, { width: 240, depth: 180 });
+  const resizedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(resizedSec.width, 240, 'Width should be updated to 240');
+  assert.strictEqual(resizedSec.depth, 180, 'Depth should be updated to 180');
+  const expectedResizedVertices = [
+    { x: resizedSec.x, y: resizedSec.y },
+    { x: resizedSec.x + 240, y: resizedSec.y },
+    { x: resizedSec.x + 240, y: resizedSec.y + 180 },
+    { x: resizedSec.x, y: resizedSec.y + 180 }
+  ];
+  assert.deepStrictEqual(resizedSec.vertices, expectedResizedVertices, 'Vertices must match resized bounding box');
+  
+  // Verify updates in moveSection
+  useDeckStore.getState().moveSection(initialSec.id, 12, 24);
+  const movedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(movedSec.x, 12, 'X coordinate should update to 12');
+  assert.strictEqual(movedSec.y, 24, 'Y coordinate should update to 24');
+  const expectedMovedVertices = [
+    { x: 12, y: 24 },
+    { x: 12 + movedSec.width, y: 24 },
+    { x: 12 + movedSec.width, y: 24 + movedSec.depth },
+    { x: 12, y: 24 + movedSec.depth }
+  ];
+  assert.deepStrictEqual(movedSec.vertices, expectedMovedVertices, 'Vertices must match moved bounding box');
+});
+
+test('10. Newly saved projects write schemaVersion 2 with vertices included', () => {
+  const sections = [
+    {
+      id: 'sec-save-test',
+      x: 24, y: 36, width: 120, depth: 96, height: 36,
+      ledgerAttached: true,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: null,
+      type: 'deck',
+      vertices: [
+        { x: 24, y: 36 },
+        { x: 144, y: 36 },
+        { x: 144, y: 132 },
+        { x: 24, y: 132 }
+      ]
+    }
+  ];
+  const materials = { species: 'SYP' };
+
+  const serialized = serializeProject('Save Test V2', sections, materials);
+  
+  assert.strictEqual(serialized.schemaVersion, 2, 'Newly saved project must have schemaVersion 2');
+  assert.ok(Array.isArray(serialized.sections[0].vertices), 'Serialized section must contain vertices');
+  assert.strictEqual(serialized.sections[0].vertices.length, 4, 'Serialized section vertices must have 4 elements');
+  assert.deepStrictEqual(serialized.sections[0].vertices, sections[0].vertices, 'Serialized vertices must match original vertices');
+});
+
+test('11. Migration adapter: loaded schemaVersion 1 project upgrades to schemaVersion 2 and populates vertices with no data loss', () => {
+  const legacyProject = {
+    schemaVersion: 1,
+    projectName: 'Legacy Load Test',
+    sections: [
+      {
+        id: 'legacy-sec-1',
+        x: 12, y: 24, width: 144, depth: 120, height: 36,
+        ledgerAttached: true,
+        railings: { n: false, s: false, e: false, w: false },
+        stairs: null,
+        type: 'deck'
+      }
+    ],
+    materials: {
+      joistSize: '2x8',
+      joistSpacing: 16,
+      species: 'SYP'
+    }
+  };
+
+  // Perform migration (validateProjectData upgrades in-place)
+  validateProjectData(legacyProject);
+
+  assert.strictEqual(legacyProject.schemaVersion, 2, 'Legacy project must be upgraded to schemaVersion 2');
+  
+  const upgradedSec = legacyProject.sections[0];
+  assert.ok(Array.isArray(upgradedSec.vertices), 'Upgraded section must have vertices populated');
+  assert.strictEqual(upgradedSec.vertices.length, 4, 'Upgraded vertices must have 4 corners');
+  
+  const expectedVertices = [
+    { x: 12, y: 24 },
+    { x: 12 + 144, y: 24 },
+    { x: 12 + 144, y: 24 + 120 },
+    { x: 12, y: 24 + 120 }
+  ];
+  assert.deepStrictEqual(upgradedSec.vertices, expectedVertices, 'Upgraded vertices must match bounding box');
+  
+  // Assert other data was preserved (no data loss)
+  assert.strictEqual(upgradedSec.id, 'legacy-sec-1', 'ID should be preserved');
+  assert.strictEqual(upgradedSec.x, 12, 'X coordinate should be preserved');
+  assert.strictEqual(upgradedSec.y, 24, 'Y coordinate should be preserved');
+  assert.strictEqual(upgradedSec.width, 144, 'Width should be preserved');
+  assert.strictEqual(upgradedSec.depth, 120, 'Depth should be preserved');
+  assert.strictEqual(upgradedSec.height, 36, 'Height should be preserved');
+  assert.strictEqual(legacyProject.materials.species, 'SYP', 'Material species should be preserved');
 });
 
 // ─── EXECUTE ALL TESTS ───
