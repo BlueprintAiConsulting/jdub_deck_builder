@@ -461,6 +461,118 @@ test('11. Migration adapter: loaded schemaVersion 1 project upgrades to schemaVe
   assert.strictEqual(legacyProject.materials.species, 'SYP', 'Material species should be preserved');
 });
 
+test('12. Render geometry alignment: vertex-derived coordinates map exactly to width/depth/x/y rectangle bounds', () => {
+  const store = useDeckStore.getState();
+  useDeckStore.getState().resetDeck();
+  const sec = useDeckStore.getState().sections[0];
+  
+  // Calculate bounding box from vertices
+  const minX = Math.min(...sec.vertices.map(v => v.x));
+  const maxX = Math.max(...sec.vertices.map(v => v.x));
+  const minY = Math.min(...sec.vertices.map(v => v.y));
+  const maxY = Math.max(...sec.vertices.map(v => v.y));
+  
+  assert.strictEqual(minX, sec.x, 'Bounding box minX must match section x');
+  assert.strictEqual(maxX, sec.x + sec.width, 'Bounding box maxX must match section x + width');
+  assert.strictEqual(minY, sec.y, 'Bounding box minY must match section y');
+  assert.strictEqual(maxY, sec.y + sec.depth, 'Bounding box maxY must match section y + depth');
+  
+  // Verify vertex index-by-index loop alignment
+  assert.deepStrictEqual(sec.vertices[0], { x: sec.x, y: sec.y }, 'Vertex 0 must be top-left');
+  assert.deepStrictEqual(sec.vertices[1], { x: sec.x + sec.width, y: sec.y }, 'Vertex 1 must be top-right');
+  assert.deepStrictEqual(sec.vertices[2], { x: sec.x + sec.width, y: sec.y + sec.depth }, 'Vertex 2 must be bottom-right');
+  assert.deepStrictEqual(sec.vertices[3], { x: sec.x, y: sec.y + sec.depth }, 'Vertex 3 must be bottom-left');
+});
+
+test('13. Stairs, landings, and multi-level render calculations remain correct and consistent with vertices bounds', () => {
+  useDeckStore.getState().resetDeck();
+  
+  // Place a landing with a custom width/depth and height
+  const landingRect = { x: 48, y: 48, width: 36, depth: 36 };
+  useDeckStore.getState().addSection(landingRect, 'landing');
+  
+  // Find landing section
+  const landingSec = useDeckStore.getState().sections.find(s => s.type === 'landing');
+  assert.ok(landingSec, 'Landing section should exist');
+  assert.strictEqual(landingSec.width, 36, 'Landing width must be exactly 36');
+  assert.strictEqual(landingSec.depth, 36, 'Landing depth must be exactly 36');
+  
+  // Verify landing vertices bounds
+  const lMinX = Math.min(...landingSec.vertices.map(v => v.x));
+  const lMaxX = Math.max(...landingSec.vertices.map(v => v.x));
+  const lMinY = Math.min(...landingSec.vertices.map(v => v.y));
+  const lMaxY = Math.max(...landingSec.vertices.map(v => v.y));
+  
+  assert.strictEqual(lMinX, landingSec.x, 'Landing minX matches x');
+  assert.strictEqual(lMaxX - lMinX, 36, 'Landing vertices span exactly 36 inches in width');
+  assert.strictEqual(lMinY, landingSec.y, 'Landing minY matches y');
+  assert.strictEqual(lMaxY - lMinY, 36, 'Landing vertices span exactly 36 inches in depth');
+  
+  // Attach stairs to a deck section
+  const deckSec = useDeckStore.getState().sections.find(s => s.type === 'deck');
+  assert.ok(deckSec, 'Deck section should exist');
+  useDeckStore.getState().attachStairs(deckSec.id, 's');
+  
+  const updatedDeck = useDeckStore.getState().sections.find(s => s.id === deckSec.id);
+  assert.ok(updatedDeck.stairs, 'Stairs must be attached');
+  assert.strictEqual(updatedDeck.stairs.direction, 's', 'Stairs direction must be south');
+  
+  // Verify structural calculations are consistent with dimensions
+  const calcs = useDeckStore.getState().sectionCalcs[deckSec.id];
+  assert.ok(calcs, 'Structural calculations must exist');
+  assert.ok(calcs.joists.positions.length > 0, 'Must calculate joist positions');
+  assert.ok(calcs.posts.posts.length > 0, 'Must calculate post positions');
+  
+  // Ensure all calculated post coordinates lie within the bounds defined by the vertices
+  const dMinX = Math.min(...updatedDeck.vertices.map(v => v.x));
+  const dMaxX = Math.max(...updatedDeck.vertices.map(v => v.x));
+  const dMinY = Math.min(...updatedDeck.vertices.map(v => v.y));
+  const dMaxY = Math.max(...updatedDeck.vertices.map(v => v.y));
+  
+  calcs.posts.posts.forEach(post => {
+    assert.ok(post.x >= dMinX - 1 && post.x <= dMaxX + 1, `Post X (${post.x}) must lie within deck vertices width range [${dMinX}, ${dMaxX}]`);
+    assert.ok(post.y >= dMinY - 1 && post.y <= dMaxY + 1, `Post Y (${post.y}) must lie within deck vertices depth range [${dMinY}, ${dMaxY}]`);
+  });
+});
+
+test('14. Save/load round-trip validation with new vertices array and schema version 2 preserves all fields', () => {
+  const sections = [
+    {
+      id: 'sec-rt-1',
+      x: 0, y: 0, width: 144, depth: 120, height: 48,
+      ledgerAttached: true,
+      railings: { n: false, s: true, e: false, w: false },
+      stairs: { type: 'stair', width: 36, numberOfSteps: 6, rise: 7.25, run: 10, direction: 's' },
+      type: 'deck',
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 144, y: 0 },
+        { x: 144, y: 120 },
+        { x: 0, y: 120 }
+      ]
+    }
+  ];
+  const materials = {
+    joistSize: '2x8',
+    joistSpacing: 12,
+    species: 'Redwood',
+    beamConfig: '3-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'Composite',
+    soilCapacity: 3000
+  };
+
+  const serialized = serializeProject('Round Trip Phase 2', sections, materials);
+  
+  assert.strictEqual(serialized.schemaVersion, 2, 'Round-trip project must be saved under schemaVersion 2');
+  validateProjectData(serialized);
+  
+  // Verify complete structural preservation
+  assert.deepStrictEqual(serialized.sections, sections, 'Serialized sections must deeply match original input');
+  assert.deepStrictEqual(serialized.materials, materials, 'Serialized materials must deeply match original input');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
@@ -477,4 +589,11 @@ for (const t of tests) {
 }
 
 console.log(`\nTest Execution Completed: ${passes} passed, ${fails} failed.`);
+console.log('\n=============================================================');
+console.log('NOTE ON TEST COVERAGE boundaries:');
+console.log('These automated tests do NOT cover actual visual rendering');
+console.log('correctness (e.g. clipping paths drawing floorboards inside');
+console.log('custom vertices, or WebGL mesh geometry positioning in 3D).');
+console.log('Visual alignment must be manually verified in the browser.');
+console.log('=============================================================\n');
 process.exit(fails > 0 ? 1 : 0);
