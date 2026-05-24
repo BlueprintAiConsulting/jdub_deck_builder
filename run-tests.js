@@ -55,6 +55,7 @@ global.document = {
 // ─── IMPORT TARGET MODULES ───
 const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
+const { calculatePosts } = await import('./src/engine/structuralCalc.js');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -253,7 +254,7 @@ test('5. Theme state toggle: defaults to dark, persists to localStorage and rest
   assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
 });
 
-test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip', () => {
+test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip with schemaVersion 1', () => {
   const sections = [
     {
       id: 'sec-deck-low',
@@ -270,6 +271,10 @@ test('6. Multi-level heights check: multiple sections with different heights sur
 
   // Round-trip
   const serialized = serializeProject('Multi Height Test', sections, materials);
+
+  // Assert schemaVersion remains exactly 1 and multi-level did not alter serialization schema version
+  assert.strictEqual(serialized.schemaVersion, 1, 'schemaVersion must remain exactly 1 after multi-level implementation');
+
   validateProjectData(serialized);
 
   // Assert both section heights survived
@@ -279,6 +284,62 @@ test('6. Multi-level heights check: multiple sections with different heights sur
   assert.ok(restoredHigh, 'High section should exist');
   assert.strictEqual(restoredLow.height, 36, 'Low section height (36) should survive');
   assert.strictEqual(restoredHigh.height, 60, 'High section height (60) should survive');
+});
+
+test('7. Backward compatibility: legacy schemaVersion 1 project created before multi-level loads without error', () => {
+  const legacyProject = {
+    schemaVersion: 1,
+    projectName: 'Legacy Project',
+    sections: [
+      {
+        id: 'legacy-sec-1',
+        x: 0, y: 0, width: 192, depth: 144, height: 36,
+        ledgerAttached: true,
+        railings: { n: false, s: false, e: false, w: false },
+        stairs: null,
+        type: 'deck'
+      }
+    ],
+    materials: {
+      joistSize: '2x8',
+      joistSpacing: 16,
+      species: 'SYP',
+      beamConfig: '2-2x10',
+      postSize: '6x6',
+      deckBoardSize: '5/4x6',
+      deckMaterial: 'PT-SYP',
+      soilCapacity: 2000
+    }
+  };
+
+  // Validate legacy project
+  const isValid = validateProjectData(legacyProject);
+  assert.strictEqual(isValid, true, 'Legacy project file must validate successfully without any errors');
+});
+
+test('8. Post-length calculation: a taller section yields longer posts in structuralCalc.js', () => {
+  const mockBeams = {
+    length: 144,
+    maxSpan: 96,
+    positions: [120]
+  };
+
+  // Calculate posts for 36-inch height deck
+  const posts36Result = calculatePosts(mockBeams, 36, '6x6');
+  assert.ok(Array.isArray(posts36Result.posts), 'Result must contain a posts array');
+  assert.strictEqual(posts36Result.posts.length, 3, 'Post count should match expected beam distribution');
+  const post36Height = posts36Result.posts[0].height;
+  assert.strictEqual(post36Height, 36, 'A 36-inch deck height input must yield 36-inch post heights');
+
+  // Calculate posts for 60-inch height deck
+  const posts60Result = calculatePosts(mockBeams, 60, '6x6');
+  assert.ok(Array.isArray(posts60Result.posts), 'Result must contain a posts array');
+  assert.strictEqual(posts60Result.posts.length, 3, 'Post count should match expected beam distribution');
+  const post60Height = posts60Result.posts[0].height;
+  assert.strictEqual(post60Height, 60, 'A 60-inch deck height input must yield 60-inch post heights');
+
+  // Assert post height is taller
+  assert.ok(post60Height > post36Height, 'Taller deck sections must yield longer posts');
 });
 
 // ─── EXECUTE ALL TESTS ───
