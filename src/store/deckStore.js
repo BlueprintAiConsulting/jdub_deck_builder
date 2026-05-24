@@ -8,7 +8,7 @@ import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGen
 
 // Initialize theme on load to prevent flash of wrong theme
 if (typeof window !== 'undefined') {
-  const savedTheme = localStorage.getItem('deckforge_theme') || 'light';
+  const savedTheme = localStorage.getItem('deckforge_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
@@ -122,7 +122,7 @@ const initialResults = recalculateAll([initialSection], DEFAULT_MATERIALS);
 
 export const useDeckStore = create((set, get) => ({
   // --- View State ---
-  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'light') : 'light',
+  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'dark') : 'dark',
   viewMode: '2d',
   selectedTool: 'select',
   showGrid: true,
