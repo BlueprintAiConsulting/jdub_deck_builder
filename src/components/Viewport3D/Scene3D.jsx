@@ -202,8 +202,8 @@ function Stairs({ stairEdge, stairCalcs, width, depth }) {
   if (!stairEdge || !stairCalcs) return null;
 
   const { numRisers, numTreads, riserHeight, totalRun } = stairCalcs;
-  const treadDepth = STAIR_RULES.idealTreadDepth;
-  const stairWidth = STAIR_RULES.maxStairWidth; // 36"
+  const stairWidth = stairCalcs.width || STAIR_RULES.maxStairWidth;
+  const treadDepth = stairCalcs.treadDepth || STAIR_RULES.idealTreadDepth;
   const treadThickness = 1.0; // 5/4 deck board
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
 
@@ -288,18 +288,23 @@ function HouseWall({ width, height }) {
 }
 
 function GroundPlane() {
+  const theme = useDeckStore((s) => s.theme);
+  const isLightTheme = theme === 'light';
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
       <planeGeometry args={[100, 100]} />
-      <meshStandardMaterial color="#1a3a1a" roughness={1} />
+      <meshStandardMaterial color={isLightTheme ? '#2d5a27' : '#1a3a1a'} roughness={1} />
     </mesh>
   );
 }
 
 export default function Scene3D() {
+  const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
   const materials = useDeckStore((s) => s.materials);
+
+  const isLightTheme = theme === 'light';
 
   // Center camera on bounding box of all sections
   const bounds = useMemo(() => {
@@ -333,8 +338,8 @@ export default function Scene3D() {
         <directionalLight position={[-10, 15, -10]} intensity={0.3} color="#8888cc" />
         <hemisphereLight intensity={0.15} color="#aaddff" groundColor="#332200" />
 
-        <color attach="background" args={['#0a1628']} />
-        <fog attach="fog" args={['#0a1628', 40, 120]} />
+        <color attach="background" args={[isLightTheme ? '#f1f5f9' : '#0a1628']} />
+        <fog attach="fog" args={[isLightTheme ? '#f1f5f9' : '#0a1628', 40, 120]} />
 
         {sections.map((sec) => {
           const calcs = sectionCalcs[sec.id];
@@ -348,7 +353,7 @@ export default function Scene3D() {
               {/* Railings — synced from 2D */}
               <Railings railings={sec.railings} width={sec.width} depth={sec.depth} height={sec.height} />
               {/* Stairs — synced from 2D */}
-              <Stairs stairEdge={sec.stairs} stairCalcs={calcs.stairs} width={sec.width} depth={sec.depth} />
+              <Stairs stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} stairCalcs={calcs.stairs} width={sec.width} depth={sec.depth} />
               {/* House wall for ledger-attached decks */}
               {sec.ledgerAttached && <HouseWall width={sec.width} height={sec.height} />}
             </group>
@@ -356,7 +361,7 @@ export default function Scene3D() {
         })}
 
         <GroundPlane />
-        <gridHelper args={[100, 100, '#1a2a4a', '#111828']} position={[0, -4.99, 0]} />
+        <gridHelper args={[100, 100, isLightTheme ? '#cbd5e1' : '#1a2a4a', isLightTheme ? '#e2e8f0' : '#111828']} position={[0, -4.99, 0]} />
       </Canvas>
     </div>
   );

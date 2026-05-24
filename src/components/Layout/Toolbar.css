@@ -190,7 +190,7 @@
 .toolbar-modal__card {
   width: 100%;
   max-width: 420px;
-  background: #0c1221;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--border-radius-lg, 12px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);

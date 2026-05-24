@@ -170,12 +170,13 @@ export function generateBOM(config, calcs) {
       unit: 'ea',
       material: config.species,
     });
+    const treadLen = optimalBoardLength(stairs.width);
     items.push({
       id: 'stair-treads',
       category: 'Stairs',
-      description: `${config.deckBoardSize || '5/4x6'} × 3' Stair Tread`,
+      description: `${config.deckBoardSize || '5/4x6'} × ${treadLen}' Stair Tread`,
       size: config.deckBoardSize || '5/4x6',
-      length: 3,
+      length: treadLen,
       quantity: stairs.numTreads * 2,
       unit: 'ea',
       material: config.deckMaterial || config.species,

@@ -58,6 +58,7 @@ export default function Canvas2D({ isMobile }) {
   const lastTouchDistRef = useRef(null);
   const [zoomScale, setZoomScale] = useState(1);
 
+  const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
   const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
@@ -96,7 +97,7 @@ export default function Canvas2D({ isMobile }) {
       return;
     }
 
-    if (selectedTool === 'rectangle') {
+    if (selectedTool === 'rectangle' || selectedTool === 'landing') {
       setInteraction({ mode: 'placing', dragStart: { x: mx, y: my }, ghostRect: { x: mx, y: my, w: 0, h: 0 } });
       return;
     }
@@ -172,10 +173,15 @@ export default function Canvas2D({ isMobile }) {
       const g = interaction.ghostRect;
       const ox = size.w / 2 + panOffset.x, oy = size.h / 2 + panOffset.y;
       const absW = Math.abs(g.w), absH = Math.abs(g.h);
+      const rx = (Math.min(g.x, g.x + g.w) - ox) / S;
+      const ry = (Math.min(g.y, g.y + g.h) - oy) / S;
+      const type = selectedTool === 'landing' ? 'landing' : 'deck';
       if (absW > 20 && absH > 20) {
-        const rx = (Math.min(g.x, g.x + g.w) - ox) / S;
-        const ry = (Math.min(g.y, g.y + g.h) - oy) / S;
-        addSection({ x: rx, y: ry, width: absW / S, depth: absH / S });
+        addSection({ x: rx, y: ry, width: absW / S, depth: absH / S }, type);
+      } else {
+        const defW = type === 'landing' ? 36 : 144;
+        const defD = type === 'landing' ? 36 : 120;
+        addSection({ x: rx - defW / 2, y: ry - defD / 2, width: defW, depth: defD }, type);
       }
       setInteraction({ mode: 'idle', dragStart: null, ghostRect: null });
     }
@@ -188,8 +194,16 @@ export default function Canvas2D({ isMobile }) {
     if (e.touches.length === 1) {
       const rect = containerRef.current.getBoundingClientRect();
       const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
-      if (selectedTool === 'rectangle') {
-        addSection({ x: (mx - size.w/2 - panOffset.x) / S, y: (my - size.h/2 - panOffset.y) / S, width: 144, depth: 120 });
+      if (selectedTool === 'rectangle' || selectedTool === 'landing') {
+        const type = selectedTool === 'landing' ? 'landing' : 'deck';
+        const defW = type === 'landing' ? 36 : 144;
+        const defD = type === 'landing' ? 36 : 120;
+        addSection({
+          x: (mx - size.w/2 - panOffset.x) / S - defW / 2,
+          y: (my - size.h/2 - panOffset.y) / S - defD / 2,
+          width: defW,
+          depth: defD
+        }, type);
         return;
       }
       if (selectedTool === 'select') {
@@ -249,10 +263,17 @@ export default function Canvas2D({ isMobile }) {
     const ox = size.w / 2 + panOffset.x;
     const oy = size.h / 2 + panOffset.y;
 
+    const isLightTheme = theme === 'light';
+
     // Background vignette
     const vg = ctx.createRadialGradient(size.w/2, size.h/2, size.w*0.1, size.w/2, size.h/2, size.w*0.8);
-    vg.addColorStop(0, 'rgba(12, 18, 33, 0)');
-    vg.addColorStop(1, 'rgba(4, 6, 12, 0.5)');
+    if (isLightTheme) {
+      vg.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      vg.addColorStop(1, 'rgba(148, 163, 184, 0.15)');
+    } else {
+      vg.addColorStop(0, 'rgba(12, 18, 33, 0)');
+      vg.addColorStop(1, 'rgba(4, 6, 12, 0.5)');
+    }
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, size.w, size.h);
 
@@ -260,13 +281,13 @@ export default function Canvas2D({ isMobile }) {
     if (showGrid) {
       const gs = 12 * S;
       // Minor gridlines (1ft)
-      ctx.strokeStyle = 'rgba(30, 50, 90, 0.15)';
+      ctx.strokeStyle = isLightTheme ? 'rgba(15, 23, 42, 0.05)' : 'rgba(30, 50, 90, 0.15)';
       ctx.lineWidth = 0.5;
       for (let x = ox % gs; x < size.w; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size.h); ctx.stroke(); }
       for (let y = oy % gs; y < size.h; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size.w, y); ctx.stroke(); }
       // Major gridlines (4ft)
       const gs4 = 48 * S;
-      ctx.strokeStyle = 'rgba(50, 80, 140, 0.25)';
+      ctx.strokeStyle = isLightTheme ? 'rgba(15, 23, 42, 0.1)' : 'rgba(50, 80, 140, 0.25)';
       ctx.lineWidth = 1;
       for (let x = ox % gs4; x < size.w; x += gs4) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size.h); ctx.stroke(); }
       for (let y = oy % gs4; y < size.h; y += gs4) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size.w, y); ctx.stroke(); }
@@ -284,30 +305,52 @@ export default function Canvas2D({ isMobile }) {
       // House wall
       if (sec.ledgerAttached) {
         const hh = 30 * zoomScale;
-        ctx.fillStyle = '#2a2a3a';
+        ctx.fillStyle = isLightTheme ? '#e2e8f0' : '#2a2a3a';
         ctx.fillRect(sx - 20, sy - hh, sw + 40, hh);
-        ctx.strokeStyle = '#444466';
+        ctx.strokeStyle = isLightTheme ? '#cbd5e1' : '#444466';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx - 20, sy - hh, sw + 40, hh);
-        ctx.fillStyle = '#888aaa';
+        ctx.fillStyle = isLightTheme ? '#64748b' : '#888aaa';
         ctx.font = '600 10px Inter';
         ctx.textAlign = 'center';
         ctx.fillText('HOUSE', sx + sw / 2, sy - hh / 2 + 3);
       }
 
-      // Deck surface
-      ctx.fillStyle = woodColor + '25';
-      ctx.fillRect(sx, sy, sw, sd);
-      ctx.strokeStyle = isSelected ? '#3b82f6' : woodColor + '80';
-      ctx.lineWidth = isSelected ? 2.5 : 2;
-      ctx.strokeRect(sx, sy, sw, sd);
+      if (sec.type === 'landing') {
+        // Landing surface
+        ctx.fillStyle = isLightTheme ? 'rgba(2, 132, 199, 0.08)' : 'rgba(14, 165, 233, 0.12)';
+        ctx.fillRect(sx, sy, sw, sd);
+        ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? '#0284c7' : '#0ea5e9');
+        ctx.lineWidth = isSelected ? 2.5 : 2;
+        ctx.strokeRect(sx, sy, sw, sd);
 
-      // Deck boards
-      const bw = 5.5 * S, gap = 0.125 * S;
-      ctx.strokeStyle = woodColor + '40';
-      ctx.lineWidth = 0.5;
-      for (let y = 0; y < sd; y += bw + gap) {
-        ctx.beginPath(); ctx.moveTo(sx, sy + y); ctx.lineTo(sx + sw, sy + y); ctx.stroke();
+        // Landing double border / pattern
+        ctx.strokeStyle = isSelected ? '#3b82f6' : (isLightTheme ? '#0369a1' : '#38bdf8');
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 4, sy + 4, sw - 8, sd - 8);
+
+        // Label in the center
+        ctx.fillStyle = isLightTheme ? '#0369a1' : '#38bdf8';
+        ctx.font = '600 10px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('LANDING', sx + sw / 2, sy + sd / 2);
+        ctx.textBaseline = 'alphabetic';
+      } else {
+        // Deck surface
+        ctx.fillStyle = woodColor + '25';
+        ctx.fillRect(sx, sy, sw, sd);
+        ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? woodColor : woodColor + '80');
+        ctx.lineWidth = isSelected ? 2.5 : 2;
+        ctx.strokeRect(sx, sy, sw, sd);
+
+        // Deck boards
+        const bw = 5.5 * S, gap = 0.125 * S;
+        ctx.strokeStyle = isLightTheme ? woodColor + '60' : woodColor + '40';
+        ctx.lineWidth = 0.5;
+        for (let y = 0; y < sd; y += bw + gap) {
+          ctx.beginPath(); ctx.moveTo(sx, sy + y); ctx.lineTo(sx + sw, sy + y); ctx.stroke();
+        }
       }
 
       // Joists
@@ -320,7 +363,7 @@ export default function Canvas2D({ isMobile }) {
       });
 
       // Beams
-      ctx.strokeStyle = '#f59e0b';
+      ctx.strokeStyle = isLightTheme ? '#d97706' : '#f59e0b';
       ctx.lineWidth = 3;
       calcs.beams.positions.forEach((yIn) => {
         const y = sy + yIn * S;
@@ -339,7 +382,7 @@ export default function Canvas2D({ isMobile }) {
       // Railings
       Object.entries(sec.railings).forEach(([edge, on]) => {
         if (!on) return;
-        ctx.strokeStyle = '#22c55e';
+        ctx.strokeStyle = isLightTheme ? '#16a34a' : '#22c55e';
         ctx.lineWidth = 3;
         ctx.beginPath();
         if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
@@ -352,17 +395,18 @@ export default function Canvas2D({ isMobile }) {
       // Stairs
       if (sec.stairs && calcs.stairs) {
         const st = calcs.stairs;
-        const stairW = 36 * S;
+        const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
+        const stairW = st.width * S;
         const stairD = st.totalRun * S;
-        ctx.fillStyle = 'rgba(236, 72, 153, 0.15)';
-        ctx.strokeStyle = '#ec4899';
+        ctx.fillStyle = isLightTheme ? 'rgba(219, 39, 119, 0.1)' : 'rgba(236, 72, 153, 0.15)';
+        ctx.strokeStyle = isLightTheme ? '#db2777' : '#ec4899';
         ctx.lineWidth = 1.5;
         let stX, stY;
-        if (sec.stairs === 's') { stX = sx + sw / 2 - stairW / 2; stY = sy + sd; }
-        else if (sec.stairs === 'n') { stX = sx + sw / 2 - stairW / 2; stY = sy - stairD; }
-        else if (sec.stairs === 'e') { stX = sx + sw; stY = sy + sd / 2 - stairW / 2; }
+        if (stairDir === 's') { stX = sx + sw / 2 - stairW / 2; stY = sy + sd; }
+        else if (stairDir === 'n') { stX = sx + sw / 2 - stairW / 2; stY = sy - stairD; }
+        else if (stairDir === 'e') { stX = sx + sw; stY = sy + sd / 2 - stairW / 2; }
         else { stX = sx - stairD; stY = sy + sd / 2 - stairW / 2; }
-        const isVert = sec.stairs === 'n' || sec.stairs === 's';
+        const isVert = stairDir === 'n' || stairDir === 's';
         const sW = isVert ? stairW : stairD;
         const sD = isVert ? stairD : stairW;
         ctx.fillRect(stX, stY, sW, sD);
@@ -379,7 +423,7 @@ export default function Canvas2D({ isMobile }) {
       }
 
       // Dimension labels
-      ctx.fillStyle = '#e8edf5';
+      ctx.fillStyle = isLightTheme ? '#0f172a' : '#e8edf5';
       ctx.font = '600 11px "JetBrains Mono"';
       ctx.textAlign = 'center';
       ctx.fillText(formatDimension(sec.width), sx + sw / 2, sy - 8);
@@ -438,29 +482,35 @@ export default function Canvas2D({ isMobile }) {
     const lx = 16, ly = size.h - 106;
     ctx.font = '500 10px Inter';
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(8, 14, 28, 0.85)';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 98, 8); ctx.fill(); ctx.strokeStyle = 'rgba(78, 142, 247, 0.12)'; ctx.lineWidth = 1; ctx.stroke(); }
-    else { ctx.fillRect(lx - 8, ly - 8, 114, 98); ctx.strokeStyle = 'rgba(78, 142, 247, 0.12)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 98); }
+    ctx.fillStyle = isLightTheme ? 'rgba(255, 255, 255, 0.9)' : 'rgba(8, 14, 28, 0.85)';
+    const legendBorder = isLightTheme ? 'rgba(15, 23, 42, 0.08)' : 'rgba(78, 142, 247, 0.12)';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 98, 8); ctx.fill(); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.stroke(); }
+    else { ctx.fillRect(lx - 8, ly - 8, 114, 98); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 98); }
     const legendItems = [
-      { color: '#4e8ef7', label: 'Joists' }, { color: '#f5a623', label: 'Beams' },
-      { color: '#f87171', label: 'Posts' }, { color: '#34d399', label: 'Railings' },
-      { color: '#f472b6', label: 'Stairs' },
+      { color: isLightTheme ? '#0284c7' : '#4e8ef7', label: 'Joists' },
+      { color: isLightTheme ? '#d97706' : '#f5a623', label: 'Beams' },
+      { color: '#f87171', label: 'Posts' },
+      { color: isLightTheme ? '#16a34a' : '#34d399', label: 'Railings' },
+      { color: isLightTheme ? '#db2777' : '#f472b6', label: 'Stairs' },
     ];
     legendItems.forEach((item, i) => {
       ctx.fillStyle = item.color; ctx.fillRect(lx, ly + i * 17, 14, 3);
-      ctx.fillStyle = '#8b9dc3'; ctx.fillText(item.label, lx + 20, ly + i * 17 + 5);
+      ctx.fillStyle = isLightTheme ? '#334155' : '#8b9dc3'; ctx.fillText(item.label, lx + 20, ly + i * 17 + 5);
     });
 
     // Tool hint
     if (selectedTool === 'rectangle') {
-      ctx.fillStyle = 'rgba(59,130,246,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillStyle = isLightTheme ? 'rgba(37,99,235,0.95)' : 'rgba(59,130,246,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText(isMobile ? 'Tap to place a deck section' : 'Click & drag to place a deck section', size.w / 2, 24);
     } else if (selectedTool === 'railing') {
-      ctx.fillStyle = 'rgba(34,197,94,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillStyle = isLightTheme ? 'rgba(22,163,74,0.95)' : 'rgba(34,197,94,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText('Click a deck edge to toggle railing', size.w / 2, 24);
     } else if (selectedTool === 'stairs') {
-      ctx.fillStyle = 'rgba(236,72,153,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillStyle = isLightTheme ? 'rgba(219,39,119,0.95)' : 'rgba(236,72,153,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText('Click a deck edge to attach stairs', size.w / 2, 24);
+    } else if (selectedTool === 'landing') {
+      ctx.fillStyle = isLightTheme ? 'rgba(2,132,199,0.95)' : 'rgba(14,165,233,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillText(isMobile ? 'Tap to place a landing' : 'Click & drag or click to place a landing', size.w / 2, 24);
     }
 
   }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S]);

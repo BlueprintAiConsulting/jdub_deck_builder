@@ -187,6 +187,8 @@ export default function Toolbar({ isMobile }) {
   const sections = useDeckStore((s) => s.sections);
   const materials = useDeckStore((s) => s.materials);
   const loadProject = useDeckStore((s) => s.loadProject);
+  const theme = useDeckStore((s) => s.theme);
+  const toggleTheme = useDeckStore((s) => s.toggleTheme);
 
   const confirmSaveAs = () => {
     const trimmed = tempProjectName.trim();
@@ -411,6 +413,31 @@ export default function Toolbar({ isMobile }) {
           </svg>
         </button>
 
+        <button
+          className="btn btn--ghost btn--icon"
+          onClick={toggleTheme}
+          aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+          id="btn-theme-toggle-mobile"
+        >
+          {theme === 'light' ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          )}
+        </button>
+
         <button className="btn btn--primary btn--icon toolbar__export-mobile" onClick={exportPDF} aria-label="Export PDF" id="btn-export">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -522,6 +549,32 @@ export default function Toolbar({ isMobile }) {
             <polyline points="7 3 7 8 15 8"/>
           </svg>
           Save As
+        </button>
+
+        <button
+          className="btn btn--ghost btn--icon"
+          onClick={toggleTheme}
+          aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+          data-tooltip={theme === 'light' ? 'Dark Theme' : 'Light Theme'}
+          id="btn-theme-toggle"
+        >
+          {theme === 'light' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          )}
         </button>
         
         <button className="btn btn--primary" id="btn-export" onClick={exportPDF} aria-label="Export PDF report" data-tooltip="Export PDF Report">

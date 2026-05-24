@@ -6,6 +6,16 @@ import { create } from 'zustand';
 import { calculateAll } from '../engine/structuralCalc';
 import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator';
 
+// Initialize theme on load to prevent flash of wrong theme
+if (typeof window !== 'undefined') {
+  const savedTheme = localStorage.getItem('deckforge_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute('content', savedTheme === 'light' ? '#f8fafc' : '#060a14');
+  }
+}
+
 let nextId = 1;
 function uid() { return `sec-${nextId++}`; }
 
@@ -31,12 +41,24 @@ function createSection(overrides = {}) {
     ledgerAttached: true,
     railings: { n: false, s: false, e: false, w: false },
     stairs: null,    // null | 'n' | 's' | 'e' | 'w'
+    type: 'deck',    // 'deck' | 'landing'
     ...overrides,
   };
 }
 
 function recalculateSection(section, materials) {
-  const config = { ...materials, ...section };
+  let stairObj = section.stairs;
+  if (typeof stairObj === 'string') {
+    stairObj = {
+      type: 'stair',
+      width: 36,
+      numberOfSteps: 5,
+      rise: 7.25,
+      run: 10,
+      direction: stairObj,
+    };
+  }
+  const config = { ...materials, ...section, stairs: stairObj };
   const calcs = calculateAll({
     width: section.width,
     depth: section.depth,
@@ -47,6 +69,7 @@ function recalculateSection(section, materials) {
     beamConfig: materials.beamConfig,
     postSize: materials.postSize,
     soilCapacity: materials.soilCapacity,
+    stairs: stairObj,
   });
   const bom = generateBOM(config, calcs);
   return { calcs, bom };
@@ -99,6 +122,7 @@ const initialResults = recalculateAll([initialSection], DEFAULT_MATERIALS);
 
 export const useDeckStore = create((set, get) => ({
   // --- View State ---
+  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'light') : 'light',
   viewMode: '2d',
   selectedTool: 'select',
   showGrid: true,
@@ -133,6 +157,18 @@ export const useDeckStore = create((set, get) => ({
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
+  toggleTheme: () => {
+    const nextTheme = get().theme === 'light' ? 'dark' : 'light';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('deckforge_theme', nextTheme);
+      document.documentElement.setAttribute('data-theme', nextTheme);
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) {
+        meta.setAttribute('content', nextTheme === 'light' ? '#f8fafc' : '#060a14');
+      }
+    }
+    set({ theme: nextTheme });
+  },
 
   // --- Actions: Interaction ---
   setInteraction: (updates) => set((s) => ({
@@ -142,15 +178,23 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Sections ---
   selectSection: (id) => set({ selectedSectionId: id }),
 
-  addSection: (rect) => {
+  addSection: (rect, type = 'deck') => {
     const state = get();
+    const isLanding = type === 'landing';
+    const minSize = isLanding ? 36 : 48;
+    const defaultW = isLanding ? 36 : 144;
+    const defaultD = isLanding ? 36 : 120;
     const snappedRect = {
       x: snapToGrid(rect.x),
       y: snapToGrid(rect.y),
-      width: Math.max(48, snapToGrid(rect.width || 144)),  // min 4ft
-      depth: Math.max(48, snapToGrid(rect.depth || 120)),   // min 4ft
+      width: Math.max(minSize, snapToGrid(rect.width || defaultW)),
+      depth: Math.max(minSize, snapToGrid(rect.depth || defaultD)),
     };
-    const sec = createSection(snappedRect);
+    const sec = createSection({
+      ...snappedRect,
+      type,
+      ledgerAttached: type === 'landing' ? false : true,
+    });
 
     // Edge snap
     const snaps = findEdgeSnap(sec, state.sections);
@@ -221,12 +265,13 @@ export const useDeckStore = create((set, get) => ({
     const state = get();
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
+      const minSize = s.type === 'landing' ? 36 : 48;
       return {
         ...s,
         x: updates.x !== undefined ? snapToGrid(updates.x) : s.x,
         y: updates.y !== undefined ? snapToGrid(updates.y) : s.y,
-        width: Math.max(48, snapToGrid(updates.width !== undefined ? updates.width : s.width)),
-        depth: Math.max(48, snapToGrid(updates.depth !== undefined ? updates.depth : s.depth)),
+        width: Math.max(minSize, snapToGrid(updates.width !== undefined ? updates.width : s.width)),
+        depth: Math.max(minSize, snapToGrid(updates.depth !== undefined ? updates.depth : s.depth)),
       };
     });
     const results = recalculateAll(newSections, state.materials);
@@ -258,7 +303,44 @@ export const useDeckStore = create((set, get) => ({
     const state = get();
     const newSections = state.sections.map((s) => {
       if (s.id !== sectionId) return s;
-      return { ...s, stairs: s.stairs === edge ? null : edge }; // toggle
+      const alreadyHasStairsOnEdge = s.stairs && (s.stairs.direction === edge || s.stairs === edge);
+      return {
+        ...s,
+        stairs: alreadyHasStairsOnEdge
+          ? null
+          : {
+              type: 'stair',
+              width: 36,
+              numberOfSteps: 5,
+              rise: 7.25,
+              run: 10,
+              direction: edge,
+            },
+      };
+    });
+    const results = recalculateAll(newSections, state.materials);
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
+    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1 });
+  },
+
+  updateStairs: (sectionId, updates) => {
+    const state = get();
+    const newSections = state.sections.map((s) => {
+      if (s.id !== sectionId) return s;
+      if (!s.stairs) return s;
+      let stairObj = s.stairs;
+      if (typeof stairObj === 'string') {
+        stairObj = {
+          type: 'stair',
+          width: 36,
+          numberOfSteps: 5,
+          rise: 7.25,
+          run: 10,
+          direction: stairObj,
+        };
+      }
+      return { ...s, stairs: { ...stairObj, ...updates } };
     });
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
@@ -347,11 +429,31 @@ export const useDeckStore = create((set, get) => ({
   },
 
   loadProject: (sections, materials) => {
-    const results = recalculateAll(sections, materials);
+    const normalizedSections = sections.map(s => {
+      const type = s.type || 'deck';
+      let stairObj = s.stairs;
+      if (typeof stairObj === 'string') {
+        stairObj = {
+          type: 'stair',
+          width: 36,
+          numberOfSteps: 5,
+          rise: 7.25,
+          run: 10,
+          direction: stairObj,
+        };
+      }
+      return {
+        ...s,
+        type,
+        stairs: stairObj
+      };
+    });
+
+    const results = recalculateAll(normalizedSections, materials);
     
     // Dynamically update nextId to avoid conflicts with existing section IDs
     let maxId = 0;
-    sections.forEach((s) => {
+    normalizedSections.forEach((s) => {
       const match = s.id.match(/^sec-(\d+)$/);
       if (match) {
         const idNum = parseInt(match[1]);
@@ -361,12 +463,17 @@ export const useDeckStore = create((set, get) => ({
     nextId = maxId + 1;
 
     set({
-      sections: sections.map((s) => ({ ...s })),
-      selectedSectionId: sections[0]?.id || null,
+      sections: normalizedSections.map((s) => ({ ...s })),
+      selectedSectionId: normalizedSections[0]?.id || null,
       materials: { ...materials },
       ...results,
-      history: [{ sections: sections.map((s) => ({ ...s })), materials: { ...materials } }],
+      history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: { ...materials } }],
       historyIndex: 0,
     });
   },
 }));
+
+if (typeof window !== 'undefined') {
+  window.useDeckStore = useDeckStore;
+}
+
