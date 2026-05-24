@@ -7,28 +7,37 @@ import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTabl
 
 const IN = 1 / 12; // inches to scene units (feet)
 
-function DeckBoards({ width, depth, species, deckBoardSize }) {
+function DeckBoards({ vertices, secX, secY, species, deckBoardSize }) {
   const color = WOOD_COLORS[species] || '#c4a35a';
   const boardW = LUMBER_ACTUAL[deckBoardSize]?.depth || 5.5;
   const boardH = LUMBER_ACTUAL[deckBoardSize]?.width || 1.0;
   const gap = 0.125;
   const boards = useMemo(() => {
+    if (!vertices || vertices.length === 0) return [];
+    
+    const localYs = vertices.map(v => v.y - secY);
+    const localXs = vertices.map(v => v.x - secX);
+    const localMinX = Math.min(...localXs), localMaxX = Math.max(...localXs);
+    const localMinY = Math.min(...localYs), localMaxY = Math.max(...localYs);
+    
+    const localWidth = localMaxX - localMinX;
+    
     const arr = [];
-    let y = 0, idx = 0;
-    while (y < depth) {
-      const bw = Math.min(boardW, depth - y);
-      arr.push({ idx, y: y + bw / 2, bw });
+    let y = localMinY, idx = 0;
+    while (y < localMaxY) {
+      const bw = Math.min(boardW, localMaxY - y);
+      arr.push({ idx, y: y + bw / 2, bw, startX: localMinX, boardWidth: localWidth });
       y += boardW + gap;
       idx++;
     }
     return arr;
-  }, [width, depth, boardW]);
+  }, [vertices, secX, secY, boardW]);
 
   return (
     <group>
-      {boards.map(({ idx, y, bw }) => (
-        <mesh key={`board-${idx}`} position={[width / 2 * IN, boardH / 2 * IN, y * IN]}>
-          <boxGeometry args={[width * IN, boardH * IN, bw * IN]} />
+      {boards.map(({ idx, y, bw, startX, boardWidth }) => (
+        <mesh key={`board-${idx}`} position={[(startX + boardWidth / 2) * IN, boardH / 2 * IN, y * IN]}>
+          <boxGeometry args={[boardWidth * IN, boardH * IN, bw * IN]} />
           <meshStandardMaterial color={color} roughness={0.72} metalness={0.03} />
         </mesh>
       ))}
@@ -347,7 +356,7 @@ export default function Scene3D() {
           if (!calcs) return null;
           return (
             <group key={sec.id} position={[sec.x * IN, sec.height * IN, sec.y * IN]}>
-              <DeckBoards width={sec.width} depth={sec.depth} species={materials.species} deckBoardSize={materials.deckBoardSize} />
+              <DeckBoards vertices={sec.vertices} secX={sec.x} secY={sec.y} species={materials.species} deckBoardSize={materials.deckBoardSize} />
               <Joists positions={calcs.joists.positions} depth={sec.depth} joistSize={materials.joistSize} />
               <Beams beamPositions={calcs.beams.positions} width={sec.width} beamConfig={materials.beamConfig} joistSize={materials.joistSize} />
               <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />

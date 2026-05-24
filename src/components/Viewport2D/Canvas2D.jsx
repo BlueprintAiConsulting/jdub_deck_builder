@@ -8,6 +8,31 @@ const SCALE = 3;
 const HANDLE_SIZE = 8;
 const HANDLES = ['nw','n','ne','e','se','s','sw','w'];
 
+function drawVerticesPath(ctx, vertices, S, ox, oy, offsetPixels = 0) {
+  if (!vertices || vertices.length === 0) return;
+  ctx.beginPath();
+  
+  if (vertices.length === 4 && offsetPixels !== 0) {
+    const xs = vertices.map(v => v.x * S + ox);
+    const ys = vertices.map(v => v.y * S + oy);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    
+    ctx.moveTo(minX + offsetPixels, minY + offsetPixels);
+    ctx.lineTo(maxX - offsetPixels, minY + offsetPixels);
+    ctx.lineTo(maxX - offsetPixels, maxY - offsetPixels);
+    ctx.lineTo(minX + offsetPixels, maxY - offsetPixels);
+  } else {
+    const startX = (vertices[0].x * S) + ox;
+    const startY = (vertices[0].y * S) + oy;
+    ctx.moveTo(startX, startY);
+    for (let i = 1; i < vertices.length; i++) {
+      ctx.lineTo((vertices[i].x * S) + ox, (vertices[i].y * S) + oy);
+    }
+  }
+  ctx.closePath();
+}
+
 function getHandlePositions(sec, S) {
   const x = sec.x * S, y = sec.y * S, w = sec.width * S, d = sec.depth * S;
   return {
@@ -319,15 +344,18 @@ export default function Canvas2D({ isMobile }) {
       if (sec.type === 'landing') {
         // Landing surface
         ctx.fillStyle = isLightTheme ? 'rgba(2, 132, 199, 0.08)' : 'rgba(14, 165, 233, 0.12)';
-        ctx.fillRect(sx, sy, sw, sd);
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+        ctx.fill();
         ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? '#0284c7' : '#0ea5e9');
         ctx.lineWidth = isSelected ? 2.5 : 2;
-        ctx.strokeRect(sx, sy, sw, sd);
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+        ctx.stroke();
 
         // Landing double border / pattern
         ctx.strokeStyle = isSelected ? '#3b82f6' : (isLightTheme ? '#0369a1' : '#38bdf8');
         ctx.lineWidth = 1;
-        ctx.strokeRect(sx + 4, sy + 4, sw - 8, sd - 8);
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy, 4);
+        ctx.stroke();
 
         // Label in the center
         ctx.fillStyle = isLightTheme ? '#0369a1' : '#38bdf8';
@@ -339,18 +367,30 @@ export default function Canvas2D({ isMobile }) {
       } else {
         // Deck surface
         ctx.fillStyle = woodColor + '25';
-        ctx.fillRect(sx, sy, sw, sd);
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+        ctx.fill();
         ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? woodColor : woodColor + '80');
         ctx.lineWidth = isSelected ? 2.5 : 2;
-        ctx.strokeRect(sx, sy, sw, sd);
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+        ctx.stroke();
 
         // Deck boards
+        ctx.save();
+        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+        ctx.clip();
+
+        const ys = sec.vertices.map(v => v.y * S + oy);
+        const xs = sec.vertices.map(v => v.x * S + ox);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+
         const bw = 5.5 * S, gap = 0.125 * S;
         ctx.strokeStyle = isLightTheme ? woodColor + '60' : woodColor + '40';
         ctx.lineWidth = 0.5;
-        for (let y = 0; y < sd; y += bw + gap) {
-          ctx.beginPath(); ctx.moveTo(sx, sy + y); ctx.lineTo(sx + sw, sy + y); ctx.stroke();
+        for (let y = minY; y < maxY; y += bw + gap) {
+          ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
         }
+        ctx.restore();
       }
 
       // Joists
