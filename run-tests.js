@@ -646,6 +646,39 @@ test('16. Rigid body dragging: moving a section rigidly shifts all vertices by t
   assert.deepStrictEqual(moved.vertices, expectedVertices, 'Vertices must shift rigidly by translation delta (+24, +48)');
 });
 
+test('17. Save/load round-trip after rigid drag: dragging a section, saving it, and loading it preserves the dragged position and vertices rigidly', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  assert.strictEqual(initialSec.x, 0, 'Starting X must be 0');
+  assert.strictEqual(initialSec.y, 0, 'Starting Y must be 0');
+
+  // Drag the section by dx = 36, dy = 60
+  useDeckStore.getState().moveSection(initialSec.id, 36, 60);
+  const movedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+
+  assert.strictEqual(movedSec.x, 36, 'X coordinate must be dragged to 36');
+  assert.strictEqual(movedSec.y, 60, 'Y coordinate must be dragged to 60');
+
+  // Serialize the current state
+  const sections = useDeckStore.getState().sections;
+  const materials = useDeckStore.getState().materials;
+  const serialized = serializeProject('Post-Drag Round Trip', sections, materials);
+
+  assert.strictEqual(serialized.schemaVersion, 2, 'Serialized version must be 2');
+  validateProjectData(serialized);
+
+  // Load the project back into the store
+  useDeckStore.getState().loadProject(serialized.sections, serialized.materials);
+
+  // Assert loaded section matches dragged state
+  const restoredSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.ok(restoredSec, 'Restored section should exist');
+  assert.strictEqual(restoredSec.x, 36, 'Restored X coordinate must match dragged position (36)');
+  assert.strictEqual(restoredSec.y, 60, 'Restored Y coordinate must match dragged position (60)');
+  assert.deepStrictEqual(restoredSec.vertices, movedSec.vertices, 'Restored vertices must match dragged vertices exactly');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
@@ -667,6 +700,7 @@ console.log('NOTE ON TEST COVERAGE boundaries:');
 console.log('These automated tests do NOT cover actual visual rendering');
 console.log('correctness (e.g. clipping paths drawing floorboards inside');
 console.log('custom vertices, or WebGL mesh geometry positioning in 3D).');
-console.log('Visual alignment must be manually verified in the browser.');
+console.log('Additionally, the interactive click "feel" and mouse dragging');
+console.log('responsiveness on the canvas must be manually verified.');
 console.log('=============================================================\n');
 process.exit(fails > 0 ? 1 : 0);
