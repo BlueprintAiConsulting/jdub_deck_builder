@@ -1016,6 +1016,125 @@ test('28. Polygon Geometric Validation: self-intersection, overlapping sections,
   assert.strictEqual(useDeckStore.getState().toast.type, 'error');
 });
 
+test('29. Hardening: check that mutating actions turn isDirty to true, saving resets isDirty to false, loading project starts as false, and autosave timestamp comparisons behave correctly', () => {
+  const store = useDeckStore;
+  
+  // 1. Reset deck: should have isDirty = false
+  store.getState().resetDeck();
+  assert.strictEqual(store.getState().isDirty, false, 'Starting/resetting deck should set isDirty to false');
+
+  // 2. Perform a mutating action (e.g. addSection) and assert isDirty becomes true
+  store.getState().addSection({ x: 300, y: 300, width: 100, depth: 100 });
+  assert.strictEqual(store.getState().isDirty, true, 'Mutating action addSection should set isDirty to true');
+
+  // 3. Reset isDirty to false manually or via saving (using mock save simulation / setDirty)
+  store.getState().setDirty(false);
+  assert.strictEqual(store.getState().isDirty, false, 'setDirty(false) should reset isDirty');
+
+  // 4. Test dragVertex mutation sets isDirty: true
+  const sec = store.getState().sections[0];
+  store.getState().dragVertex(sec.id, 0, 10, 10);
+  assert.strictEqual(store.getState().isDirty, true, 'dragVertex should set isDirty to true');
+
+  // 5. Test loadProject sets isDirty: false
+  const sampleSections = [{ id: 'sec-load-test', type: 'deck', x: 0, y: 0, width: 100, depth: 100, vertices: [] }];
+  const sampleMaterials = { joistSize: '2x8' };
+  store.getState().loadProject(sampleSections, sampleMaterials);
+  assert.strictEqual(store.getState().isDirty, false, 'loadProject should set isDirty to false');
+
+  // 6. Test autosave recovery timestamp comparisons
+  // Mock localStorage with different manual and draft timestamps
+  mockLocalStorage.clear();
+  
+  // Save a manual project with timestamp
+  const manualProjectName = 'Manual Project';
+  const tManual = new Date('2026-05-26T12:00:00.000Z');
+  const manualProjectData = {
+    schemaVersion: 2,
+    projectName: manualProjectName,
+    sections: sampleSections,
+    materials: sampleMaterials,
+    timestamp: tManual.toISOString()
+  };
+  mockLocalStorage.setItem(`deckforge_project_${manualProjectName}`, JSON.stringify(manualProjectData));
+  mockLocalStorage.setItem('deckforge_recent_projects', JSON.stringify([manualProjectName]));
+
+  // Case A: Draft is older than manual save -> should NOT trigger banner
+  const tDraftOlder = new Date('2026-05-26T11:59:00.000Z');
+  const draftOlder = {
+    projectName: manualProjectName,
+    sections: sampleSections,
+    materials: sampleMaterials,
+    timestamp: tDraftOlder.toISOString()
+  };
+  mockLocalStorage.setItem('deckforge_autosave_draft', JSON.stringify(draftOlder));
+
+  // Simulating AppShell mount timestamp checking logic:
+  let maxManualTimestampA = 0;
+  const recentsA = JSON.parse(mockLocalStorage.getItem('deckforge_recent_projects') || '[]');
+  recentsA.forEach(name => {
+    const projKey = `deckforge_project_${name}`;
+    const rawData = mockLocalStorage.getItem(projKey);
+    if (rawData) {
+      const data = JSON.parse(rawData);
+      if (data && data.timestamp) {
+        const t = new Date(data.timestamp).getTime();
+        if (t > maxManualTimestampA) {
+          maxManualTimestampA = t;
+        }
+      }
+    }
+  });
+
+  const rawDraftA = mockLocalStorage.getItem('deckforge_autosave_draft');
+  let triggerBannerA = false;
+  if (rawDraftA) {
+    const draft = JSON.parse(rawDraftA);
+    const draftTime = new Date(draft.timestamp).getTime();
+    if (draftTime > maxManualTimestampA + 2000) {
+      triggerBannerA = true;
+    }
+  }
+  assert.strictEqual(triggerBannerA, false, 'Older draft should not trigger the recovery banner');
+
+  // Case B: Draft is newer than manual save by > 2s -> SHOULD trigger banner
+  const tDraftNewer = new Date('2026-05-26T12:00:05.000Z'); // 5 seconds newer
+  const draftNewer = {
+    projectName: manualProjectName,
+    sections: sampleSections,
+    materials: sampleMaterials,
+    timestamp: tDraftNewer.toISOString()
+  };
+  mockLocalStorage.setItem('deckforge_autosave_draft', JSON.stringify(draftNewer));
+
+  let maxManualTimestampB = 0;
+  const recentsB = JSON.parse(mockLocalStorage.getItem('deckforge_recent_projects') || '[]');
+  recentsB.forEach(name => {
+    const projKey = `deckforge_project_${name}`;
+    const rawData = mockLocalStorage.getItem(projKey);
+    if (rawData) {
+      const data = JSON.parse(rawData);
+      if (data && data.timestamp) {
+        const t = new Date(data.timestamp).getTime();
+        if (t > maxManualTimestampB) {
+          maxManualTimestampB = t;
+        }
+      }
+    }
+  });
+
+  const rawDraftB = mockLocalStorage.getItem('deckforge_autosave_draft');
+  let triggerBannerB = false;
+  if (rawDraftB) {
+    const draft = JSON.parse(rawDraftB);
+    const draftTime = new Date(draft.timestamp).getTime();
+    if (draftTime > maxManualTimestampB + 2000) {
+      triggerBannerB = true;
+    }
+  }
+  assert.strictEqual(triggerBannerB, true, 'Newer draft (> 2s threshold) should trigger the recovery banner');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

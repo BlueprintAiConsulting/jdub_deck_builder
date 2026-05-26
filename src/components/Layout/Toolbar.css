@@ -313,3 +313,17 @@
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Unsaved changes dot indicator */
+.toolbar__dirty-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--accent-warm, #f5a623);
+  box-shadow: var(--shadow-glow-amber);
+  margin-left: var(--space-2, 8px);
+  vertical-align: middle;
+  animation: selectPulse 2s infinite;
+}
+

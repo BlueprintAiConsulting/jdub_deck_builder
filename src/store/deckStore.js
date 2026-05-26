@@ -163,6 +163,7 @@ export const useDeckStore = create((set, get) => ({
   materials: { ...DEFAULT_MATERIALS },
   currentProjectName: '',
   toast: null,
+  isDirty: false,
 
   // --- Interaction State ---
   interaction: {
@@ -216,6 +217,7 @@ export const useDeckStore = create((set, get) => ({
     }, 3000);
   },
   hideToast: () => set({ toast: null }),
+  setDirty: (dirty) => set({ isDirty: dirty }),
 
   // --- Actions: Interaction ---
   setInteraction: (updates) => set((s) => ({
@@ -275,6 +277,7 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -293,6 +296,7 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -327,7 +331,7 @@ export const useDeckStore = create((set, get) => ({
     }
 
     // No recalculate needed for position-only moves (structure unchanged)
-    set({ sections: newSections });
+    set({ sections: newSections, isDirty: true });
   },
 
   finishMove: () => {
@@ -338,6 +342,7 @@ export const useDeckStore = create((set, get) => ({
       interaction: { mode: 'idle', dragStart: null, ghostRect: null, resizeHandle: null },
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -380,6 +385,7 @@ export const useDeckStore = create((set, get) => ({
       interaction: { mode: 'idle', dragStart: null, ghostRect: null, resizeHandle: null },
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -392,7 +398,7 @@ export const useDeckStore = create((set, get) => ({
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1 });
+    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
   attachStairs: (sectionId, edge) => {
@@ -417,7 +423,7 @@ export const useDeckStore = create((set, get) => ({
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1 });
+    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
   updateStairs: (sectionId, updates) => {
@@ -441,7 +447,7 @@ export const useDeckStore = create((set, get) => ({
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1 });
+    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
   // --- Actions: Deck Config (applies to selected section or global materials) ---
@@ -479,6 +485,7 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: newHistory,
       historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -499,6 +506,7 @@ export const useDeckStore = create((set, get) => ({
       selectedSectionId: prev.sections[0]?.id,
       ...results,
       historyIndex: historyIndex - 1,
+      isDirty: true,
     });
   },
 
@@ -513,6 +521,7 @@ export const useDeckStore = create((set, get) => ({
       selectedSectionId: next.sections[0]?.id,
       ...results,
       historyIndex: historyIndex + 1,
+      isDirty: true,
     });
   },
 
@@ -529,6 +538,7 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: [{ sections: [{ ...sec }], materials: { ...mat } }],
       historyIndex: 0,
+      isDirty: false,
     });
   },
 
@@ -580,6 +590,7 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: { ...materials } }],
       historyIndex: 0,
+      isDirty: false,
     });
   },
 
@@ -605,7 +616,8 @@ export const useDeckStore = create((set, get) => ({
     const results = recalculateAll(newSections, state.materials);
     set({
       sections: newSections,
-      ...results
+      ...results,
+      isDirty: true,
     });
   },
 
@@ -653,7 +665,8 @@ export const useDeckStore = create((set, get) => ({
         selectedVertexIndex: insertIndex
       },
       history: newHistory,
-      historyIndex: newHistory.length - 1
+      historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 
@@ -682,7 +695,8 @@ export const useDeckStore = create((set, get) => ({
         selectedVertexIndex: null
       },
       history: newHistory,
-      historyIndex: newHistory.length - 1
+      historyIndex: newHistory.length - 1,
+      isDirty: true,
     });
   },
 }));

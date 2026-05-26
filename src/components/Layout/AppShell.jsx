@@ -32,9 +32,19 @@ export default function AppShell() {
   const setCurrentProjectName = useDeckStore((s) => s.setCurrentProjectName);
   const toast = useDeckStore((s) => s.toast);
   const hideToast = useDeckStore((s) => s.hideToast);
+  const showToast = useDeckStore((s) => s.showToast);
+  const isDirty = useDeckStore((s) => s.isDirty);
+  const setDirty = useDeckStore((s) => s.setDirty);
+  const sections = useDeckStore((s) => s.sections);
+  const materials = useDeckStore((s) => s.materials);
+  const currentProjectName = useDeckStore((s) => s.currentProjectName);
 
-  // Auto-restore last saved project on mount
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [draftData, setDraftData] = useState(null);
+
+  // Auto-restore last saved project on mount, and check for autosave draft
   useEffect(() => {
+    let maxManualTimestamp = 0;
     try {
       const recents = listRecentProjects();
       if (recents && recents.length > 0) {
@@ -45,10 +55,90 @@ export default function AppShell() {
           setCurrentProjectName(mostRecent);
         }
       }
+
+      // Find the maximum timestamp among all manually saved projects
+      recents.forEach(name => {
+        try {
+          const projectData = loadProjectFromLocalStorage(name);
+          if (projectData && projectData.timestamp) {
+            const t = new Date(projectData.timestamp).getTime();
+            if (t > maxManualTimestamp) {
+              maxManualTimestamp = t;
+            }
+          }
+        } catch (e) {}
+      });
     } catch (err) {
       console.error('Failed to auto-restore last saved project:', err);
     }
+
+    try {
+      const rawDraft = localStorage.getItem('deckforge_autosave_draft');
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft);
+        if (draft && draft.sections && draft.materials && draft.timestamp) {
+          const draftTime = new Date(draft.timestamp).getTime();
+          // Trigger the banner if the draft's timestamp is strictly greater than the last saved manual project's timestamp by 2 seconds
+          if (draftTime > maxManualTimestamp + 2000) {
+            setDraftData(draft);
+            setShowDraftBanner(true);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to parse autosave draft:', err);
+    }
   }, [loadProject, setCurrentProjectName]);
+
+  // Page exit warning when there are unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
+  // Debounced background autosave (1.5s delay)
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = setTimeout(() => {
+      try {
+        const draft = {
+          projectName: currentProjectName,
+          sections,
+          materials,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem('deckforge_autosave_draft', JSON.stringify(draft));
+      } catch (err) {
+        console.error('Autosave failed:', err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [isDirty, sections, materials, currentProjectName]);
+
+  const handleRestoreDraft = useCallback(() => {
+    if (draftData && draftData.sections && draftData.materials) {
+      loadProject(draftData.sections, draftData.materials);
+      if (draftData.projectName) {
+        setCurrentProjectName(draftData.projectName);
+      }
+      setDirty(true);
+      showToast('Draft restored successfully!', 'success');
+    }
+    setShowDraftBanner(false);
+  }, [draftData, loadProject, setCurrentProjectName, setDirty, showToast]);
+
+  const handleDiscardDraft = useCallback(() => {
+    localStorage.removeItem('deckforge_autosave_draft');
+    setShowDraftBanner(false);
+    showToast('Draft discarded.', 'info');
+  }, [showToast]);
 
   // Mobile panel state: 'none' | 'tools' | 'properties' | 'bom'
   const [mobilePanel, setMobilePanel] = useState('none');
@@ -127,6 +217,27 @@ export default function AppShell() {
             </div>
           </div>
         )}
+
+        {showDraftBanner && (
+          <div className="draft-banner" role="alert">
+            <div className="draft-banner__icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-warm)" strokeWidth="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div className="draft-banner__content">
+              <span className="draft-banner__message">
+                We found unsaved changes from your last session.
+              </span>
+            </div>
+            <div className="draft-banner__actions">
+              <button className="btn btn--primary btn--sm" onClick={handleRestoreDraft}>Restore Draft</button>
+              <button className="btn btn--ghost btn--sm" onClick={handleDiscardDraft}>Discard</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -174,6 +285,27 @@ export default function AppShell() {
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
+          </div>
+        </div>
+      )}
+
+      {showDraftBanner && (
+        <div className="draft-banner" role="alert">
+          <div className="draft-banner__icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-warm)" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div className="draft-banner__content">
+            <span className="draft-banner__message">
+              We found unsaved changes from your last session.
+            </span>
+          </div>
+          <div className="draft-banner__actions">
+            <button className="btn btn--primary btn--sm" onClick={handleRestoreDraft}>Restore Draft</button>
+            <button className="btn btn--ghost btn--sm" onClick={handleDiscardDraft}>Discard</button>
           </div>
         </div>
       )}

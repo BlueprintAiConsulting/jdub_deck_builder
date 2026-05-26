@@ -180,6 +180,8 @@ export default function Toolbar({ isMobile }) {
   const currentProjectName = useDeckStore((s) => s.currentProjectName);
   const setCurrentProjectName = useDeckStore((s) => s.setCurrentProjectName);
   const showToast = useDeckStore((s) => s.showToast);
+  const isDirty = useDeckStore((s) => s.isDirty);
+  const setDirty = useDeckStore((s) => s.setDirty);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
@@ -202,6 +204,7 @@ export default function Toolbar({ isMobile }) {
     try {
       saveProjectToLocalStorage(trimmed, sections, materials);
       showToast('Project saved successfully!', 'success');
+      setDirty(false);
     } catch (err) {
       alert(err.message || 'Failed to save project.');
     }
@@ -219,11 +222,12 @@ export default function Toolbar({ isMobile }) {
       try {
         saveProjectToLocalStorage(currentProjectName, sections, materials);
         showToast('Project saved successfully!', 'success');
+        setDirty(false);
       } catch (err) {
         alert(err.message || 'Failed to save project.');
       }
     }
-  }, [currentProjectName, sections, materials, handleSaveAsClick, showToast]);
+  }, [currentProjectName, sections, materials, handleSaveAsClick, showToast, setDirty]);
 
   const handleExportClick = useCallback(() => {
     const name = currentProjectName || 'My Deck Project';
@@ -381,6 +385,7 @@ export default function Toolbar({ isMobile }) {
           <span className="toolbar__title toolbar__title--mobile">
             DeckForge
             {currentProjectName && <span className="toolbar__project-name-mobile"> | {currentProjectName}</span>}
+            {isDirty && <span className="toolbar__dirty-dot" data-tooltip="Unsaved changes" />}
           </span>
         </div>
 
@@ -495,6 +500,7 @@ export default function Toolbar({ isMobile }) {
         <span className="toolbar__title">
           DeckForge
           {currentProjectName && <span className="toolbar__project-name"> | {currentProjectName}</span>}
+          {isDirty && <span className="toolbar__dirty-dot" data-tooltip="Unsaved changes" />}
         </span>
       </div>
 
