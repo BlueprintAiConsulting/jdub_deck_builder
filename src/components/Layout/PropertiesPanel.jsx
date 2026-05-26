@@ -103,7 +103,7 @@ function SelectField({ id, label, value, options, onChange, swatch }) {
         {swatch && <span className="prop-field__swatch" style={{ background: swatch }}></span>}
         <select id={id} name={id} className={`select ${swatch ? 'select--with-swatch' : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
           {options.map((opt) => (
-            <option key={opt.value ?? opt} value={opt.value ?? opt}>
+            <option key={opt.value ?? opt} value={opt.value ?? opt} disabled={opt.disabled}>
               {opt.label ?? opt}
             </option>
           ))}
@@ -274,6 +274,9 @@ export default function PropertiesPanel({ isMobile }) {
                 key={edge}
                 className={`btn btn--sm railing-btn ${currentSection.railings[edge] ? 'railing-btn--active' : ''}`}
                 onClick={() => toggleRailing(selectedSectionId, edge)}
+                disabled={edge === 'n' && currentSection.ledgerAttached}
+                title={edge === 'n' && currentSection.ledgerAttached ? "Blocked by House Wall" : ""}
+                style={edge === 'n' && currentSection.ledgerAttached ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
               >
                 {{ n: '↑ North', s: '↓ South', e: '→ East', w: '← West' }[edge]}
               </button>
@@ -287,7 +290,7 @@ export default function PropertiesPanel({ isMobile }) {
               label="Stair Direction"
               value={stairObj.direction || 's'}
               options={[
-                { value: 'n', label: '↑ North Edge' },
+                { value: 'n', label: '↑ North Edge', disabled: currentSection.ledgerAttached },
                 { value: 's', label: '↓ South Edge' },
                 { value: 'e', label: '→ East Edge' },
                 { value: 'w', label: '← West Edge' },
@@ -360,7 +363,7 @@ export default function PropertiesPanel({ isMobile }) {
             value="none"
             options={[
               { value: 'none', label: 'None' },
-              { value: 'n', label: '↑ North Edge' },
+              { value: 'n', label: '↑ North Edge', disabled: currentSection.ledgerAttached },
               { value: 's', label: '↓ South Edge' },
               { value: 'e', label: '→ East Edge' },
               { value: 'w', label: '← West Edge' },

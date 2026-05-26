@@ -391,10 +391,19 @@ export const useDeckStore = create((set, get) => ({
 
   toggleRailing: (sectionId, edge) => {
     const state = get();
+    let blocked = false;
     const newSections = state.sections.map((s) => {
       if (s.id !== sectionId) return s;
+      if (edge === 'n' && s.ledgerAttached) {
+        blocked = true;
+        return s;
+      }
       return { ...s, railings: { ...s.railings, [edge]: !s.railings[edge] } };
     });
+    if (blocked) {
+      state.showToast("Cannot add railing to house attachment edge", "warning");
+      return;
+    }
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
@@ -403,8 +412,13 @@ export const useDeckStore = create((set, get) => ({
 
   attachStairs: (sectionId, edge) => {
     const state = get();
+    let blocked = false;
     const newSections = state.sections.map((s) => {
       if (s.id !== sectionId) return s;
+      if (edge === 'n' && s.ledgerAttached) {
+        blocked = true;
+        return s;
+      }
       const alreadyHasStairsOnEdge = s.stairs && (s.stairs.direction === edge || s.stairs === edge);
       return {
         ...s,
@@ -420,6 +434,10 @@ export const useDeckStore = create((set, get) => ({
             },
       };
     });
+    if (blocked) {
+      state.showToast("Cannot attach stairs to house wall", "warning");
+      return;
+    }
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
@@ -466,6 +484,12 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
       const updated = { ...s, ...sectionUpdates };
+      if (sectionUpdates.ledgerAttached === true) {
+        updated.railings = { ...updated.railings, n: false };
+        if (updated.stairs && (updated.stairs === 'n' || updated.stairs.direction === 'n')) {
+          updated.stairs = null;
+        }
+      }
       updated.vertices = [
         { x: updated.x, y: updated.y },
         { x: updated.x + updated.width, y: updated.y },

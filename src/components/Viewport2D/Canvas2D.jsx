@@ -547,6 +547,21 @@ export default function Canvas2D({ isMobile }) {
         ctx.restore();
       }
 
+      // House Wall (if ledger attached)
+      if (sec.ledgerAttached) {
+        ctx.fillStyle = isLightTheme ? '#cbd5e1' : '#334155';
+        const wallThickness = 6 * S; // 6 inches thick
+        const wallExtend = 24 * S; // extend 24 inches on each side
+        ctx.fillRect(sx - wallExtend, sy - wallThickness, sw + wallExtend * 2, wallThickness);
+        
+        ctx.fillStyle = isLightTheme ? '#475569' : '#94a3b8';
+        ctx.font = '600 12px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('HOUSE WALL', sx + sw / 2, sy - wallThickness / 2);
+        ctx.textBaseline = 'alphabetic';
+      }
+
       // Joists
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 1.5;
