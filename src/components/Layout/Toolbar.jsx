@@ -179,6 +179,7 @@ export default function Toolbar({ isMobile }) {
   // Project save/load states
   const currentProjectName = useDeckStore((s) => s.currentProjectName);
   const setCurrentProjectName = useDeckStore((s) => s.setCurrentProjectName);
+  const showToast = useDeckStore((s) => s.showToast);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
@@ -200,6 +201,7 @@ export default function Toolbar({ isMobile }) {
     
     try {
       saveProjectToLocalStorage(trimmed, sections, materials);
+      showToast('Project saved successfully!', 'success');
     } catch (err) {
       alert(err.message || 'Failed to save project.');
     }
@@ -216,11 +218,12 @@ export default function Toolbar({ isMobile }) {
     } else {
       try {
         saveProjectToLocalStorage(currentProjectName, sections, materials);
+        showToast('Project saved successfully!', 'success');
       } catch (err) {
         alert(err.message || 'Failed to save project.');
       }
     }
-  }, [currentProjectName, sections, materials, handleSaveAsClick]);
+  }, [currentProjectName, sections, materials, handleSaveAsClick, showToast]);
 
   const handleExportClick = useCallback(() => {
     const name = currentProjectName || 'My Deck Project';

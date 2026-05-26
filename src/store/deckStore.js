@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { calculateAll } from '../engine/structuralCalc';
 import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator';
+import { validateSectionsState } from '../utils/geometry';
 
 // Initialize theme on load to prevent flash of wrong theme
 if (typeof window !== 'undefined') {
@@ -145,6 +146,8 @@ function updateBoundingBoxFromVertices(section) {
 const initialSection = createSection();
 const initialResults = recalculateAll([initialSection], DEFAULT_MATERIALS);
 
+let nextToastId = 1;
+
 export const useDeckStore = create((set, get) => ({
   // --- View State ---
   theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'dark') : 'dark',
@@ -159,6 +162,7 @@ export const useDeckStore = create((set, get) => ({
   selectedSectionId: initialSection.id,
   materials: { ...DEFAULT_MATERIALS },
   currentProjectName: '',
+  toast: null,
 
   // --- Interaction State ---
   interaction: {
@@ -197,6 +201,21 @@ export const useDeckStore = create((set, get) => ({
     set({ theme: nextTheme });
   },
   setCurrentProjectName: (name) => set({ currentProjectName: name }),
+  showToast: (message, type = 'success') => {
+    const currentToast = get().toast;
+    if (currentToast && currentToast.message === message && currentToast.type === type) {
+      return;
+    }
+    const id = nextToastId++;
+    set({ toast: { message, type, id } });
+    setTimeout(() => {
+      const t = get().toast;
+      if (t && t.id === id) {
+        set({ toast: null });
+      }
+    }, 3000);
+  },
+  hideToast: () => set({ toast: null }),
 
   // --- Actions: Interaction ---
   setInteraction: (updates) => set((s) => ({
@@ -238,6 +257,12 @@ export const useDeckStore = create((set, get) => ({
     ];
 
     const newSections = [...state.sections, sec];
+
+    if (!validateSectionsState(newSections)) {
+      state.showToast("Overlapping/intersecting layout is invalid", "error");
+      return;
+    }
+
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
@@ -295,6 +320,12 @@ export const useDeckStore = create((set, get) => ({
       }));
       return moved;
     });
+
+    if (!validateSectionsState(newSections)) {
+      state.showToast("Overlapping/intersecting layout is invalid", "error");
+      return;
+    }
+
     // No recalculate needed for position-only moves (structure unchanged)
     set({ sections: newSections });
   },
@@ -333,6 +364,12 @@ export const useDeckStore = create((set, get) => ({
         ]
       };
     });
+
+    if (!validateSectionsState(newSections)) {
+      state.showToast("Overlapping/intersecting layout is invalid", "error");
+      return;
+    }
+
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
@@ -560,6 +597,11 @@ export const useDeckStore = create((set, get) => ({
       return updateBoundingBoxFromVertices(updated);
     });
 
+    if (!validateSectionsState(newSections)) {
+      state.showToast("Overlapping/intersecting layout is invalid", "error");
+      return;
+    }
+
     const results = recalculateAll(newSections, state.materials);
     set({
       sections: newSections,
@@ -592,6 +634,11 @@ export const useDeckStore = create((set, get) => ({
       updated.vertices = updatedVertices;
       return updateBoundingBoxFromVertices(updated);
     });
+
+    if (!validateSectionsState(newSections)) {
+      state.showToast("Overlapping/intersecting layout is invalid", "error");
+      return;
+    }
 
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);

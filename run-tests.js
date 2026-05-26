@@ -510,8 +510,8 @@ test('12. Render geometry alignment: vertex-derived coordinates map exactly to w
 test('13. Stairs, landings, and multi-level render calculations remain correct and consistent with vertices bounds', () => {
   useDeckStore.getState().resetDeck();
   
-  // Place a landing with a custom width/depth and height
-  const landingRect = { x: 48, y: 48, width: 36, depth: 36 };
+  // Place a landing with a custom width/depth and height (non-overlapping)
+  const landingRect = { x: 204, y: 204, width: 36, depth: 36 };
   useDeckStore.getState().addSection(landingRect, 'landing');
   
   // Find landing section
@@ -932,6 +932,88 @@ test('26. Round-trip integrity: L-shaped custom polygon sections, stairs, and la
   assert.strictEqual(data.schemaVersion, 2);
   assert.deepStrictEqual(data.sections, sections, 'Restored sections with L-shape, stairs, and landing should be identical');
   assert.deepStrictEqual(data.materials, materials, 'Restored materials should be identical');
+});
+
+test('27. Toast Notification: showToast sets state, suppresses consecutive duplicates, and hideToast clears it', () => {
+  const store = useDeckStore;
+  
+  // Clear any existing toast
+  store.getState().hideToast();
+  assert.strictEqual(store.getState().toast, null);
+
+  // Trigger toast
+  store.getState().showToast('Test Toast Success', 'success');
+  const t1 = store.getState().toast;
+  assert.ok(t1, 'Toast should be set');
+  assert.strictEqual(t1.message, 'Test Toast Success');
+  assert.strictEqual(t1.type, 'success');
+
+  // Trigger same toast - should not change the toast ID (deduplicated)
+  store.getState().showToast('Test Toast Success', 'success');
+  const t2 = store.getState().toast;
+  assert.strictEqual(t1.id, t2.id, 'Duplicate toast should not create a new toast instance');
+
+  // Trigger different toast - should update
+  store.getState().showToast('Test Toast Info', 'info');
+  const t3 = store.getState().toast;
+  assert.notStrictEqual(t1.id, t3.id, 'Different toast should update state');
+  assert.strictEqual(t3.message, 'Test Toast Info');
+
+  // Clear toast
+  store.getState().hideToast();
+  assert.strictEqual(store.getState().toast, null, 'hideToast should clear the toast state');
+});
+
+test('28. Polygon Geometric Validation: self-intersection, overlapping sections, and rigid moves are validated and blocked if invalid', () => {
+  useDeckStore.getState().resetDeck();
+  
+  // Verify starting state (1 section: sec-1 at 0,0, w:192, d:144)
+  const initialSections = useDeckStore.getState().sections;
+  assert.strictEqual(initialSections.length, 1);
+  const sec1 = initialSections[0];
+
+  // 1. Try to drag a vertex to cause self-intersection
+  // Current vertices of sec1: [ {0,0}, {192,0}, {192,144}, {0,144} ]
+  // Try dragging V0 (0,0) to (240, 72)
+  // This will cross V1-V2 (192,0 to 192,144), resulting in self-intersection.
+  const prevVertices = [...sec1.vertices];
+  useDeckStore.getState().dragVertex(sec1.id, 0, 240, 72);
+  
+  const secAfterInvalidDrag = useDeckStore.getState().sections.find(s => s.id === sec1.id);
+  assert.deepStrictEqual(secAfterInvalidDrag.vertices, prevVertices, 'Invalid drag causing self-intersection must be rejected/reverted');
+  
+  const toastAfterDrag = useDeckStore.getState().toast;
+  assert.ok(toastAfterDrag, 'Toast should be shown on invalid geometry');
+  assert.strictEqual(toastAfterDrag.message, 'Overlapping/intersecting layout is invalid');
+  assert.strictEqual(toastAfterDrag.type, 'error');
+
+  // Clear toast for next checks
+  useDeckStore.getState().hideToast();
+
+  // 2. Add an adjacent section (allowed!)
+  // Create another section right next to sec1 (touching at x=192)
+  useDeckStore.getState().addSection({ x: 192, y: 0, width: 144, depth: 144 });
+  const sectionsAfterAdd = useDeckStore.getState().sections;
+  assert.strictEqual(sectionsAfterAdd.length, 2, 'Adjacent sections that touch boundaries are allowed');
+  const sec2 = sectionsAfterAdd[1];
+
+  // 3. Move sec2 to overlap with sec1 (should be blocked)
+  // Try moving sec2 rigid coordinates from (192,0) to (96, 0)
+  const prevSec2Vertices = [...sec2.vertices];
+  useDeckStore.getState().moveSection(sec2.id, 96, 0);
+  
+  const sec2AfterInvalidMove = useDeckStore.getState().sections.find(s => s.id === sec2.id);
+  assert.deepStrictEqual(sec2AfterInvalidMove.vertices, prevSec2Vertices, 'Overlapping section moves must be rejected/reverted');
+  assert.strictEqual(useDeckStore.getState().toast.type, 'error', 'Error toast must be triggered on overlap');
+
+  // Clear toast
+  useDeckStore.getState().hideToast();
+
+  // 4. Try to add a third section that overlaps completely (should be blocked)
+  useDeckStore.getState().addSection({ x: 48, y: 48, width: 96, depth: 96 });
+  const sectionsAfterOverlapAdd = useDeckStore.getState().sections;
+  assert.strictEqual(sectionsAfterOverlapAdd.length, 2, 'Adding an overlapping section must be blocked');
+  assert.strictEqual(useDeckStore.getState().toast.type, 'error');
 });
 
 // ─── EXECUTE ALL TESTS ───
