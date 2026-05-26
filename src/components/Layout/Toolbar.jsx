@@ -177,7 +177,8 @@ export default function Toolbar({ isMobile }) {
   }));
 
   // Project save/load states
-  const [currentProjectName, setCurrentProjectName] = useState('');
+  const currentProjectName = useDeckStore((s) => s.currentProjectName);
+  const setCurrentProjectName = useDeckStore((s) => s.setCurrentProjectName);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
@@ -197,9 +198,11 @@ export default function Toolbar({ isMobile }) {
     setCurrentProjectName(trimmed);
     setShowSaveModal(false);
     
-    // Save to local file & localStorage
-    downloadProjectFile(trimmed, sections, materials);
-    saveProjectToLocalStorage(trimmed, sections, materials);
+    try {
+      saveProjectToLocalStorage(trimmed, sections, materials);
+    } catch (err) {
+      alert(err.message || 'Failed to save project.');
+    }
   };
 
   const handleSaveAsClick = useCallback(() => {
@@ -211,10 +214,18 @@ export default function Toolbar({ isMobile }) {
     if (!currentProjectName) {
       handleSaveAsClick();
     } else {
-      downloadProjectFile(currentProjectName, sections, materials);
-      saveProjectToLocalStorage(currentProjectName, sections, materials);
+      try {
+        saveProjectToLocalStorage(currentProjectName, sections, materials);
+      } catch (err) {
+        alert(err.message || 'Failed to save project.');
+      }
     }
   }, [currentProjectName, sections, materials, handleSaveAsClick]);
+
+  const handleExportClick = useCallback(() => {
+    const name = currentProjectName || 'My Deck Project';
+    downloadProjectFile(name, sections, materials);
+  }, [currentProjectName, sections, materials]);
 
   const handleOpenClick = () => {
     setRecentProjects(listRecentProjects());
@@ -401,15 +412,22 @@ export default function Toolbar({ isMobile }) {
           </svg>
         </button>
 
-        {/* Mobile Open & Save */}
-        <button className="btn btn--ghost btn--icon" onClick={handleOpenClick} aria-label="Open Project" id="btn-open-mobile">
+        {/* Mobile Open, Save & Export */}
+        <button className="btn btn--ghost btn--icon" onClick={handleOpenClick} aria-label="Open Project" id="btn-open-mobile" title="Open project">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
         </button>
-        <button className="btn btn--ghost btn--icon" onClick={handleSaveClick} aria-label="Save Project" id="btn-save-mobile">
+        <button className="btn btn--ghost btn--icon" onClick={handleSaveClick} aria-label="Save Project" id="btn-save-mobile" title="Save project to browser (in-app)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          </svg>
+        </button>
+        <button className="btn btn--ghost btn--icon" onClick={handleExportClick} aria-label="Export Project" id="btn-export-mobile" title="Export .deck file (download)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
         </button>
 
@@ -527,14 +545,14 @@ export default function Toolbar({ isMobile }) {
       <div style={{ flex: 1 }} />
 
       <div className="toolbar__group">
-        {/* Save & Load controls */}
+        {/* Save, Load & Export controls */}
         <button className="btn btn--secondary btn--icon" onClick={handleOpenClick} aria-label="Open design" data-tooltip="Open Design" id="btn-open">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
           </svg>
           Open
         </button>
-        <button className="btn btn--secondary btn--icon" onClick={handleSaveClick} aria-label="Save design" data-tooltip="Save Design" id="btn-save">
+        <button className="btn btn--secondary btn--icon" onClick={handleSaveClick} aria-label="Save design" data-tooltip="Save to browser storage (in-app)" id="btn-save">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
             <polyline points="17 21 17 13 7 13 7 21"/>
@@ -542,13 +560,21 @@ export default function Toolbar({ isMobile }) {
           </svg>
           Save
         </button>
-        <button className="btn btn--secondary btn--icon" onClick={handleSaveAsClick} aria-label="Save design as" data-tooltip="Save Design As" id="btn-save-as">
+        <button className="btn btn--secondary btn--icon" onClick={handleSaveAsClick} aria-label="Save design as" data-tooltip="Save as new project in browser" id="btn-save-as">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
             <polyline points="17 21 17 13 7 13 7 21"/>
             <polyline points="7 3 7 8 15 8"/>
           </svg>
           Save As
+        </button>
+        <button className="btn btn--secondary btn--icon" onClick={handleExportClick} aria-label="Export design to file" data-tooltip="Export .deck file (download file)" id="btn-export-deck">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export
         </button>
 
         <button

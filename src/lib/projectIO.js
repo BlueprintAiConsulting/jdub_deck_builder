@@ -42,29 +42,38 @@ export function downloadProjectFile(projectName, sections, materials) {
  * Saves a project state to browser localStorage and updates the Recent Projects list.
  */
 export function saveProjectToLocalStorage(projectName, sections, materials) {
-  const data = serializeProject(projectName, sections, materials);
-  const key = `deckforge_project_${projectName}`;
-  localStorage.setItem(key, JSON.stringify(data));
-
-  // Update list of recent projects
-  let recent = [];
   try {
-    const raw = localStorage.getItem('deckforge_recent_projects');
-    recent = raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error('Failed to parse recent projects:', e);
+    const data = serializeProject(projectName, sections, materials);
+    const key = `deckforge_project_${projectName}`;
+    localStorage.setItem(key, JSON.stringify(data));
+
+    // Update list of recent projects
+    let recent = [];
+    try {
+      const raw = localStorage.getItem('deckforge_recent_projects');
+      recent = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('Failed to parse recent projects:', e);
+    }
+
+    // Remove existing entry to move it to the front
+    recent = recent.filter(name => name !== projectName);
+    recent.unshift(projectName);
+
+    // Limit to most recent 20 projects
+    if (recent.length > 20) {
+      recent = recent.slice(0, 20);
+    }
+
+    localStorage.setItem('deckforge_recent_projects', JSON.stringify(recent));
+  } catch (error) {
+    console.error('Failed to save project to localStorage:', error);
+    if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+      throw new Error('Browser storage is full. Please use "Export" to download your project file (.deck) to prevent losing your work.');
+    } else {
+      throw new Error('Failed to save project to browser storage. Please check browser settings or use "Export" to download your project file (.deck).');
+    }
   }
-
-  // Remove existing entry to move it to the front
-  recent = recent.filter(name => name !== projectName);
-  recent.unshift(projectName);
-
-  // Limit to most recent 20 projects
-  if (recent.length > 20) {
-    recent = recent.slice(0, 20);
-  }
-
-  localStorage.setItem('deckforge_recent_projects', JSON.stringify(recent));
 }
 
 /**

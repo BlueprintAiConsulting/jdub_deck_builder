@@ -158,6 +158,7 @@ export const useDeckStore = create((set, get) => ({
   sections: [initialSection],
   selectedSectionId: initialSection.id,
   materials: { ...DEFAULT_MATERIALS },
+  currentProjectName: '',
 
   // --- Interaction State ---
   interaction: {
@@ -195,6 +196,7 @@ export const useDeckStore = create((set, get) => ({
     }
     set({ theme: nextTheme });
   },
+  setCurrentProjectName: (name) => set({ currentProjectName: name }),
 
   // --- Actions: Interaction ---
   setInteraction: (updates) => set((s) => ({
@@ -486,6 +488,7 @@ export const useDeckStore = create((set, get) => ({
       sections: [sec],
       selectedSectionId: sec.id,
       materials: mat,
+      currentProjectName: '',
       ...results,
       history: [{ sections: [{ ...sec }], materials: { ...mat } }],
       historyIndex: 0,

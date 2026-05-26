@@ -6,6 +6,7 @@ import BomBar from './BomBar';
 import Canvas2D from '../Viewport2D/Canvas2D';
 import Scene3D from '../Viewport3D/Scene3D';
 import { useDeckStore } from '../../store/deckStore';
+import { listRecentProjects, loadProjectFromLocalStorage } from '../../lib/projectIO';
 import './AppShell.css';
 
 const MOBILE_BREAKPOINT = 768;
@@ -27,6 +28,25 @@ function useIsMobile() {
 export default function AppShell() {
   const viewMode = useDeckStore((s) => s.viewMode);
   const isMobile = useIsMobile();
+  const loadProject = useDeckStore((s) => s.loadProject);
+  const setCurrentProjectName = useDeckStore((s) => s.setCurrentProjectName);
+
+  // Auto-restore last saved project on mount
+  useEffect(() => {
+    try {
+      const recents = listRecentProjects();
+      if (recents && recents.length > 0) {
+        const mostRecent = recents[0];
+        const data = loadProjectFromLocalStorage(mostRecent);
+        if (data && data.sections && data.materials) {
+          loadProject(data.sections, data.materials);
+          setCurrentProjectName(mostRecent);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to auto-restore last saved project:', err);
+    }
+  }, [loadProject, setCurrentProjectName]);
 
   // Mobile panel state: 'none' | 'tools' | 'properties' | 'bom'
   const [mobilePanel, setMobilePanel] = useState('none');
