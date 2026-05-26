@@ -42,6 +42,7 @@ global.window = {
   localStorage: mockLocalStorage
 };
 global.localStorage = mockLocalStorage;
+let createdElements = [];
 global.document = {
   documentElement: mockDocumentElement,
   querySelector(selector) {
@@ -49,10 +50,32 @@ global.document = {
       return mockMeta;
     }
     return null;
+  },
+  createElement(tagName) {
+    const el = {
+      tagName: tagName.toUpperCase(),
+      click() { this.clicked = true; },
+      setAttribute(name, val) { this[name] = val; }
+    };
+    createdElements.push(el);
+    return el;
+  },
+  body: {
+    appendChild(el) { el.appended = true; },
+    removeChild(el) { el.removed = true; }
   }
 };
 
-const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
+global.URL.createObjectURL = () => 'blob:mock';
+global.URL.revokeObjectURL = () => {};
+
+const {
+  serializeProject,
+  validateProjectData,
+  saveProjectToLocalStorage,
+  loadProjectFromLocalStorage,
+  downloadProjectFile
+} = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
 const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/components/Viewport2D/Canvas2D.jsx');
@@ -754,6 +777,161 @@ test('20. Deleting a Vertex: deleting a vertex removes it, updates bounding box,
   
   // Should be blocked: vertices count remains 3
   assert.strictEqual(updatedSec2.vertices.length, 3, 'Deletion below 3 vertices must be blocked');
+});
+
+test('21. Save writes to storage, not a file: save action updates localStorage and does not download a file', () => {
+  mockLocalStorage.clear();
+  createdElements = [];
+
+  const sections = [{ id: 'sec-1', type: 'deck', x: 0, y: 0, width: 100, depth: 100, vertices: [] }];
+  const materials = { species: 'SYP' };
+
+  saveProjectToLocalStorage('Test Project', sections, materials);
+
+  const stored = mockLocalStorage.getItem('deckforge_project_Test Project');
+  assert.ok(stored, 'Project data should be stored in localStorage');
+  const parsed = JSON.parse(stored);
+  assert.equal(parsed.projectName, 'Test Project');
+  assert.strictEqual(createdElements.length, 0, 'Should not initiate a file download');
+});
+
+test('22. Save is in-place: repeatedly saving a project updates the same key and does not accumulate extra entries', () => {
+  mockLocalStorage.clear();
+
+  const sections = [{ id: 'sec-1', type: 'deck', x: 0, y: 0, width: 100, depth: 100, vertices: [] }];
+  const materials = { species: 'SYP' };
+
+  saveProjectToLocalStorage('Test Project', sections, materials);
+  const keysCount1 = Object.keys(mockLocalStorage.store).length;
+
+  saveProjectToLocalStorage('Test Project', [{ ...sections[0], width: 120 }], materials);
+  const keysCount2 = Object.keys(mockLocalStorage.store).length;
+
+  assert.strictEqual(keysCount1, keysCount2, 'Saving repeatedly should not create new keys');
+  
+  const stored = mockLocalStorage.getItem('deckforge_project_Test Project');
+  const parsed = JSON.parse(stored);
+  assert.strictEqual(parsed.sections[0].width, 120, 'Data should be updated in place');
+});
+
+test('23. Auto-restore: mount routine retrieves the most recent project and loads it into store', () => {
+  mockLocalStorage.clear();
+
+  const sections = [{ id: 'sec-1', type: 'deck', x: 10, y: 20, width: 100, depth: 100, vertices: [] }];
+  const materials = { species: 'SYP' };
+
+  saveProjectToLocalStorage('Restore Project', sections, materials);
+
+  useDeckStore.getState().resetDeck();
+  assert.notStrictEqual(useDeckStore.getState().currentProjectName, 'Restore Project');
+
+  const recents = JSON.parse(mockLocalStorage.getItem('deckforge_recent_projects') || '[]');
+  assert.ok(recents.length > 0, 'Recents list should not be empty');
+  const mostRecent = recents[0];
+  assert.strictEqual(mostRecent, 'Restore Project', 'Most recent project should match');
+
+  const data = loadProjectFromLocalStorage(mostRecent);
+  useDeckStore.getState().loadProject(data.sections, data.materials);
+  useDeckStore.getState().setCurrentProjectName(mostRecent);
+
+  const finalState = useDeckStore.getState();
+  assert.strictEqual(finalState.currentProjectName, 'Restore Project', 'Store name should be restored');
+  assert.strictEqual(finalState.sections[0].x, 10, 'Store sections should be restored');
+  assert.strictEqual(finalState.materials.species, 'SYP', 'Store materials should be restored');
+});
+
+test('24. Export still writes a file: export action triggers .deck file download', () => {
+  createdElements = [];
+
+  const sections = [{ id: 'sec-1', type: 'deck', x: 0, y: 0, width: 100, depth: 100, vertices: [] }];
+  const materials = { species: 'SYP' };
+
+  downloadProjectFile('Export Project', sections, materials);
+
+  assert.strictEqual(createdElements.length, 1, 'Should create exactly one download element');
+  assert.strictEqual(createdElements[0].tagName, 'A', 'Should create a link');
+  assert.strictEqual(createdElements[0].download, 'Export_Project.deck', 'Should download as correct filename');
+});
+
+test('25. Quota handling: catching localStorage QuotaExceededError and throwing a clear user-facing error message', () => {
+  mockLocalStorage.clear();
+
+  const originalSetItem = mockLocalStorage.setItem;
+  mockLocalStorage.setItem = () => {
+    const err = new Error('Quota exceeded');
+    err.name = 'QuotaExceededError';
+    throw err;
+  };
+
+  const sections = [{ id: 'sec-1', type: 'deck', x: 0, y: 0, width: 100, depth: 100, vertices: [] }];
+  const materials = { species: 'SYP' };
+
+  assert.throws(
+    () => saveProjectToLocalStorage('Full Project', sections, materials),
+    /Browser storage is full. Please use "Export"/,
+    'Should throw descriptive quota exceeded error'
+  );
+
+  mockLocalStorage.setItem = originalSetItem;
+});
+
+test('26. Round-trip integrity: L-shaped custom polygon sections, stairs, and landings save and load perfectly', () => {
+  mockLocalStorage.clear();
+
+  const lShapeVertices = [
+    { x: 0, y: 0 },
+    { x: 192, y: 0 },
+    { x: 192, y: 72 },
+    { x: 96, y: 72 },
+    { x: 96, y: 144 },
+    { x: 0, y: 144 }
+  ];
+
+  const sections = [
+    {
+      id: 'sec-l-shape',
+      x: 0, y: 0, width: 192, depth: 144, height: 36,
+      ledgerAttached: true,
+      railings: { n: true, s: false, e: true, w: true },
+      stairs: { type: 'stair', width: 36, numberOfSteps: 5, rise: 7.25, run: 10, direction: 's' },
+      type: 'deck',
+      vertices: lShapeVertices
+    },
+    {
+      id: 'sec-landing',
+      x: 200, y: 200, width: 36, depth: 36, height: 36,
+      ledgerAttached: false,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: null,
+      type: 'landing',
+      vertices: [
+        { x: 200, y: 200 },
+        { x: 236, y: 200 },
+        { x: 236, y: 236 },
+        { x: 200, y: 236 }
+      ]
+    }
+  ];
+
+  const materials = {
+    joistSize: '2x8',
+    joistSpacing: 16,
+    species: 'SYP',
+    beamConfig: '2-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'PT-SYP',
+    soilCapacity: 2000
+  };
+
+  saveProjectToLocalStorage('L-Shape Project', sections, materials);
+
+  const data = loadProjectFromLocalStorage('L-Shape Project');
+
+  assert.strictEqual(data.projectName, 'L-Shape Project');
+  assert.strictEqual(data.schemaVersion, 2);
+  assert.deepStrictEqual(data.sections, sections, 'Restored sections with L-shape, stairs, and landing should be identical');
+  assert.deepStrictEqual(data.materials, materials, 'Restored materials should be identical');
 });
 
 // ─── EXECUTE ALL TESTS ───
