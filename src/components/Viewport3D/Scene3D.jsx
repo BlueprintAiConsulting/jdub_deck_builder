@@ -7,26 +7,63 @@ import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTabl
 
 const IN = 1 / 12; // inches to scene units (feet)
 
+export function getHorizontalIntersections(y, vertices) {
+  const intersections = [];
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i];
+    const b = vertices[(i + 1) % vertices.length];
+    
+    const minY = Math.min(a.y, b.y);
+    const maxY = Math.max(a.y, b.y);
+    
+    if (y >= minY && y <= maxY && minY !== maxY) {
+      const x = a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y);
+      intersections.push(x);
+    }
+  }
+  
+  const sorted = intersections.sort((a, b) => a - b);
+  const unique = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (unique.length === 0 || Math.abs(sorted[i] - unique[unique.length - 1]) > 0.001) {
+      unique.push(sorted[i]);
+    }
+  }
+  
+  const segments = [];
+  for (let i = 0; i < unique.length - 1; i += 2) {
+    segments.push({ startX: unique[i], endX: unique[i + 1] });
+  }
+  return segments;
+}
+
 function DeckBoards({ vertices, secX, secY, species, deckBoardSize }) {
   const color = WOOD_COLORS[species] || '#c4a35a';
   const boardW = LUMBER_ACTUAL[deckBoardSize]?.depth || 5.5;
   const boardH = LUMBER_ACTUAL[deckBoardSize]?.width || 1.0;
   const gap = 0.125;
+
   const boards = useMemo(() => {
     if (!vertices || vertices.length === 0) return [];
     
-    const localYs = vertices.map(v => v.y - secY);
-    const localXs = vertices.map(v => v.x - secX);
-    const localMinX = Math.min(...localXs), localMaxX = Math.max(...localXs);
-    const localMinY = Math.min(...localYs), localMaxY = Math.max(...localYs);
-    
-    const localWidth = localMaxX - localMinX;
+    const localVertices = vertices.map(v => ({ x: v.x - secX, y: v.y - secY }));
+    const localYs = localVertices.map(v => v.y);
+    const localMinY = Math.min(...localYs);
+    const localMaxY = Math.max(...localYs);
     
     const arr = [];
     let y = localMinY, idx = 0;
     while (y < localMaxY) {
       const bw = Math.min(boardW, localMaxY - y);
-      arr.push({ idx, y: y + bw / 2, bw, startX: localMinX, boardWidth: localWidth });
+      const boardCenterY = y + bw / 2;
+      const segments = getHorizontalIntersections(boardCenterY, localVertices);
+      
+      segments.forEach((seg, sIdx) => {
+        const boardWidth = seg.endX - seg.startX;
+        if (boardWidth > 0.5) {
+          arr.push({ id: `${idx}-${sIdx}`, y: boardCenterY, bw, startX: seg.startX, boardWidth });
+        }
+      });
       y += boardW + gap;
       idx++;
     }
@@ -35,8 +72,8 @@ function DeckBoards({ vertices, secX, secY, species, deckBoardSize }) {
 
   return (
     <group>
-      {boards.map(({ idx, y, bw, startX, boardWidth }) => (
-        <mesh key={`board-${idx}`} position={[(startX + boardWidth / 2) * IN, boardH / 2 * IN, y * IN]}>
+      {boards.map(({ id, y, bw, startX, boardWidth }) => (
+        <mesh key={`board-${id}`} position={[(startX + boardWidth / 2) * IN, boardH / 2 * IN, y * IN]}>
           <boxGeometry args={[boardWidth * IN, boardH * IN, bw * IN]} />
           <meshStandardMaterial color={color} roughness={0.72} metalness={0.03} />
         </mesh>

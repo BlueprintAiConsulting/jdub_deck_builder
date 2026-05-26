@@ -126,6 +126,22 @@ function findEdgeSnap(movingSection, allSections, threshold = 12) {
   return snaps;
 }
 
+// Keep section bounding box (x, y, width, depth) synchronized with vertices
+function updateBoundingBoxFromVertices(section) {
+  if (!section.vertices || section.vertices.length === 0) return section;
+  const xs = section.vertices.map(v => v.x);
+  const ys = section.vertices.map(v => v.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  section.x = minX;
+  section.y = minY;
+  section.width = maxX - minX;
+  section.depth = maxY - minY;
+  return section;
+}
+
 const initialSection = createSection();
 const initialResults = recalculateAll([initialSection], DEFAULT_MATERIALS);
 
@@ -145,10 +161,11 @@ export const useDeckStore = create((set, get) => ({
 
   // --- Interaction State ---
   interaction: {
-    mode: 'idle', // 'idle' | 'placing' | 'resizing' | 'moving'
+    mode: 'idle', // 'idle' | 'placing' | 'resizing' | 'moving' | 'dragging_vertex'
     dragStart: null,
     ghostRect: null,
     resizeHandle: null,
+    selectedVertexIndex: null,
   },
 
   // --- Calculated Results (per section) ---
@@ -523,6 +540,99 @@ export const useDeckStore = create((set, get) => ({
       ...results,
       history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: { ...materials } }],
       historyIndex: 0,
+    });
+  },
+
+  dragVertex: (id, vertexIndex, newX, newY) => {
+    const state = get();
+    const newSections = state.sections.map((s) => {
+      if (s.id !== id) return s;
+      const updated = { ...s };
+      const updatedVertices = [...s.vertices];
+      updatedVertices[vertexIndex] = {
+        x: snapToGrid(newX),
+        y: snapToGrid(newY)
+      };
+      updated.vertices = updatedVertices;
+      return updateBoundingBoxFromVertices(updated);
+    });
+
+    const results = recalculateAll(newSections, state.materials);
+    set({
+      sections: newSections,
+      ...results
+    });
+  },
+
+  finishVertexDrag: () => {
+    const state = get();
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push({ sections: state.sections.map((s) => ({ ...s })), materials: { ...state.materials } });
+    set({
+      interaction: {
+        ...state.interaction,
+        mode: 'idle',
+        dragStart: null
+      },
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+    });
+  },
+
+  addVertex: (id, insertIndex, newVertex) => {
+    const state = get();
+    const newSections = state.sections.map((s) => {
+      if (s.id !== id) return s;
+      const updated = { ...s };
+      const updatedVertices = [...s.vertices];
+      updatedVertices.splice(insertIndex, 0, newVertex);
+      updated.vertices = updatedVertices;
+      return updateBoundingBoxFromVertices(updated);
+    });
+
+    const results = recalculateAll(newSections, state.materials);
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
+
+    set({
+      sections: newSections,
+      ...results,
+      interaction: {
+        ...state.interaction,
+        mode: 'idle',
+        selectedVertexIndex: insertIndex
+      },
+      history: newHistory,
+      historyIndex: newHistory.length - 1
+    });
+  },
+
+  removeVertex: (id, vertexIndex) => {
+    const state = get();
+    const newSections = state.sections.map((s) => {
+      if (s.id !== id) return s;
+      if (s.vertices.length <= 3) return s; // Minimum 3 vertices safety
+      const updated = { ...s };
+      const updatedVertices = [...s.vertices];
+      updatedVertices.splice(vertexIndex, 1);
+      updated.vertices = updatedVertices;
+      return updateBoundingBoxFromVertices(updated);
+    });
+
+    const results = recalculateAll(newSections, state.materials);
+    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
+
+    set({
+      sections: newSections,
+      ...results,
+      interaction: {
+        ...state.interaction,
+        mode: 'idle',
+        selectedVertexIndex: null
+      },
+      history: newHistory,
+      historyIndex: newHistory.length - 1
     });
   },
 }));

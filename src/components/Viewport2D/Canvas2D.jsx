@@ -76,6 +76,51 @@ export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch) {
   return null;
 }
 
+export function hitTestVertices(mx, my, vertices, S, panX, panY, cw, ch) {
+  if (!vertices) return -1;
+  const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
+  const handleRadius = 6;
+  for (let i = 0; i < vertices.length; i++) {
+    const vx = vertices[i].x * S + ox;
+    const vy = vertices[i].y * S + oy;
+    if (Math.abs(mx - vx) < handleRadius + 3 && Math.abs(my - vy) < handleRadius + 3) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+export function getDistanceToSegment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  
+  const cx = ax + t * dx;
+  const cy = ay + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+export function findEdgeSplitIndex(lx, ly, vertices, thresholdInches) {
+  if (!vertices || vertices.length < 3) return -1;
+  let bestIndex = -1;
+  let minDistance = thresholdInches;
+  
+  for (let i = 0; i < vertices.length; i++) {
+    const v1 = vertices[i];
+    const v2 = vertices[(i + 1) % vertices.length];
+    const dist = getDistanceToSegment(lx, ly, v1.x, v1.y, v2.x, v2.y);
+    if (dist < minDistance) {
+      minDistance = dist;
+      bestIndex = i;
+    }
+  }
+  return bestIndex;
+}
+
 function getNearestEdge(mx, my, sec, S, panX, panY, cw, ch) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
   const sx = sec.x * S + ox, sy = sec.y * S + oy;
@@ -113,6 +158,10 @@ export default function Canvas2D({ isMobile }) {
   const setInteraction = useDeckStore((s) => s.setInteraction);
   const toggleRailing = useDeckStore((s) => s.toggleRailing);
   const attachStairs = useDeckStore((s) => s.attachStairs);
+  const dragVertex = useDeckStore((s) => s.dragVertex);
+  const finishVertexDrag = useDeckStore((s) => s.finishVertexDrag);
+  const addVertex = useDeckStore((s) => s.addVertex);
+  const removeVertex = useDeckStore((s) => s.removeVertex);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -144,6 +193,19 @@ export default function Canvas2D({ isMobile }) {
     if (selectedTool === 'select') {
       const sel = sections.find((s) => s.id === selectedSectionId);
       if (sel) {
+        // Check vertex handles first
+        const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
+        if (vIdx !== -1) {
+          setInteraction({
+            mode: 'dragging_vertex',
+            vertexIndex: vIdx,
+            dragStart: { x: mx, y: my },
+            selectedVertexIndex: vIdx
+          });
+          return;
+        }
+
+        // Check resize handles
         const handle = hitTestHandles(mx, my, sel, S, panOffset.x, panOffset.y, size.w, size.h);
         if (handle) {
           setInteraction({ mode: 'resizing', resizeHandle: handle, dragStart: { x: mx, y: my } });
@@ -156,6 +218,7 @@ export default function Canvas2D({ isMobile }) {
         setInteraction({ mode: 'moving', dragStart: { x: mx, y: my } });
       } else {
         selectSection(null);
+        setInteraction({ mode: 'idle', dragStart: null, selectedVertexIndex: null });
       }
       return;
     }
@@ -185,6 +248,14 @@ export default function Canvas2D({ isMobile }) {
     if (interaction.mode === 'placing' && interaction.dragStart) {
       setInteraction({ ghostRect: { x: interaction.dragStart.x, y: interaction.dragStart.y, w: mx - interaction.dragStart.x, h: my - interaction.dragStart.y } });
     }
+    if (interaction.mode === 'dragging_vertex' && selectedSectionId) {
+      const ox = size.w / 2 + panOffset.x;
+      const oy = size.h / 2 + panOffset.y;
+      const newX = (mx - ox) / S;
+      const newY = (my - oy) / S;
+      dragVertex(selectedSectionId, interaction.vertexIndex, newX, newY);
+      return;
+    }
     if (interaction.mode === 'moving' && interaction.dragStart && selectedSectionId) {
       const sec = sections.find((s) => s.id === selectedSectionId);
       if (!sec) return;
@@ -204,7 +275,7 @@ export default function Canvas2D({ isMobile }) {
       if (h.includes('n')) { u.y = sec.y + dy; u.depth = sec.depth - dy; }
       resizeSection(selectedSectionId, u);
     }
-  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection]);
+  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection, dragVertex, size.w, size.h, panOffset.x, panOffset.y]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) { setIsPanning(false); return; }
@@ -224,9 +295,10 @@ export default function Canvas2D({ isMobile }) {
       }
       setInteraction({ mode: 'idle', dragStart: null, ghostRect: null });
     }
+    if (interaction.mode === 'dragging_vertex') finishVertexDrag();
     if (interaction.mode === 'moving') finishMove();
     if (interaction.mode === 'resizing') setInteraction({ mode: 'idle', dragStart: null, resizeHandle: null });
-  }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction]);
+  }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction, finishVertexDrag]);
 
   // Touch handlers
   const handleTouchStart = useCallback((e) => {
@@ -287,6 +359,74 @@ export default function Canvas2D({ isMobile }) {
     lastTouchDistRef.current = null;
     if (interaction.mode === 'moving') finishMove();
   }, [interaction, finishMove]);
+
+  // Global keyboard listener to delete active vertex via Backspace/Delete keys
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.closest('input, select') && selectedSectionId) {
+        const sec = sections.find((s) => s.id === selectedSectionId);
+        if (sec && interaction.selectedVertexIndex !== null && interaction.selectedVertexIndex !== undefined) {
+          if (sec.vertices.length <= 3) {
+            alert("A deck section must have at least 3 vertices to remain a valid polygon.");
+            return;
+          }
+          removeVertex(selectedSectionId, interaction.selectedVertexIndex);
+          e.preventDefault();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [selectedSectionId, sections, interaction.selectedVertexIndex, removeVertex]);
+
+  // Double-click to split polygon edge
+  const handleDoubleClick = useCallback((e) => {
+    if (selectedTool !== 'select' || !selectedSectionId) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+    const ox = size.w / 2 + panOffset.x;
+    const oy = size.h / 2 + panOffset.y;
+    const lx = (mx - ox) / S;
+    const ly = (my - oy) / S;
+
+    const sec = sections.find((s) => s.id === selectedSectionId);
+    if (!sec) return;
+
+    // Use split edge threshold (approx 12 layout inches)
+    const thresholdInches = 12 / S;
+    const splitIdx = findEdgeSplitIndex(lx, ly, sec.vertices, thresholdInches);
+
+    if (splitIdx !== -1) {
+      // Snapped to nearest 12-inch grid point
+      const newV = {
+        x: Math.round(lx / 12) * 12,
+        y: Math.round(ly / 12) * 12
+      };
+      addVertex(selectedSectionId, splitIdx + 1, newV);
+    }
+  }, [selectedTool, selectedSectionId, sections, S, size, panOffset, addVertex]);
+
+  // Right-click context menu to delete a vertex
+  const handleContextMenu = useCallback((e) => {
+    if (selectedTool !== 'select' || !selectedSectionId) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+    const sec = sections.find((s) => s.id === selectedSectionId);
+    if (!sec) return;
+
+    const vIdx = hitTestVertices(mx, my, sec.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
+    if (vIdx !== -1) {
+      e.preventDefault(); // Stop standard context menu if clicking handle
+      if (sec.vertices.length <= 3) {
+        alert("A deck section must have at least 3 vertices to remain a valid polygon.");
+        return;
+      }
+      removeVertex(selectedSectionId, vIdx);
+    }
+  }, [selectedTool, selectedSectionId, sections, S, panOffset, size, removeVertex]);
 
   // --- DRAW ---
   useEffect(() => {
@@ -522,6 +662,26 @@ export default function Canvas2D({ isMobile }) {
           ctx.strokeRect(pos.cx + ox - HANDLE_SIZE/2, pos.cy + oy - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE);
         });
       }
+
+      // Vertex handles (selected only)
+      if (isSelected && selectedTool === 'select' && sec.vertices) {
+        sec.vertices.forEach((v, idx) => {
+          const vx = v.x * S + ox;
+          const vy = v.y * S + oy;
+          const isVertexSelected = interaction.selectedVertexIndex === idx;
+
+          ctx.fillStyle = isVertexSelected ? '#ef4444' : '#10b981'; // Red if active, Emerald otherwise
+          ctx.beginPath();
+          ctx.arc(vx, vy, 6, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(vx, vy, 6, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
     });
 
     // Ghost rectangle while placing
@@ -582,7 +742,7 @@ export default function Canvas2D({ isMobile }) {
   }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S]);
 
   const cursor = interaction.mode === 'placing' ? 'crosshair' :
-    interaction.mode === 'moving' ? 'grabbing' :
+    interaction.mode === 'moving' || interaction.mode === 'dragging_vertex' ? 'grabbing' :
     interaction.mode === 'resizing' ? 'nwse-resize' :
     selectedTool === 'rectangle' ? 'crosshair' : 'default';
 
@@ -599,6 +759,7 @@ export default function Canvas2D({ isMobile }) {
   return (
     <div ref={containerRef} className="canvas-2d"
       onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+      onDoubleClick={handleDoubleClick} onContextMenu={handleContextMenu}
       onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
       style={{ cursor, touchAction: 'none' }}>

@@ -55,7 +55,7 @@ global.document = {
 const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
-const { isPointInPolygon, hitTestSection } = await import('./src/components/Viewport2D/Canvas2D.jsx');
+const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/components/Viewport2D/Canvas2D.jsx');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -677,6 +677,83 @@ test('17. Save/load round-trip after rigid drag: dragging a section, saving it, 
   assert.strictEqual(restoredSec.x, 36, 'Restored X coordinate must match dragged position (36)');
   assert.strictEqual(restoredSec.y, 60, 'Restored Y coordinate must match dragged position (60)');
   assert.deepStrictEqual(restoredSec.vertices, movedSec.vertices, 'Restored vertices must match dragged vertices exactly');
+});
+
+test('18. Polygon Edge Splitting (Add Vertex): splitting an edge inserts a new vertex in vertices and updates state', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Starting vertices: 4-corner rectangle at x:0, y:0, w:192, d:144
+  // [ {x:0, y:0}, {x:192, y:0}, {x:192, y:144}, {x:0, y:144} ]
+  
+  // Click on the edge between V1 (192, 0) and V2 (192, 144) at layout coordinates (192, 72)
+  const splitIdx = findEdgeSplitIndex(192, 72, initialSec.vertices, 12);
+  assert.strictEqual(splitIdx, 1, 'Edge split index should be 1 (between V1 and V2)');
+
+  // Call store addVertex to insert new vertex at splitIdx + 1 = 2
+  const newV = { x: 192, y: 72 };
+  useDeckStore.getState().addVertex(initialSec.id, 2, newV);
+
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(updatedSec.vertices.length, 5, 'Vertices count must increase to 5');
+  assert.deepStrictEqual(updatedSec.vertices[2], newV, 'Inserted vertex must be at index 2');
+
+  // Verify bounding box (remains w:192, d:144 because split was on the boundary)
+  assert.strictEqual(updatedSec.x, 0);
+  assert.strictEqual(updatedSec.y, 0);
+  assert.strictEqual(updatedSec.width, 192);
+  assert.strictEqual(updatedSec.depth, 144);
+});
+
+test('19. Dragging a Vertex: dragging a vertex updates its coordinates, snaps to grid, and keeps bounding box synced', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Drag V1 (192, 0) to new location (144, 24)
+  useDeckStore.getState().dragVertex(initialSec.id, 1, 144, 24);
+
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(updatedSec.vertices[1].x, 144, 'Vertex X must snap and update to 144');
+  assert.strictEqual(updatedSec.vertices[1].y, 24, 'Vertex Y must snap and update to 24');
+
+  // Check bounding box updates
+  // Vertices are now: [ {0,0}, {144,24}, {192,144}, {0,144} ]
+  // xs: 0, 144, 192, 0 -> min: 0, max: 192
+  // ys: 0, 24, 144, 144 -> min: 0, max: 144
+  assert.strictEqual(updatedSec.x, 0, 'Bounding box X must be minX (0)');
+  assert.strictEqual(updatedSec.y, 0, 'Bounding box Y must be minY (0)');
+  assert.strictEqual(updatedSec.width, 192, 'Bounding box width must be 192');
+  assert.strictEqual(updatedSec.depth, 144, 'Bounding box depth must be 144');
+
+  // Drag V2 (192, 144) outward to (240, 168)
+  useDeckStore.getState().dragVertex(initialSec.id, 2, 240, 168);
+  const updatedSec2 = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(updatedSec2.width, 240, 'Bounding box width must expand to 240');
+  assert.strictEqual(updatedSec2.depth, 168, 'Bounding box depth must expand to 168');
+});
+
+test('20. Deleting a Vertex: deleting a vertex removes it, updates bounding box, and is blocked below 3 vertices', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Delete V1 (192, 0)
+  useDeckStore.getState().removeVertex(initialSec.id, 1);
+
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(updatedSec.vertices.length, 3, 'Vertices count must decrease to 3');
+  
+  // Bounding box should update
+  // Remaining vertices: [ {0,0}, {192,144}, {0,144} ]
+  // minX:0, maxX:192, minY:0, maxY:144
+  assert.strictEqual(updatedSec.width, 192);
+  assert.strictEqual(updatedSec.depth, 144);
+
+  // Attempt to delete another vertex (leaving only 2 vertices)
+  useDeckStore.getState().removeVertex(initialSec.id, 0);
+  const updatedSec2 = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  
+  // Should be blocked: vertices count remains 3
+  assert.strictEqual(updatedSec2.vertices.length, 3, 'Deletion below 3 vertices must be blocked');
 });
 
 // ─── EXECUTE ALL TESTS ───
