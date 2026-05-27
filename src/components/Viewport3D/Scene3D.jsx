@@ -599,7 +599,7 @@ function Stairs({ stairEdge, stairCalcs, width, depth, species, deckMaterial }) 
   );
 }
 
-function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial }) {
+function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height }) {
   if (!rampEdge || !rampCalcs) return null;
 
   const { totalRise, run, surfaceLength, width: rampWidth } = rampCalcs;
@@ -608,6 +608,10 @@ function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial }) {
 
   const { color, type } = getMaterialVisuals(deckMaterial, species);
   const texture = getProceduralTexture(color, type);
+  
+  // Textures for framing/posts
+  const woodTexture = getProceduralTexture('#5a4d3b', 'wood');
+  const postTexture = getProceduralTexture('#504230', 'wood');
 
   let startX, startZ, rotY;
   const align = rampCalcs.align || 'center';
@@ -629,22 +633,178 @@ function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial }) {
     rotY = Math.PI / 2;
   }
 
-  // Tilt angle around local X axis
-  const theta = Math.atan2(totalRise, run);
-
   // Position at top-center of the ramp (at the deck edge)
   const groupX = (rampEdge === 's' || rampEdge === 'n') ? startX + rampWidth / 2 : startX;
   const groupZ = (rampEdge === 'e' || rampEdge === 'w') ? startZ + rampWidth / 2 : startZ;
 
-  return (
-    <group position={[groupX * IN, deckTopY * IN, groupZ * IN]} rotation={[0, rotY, 0]}>
-      {/* Tilted ramp surface */}
-      <group rotation={[theta, 0, 0]}>
-        <mesh position={[0, -treadThickness / 2 * IN, surfaceLength / 2 * IN]} castShadow receiveShadow>
-          <boxGeometry args={[rampWidth * IN, treadThickness * IN, surfaceLength * IN]} />
+  const postActualWidth = postSize === '6x6' ? 5.5 : 3.5;
+  const stringerDepth = 11.25; // 2x12
+
+  const N = rampCalcs.intermediateLandings || 0;
+  const numSegments = N + 1;
+  const segRun = run / numSegments;
+  const segRise = totalRise / numSegments;
+  const segSurfaceLength = Math.sqrt(segRun ** 2 + segRise ** 2);
+  const theta = Math.atan2(segRise, segRun);
+  const landingRun = 60;
+  const landingW = Math.max(60, rampWidth);
+
+  const elements = [];
+  let currentZ = 0;
+  let currentY = 0;
+
+  for (let j = 0; j < 2 * numSegments - 1; j++) {
+    const isLanding = j % 2 === 1;
+
+    if (!isLanding) {
+      const nextZ = currentZ + segRun;
+      const nextY = currentY - segRise;
+      const z_mid = (currentZ + nextZ) / 2;
+      const y_mid = (currentY + nextY) / 2;
+
+      // 1. Decking surface and 2x12 Sloped Stringers
+      elements.push(
+        <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[theta, 0, 0]}>
+          <mesh castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
+            <boxGeometry args={[rampWidth * IN, treadThickness * IN, segSurfaceLength * IN]} />
+            <meshStandardMaterial map={texture} roughness={0.7} />
+          </mesh>
+          {(() => {
+            const numStringers = Math.max(3, Math.ceil(rampWidth / 16) + 1);
+            const stringerElements = [];
+            for (let s = 0; s < numStringers; s++) {
+              let x_pos = 0;
+              if (numStringers > 1) {
+                x_pos = -rampWidth / 2 + 0.75 + s * (rampWidth - 1.5) / (numStringers - 1);
+              }
+              stringerElements.push(
+                <mesh key={`stringer-${s}`} position={[x_pos * IN, -(treadThickness + stringerDepth / 2) * IN, 0]} castShadow receiveShadow>
+                  <boxGeometry args={[1.5 * IN, stringerDepth * IN, segSurfaceLength * IN]} />
+                  <meshStandardMaterial map={woodTexture} roughness={0.8} />
+                </mesh>
+              );
+            }
+            return stringerElements;
+          })()}
+        </group>
+      );
+
+      // 2. Vertical Support Posts under stringers (one pair at midpoint)
+      const y_top_in = y_mid - treadThickness - stringerDepth;
+      const y_bottom_in = -(height + deckTopY) - 60;
+      const postHeight_in = Math.max(12, y_top_in - y_bottom_in);
+      const y_post_center_in = y_top_in - postHeight_in / 2;
+      
+      const x_left = -rampWidth / 2 + postActualWidth / 2;
+      const x_right = rampWidth / 2 - postActualWidth / 2;
+
+      elements.push(
+        <group key={`ramp-seg-posts-${j}`}>
+          <mesh position={[x_left * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+          <mesh position={[x_right * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+        </group>
+      );
+
+      currentZ = nextZ;
+      currentY = nextY;
+    } else {
+      const nextZ = currentZ + landingRun;
+      const nextY = currentY;
+      const z_mid = (currentZ + nextZ) / 2;
+      const y_mid = currentY;
+
+      // 1. Landing Decking Surface
+      elements.push(
+        <mesh key={`ramp-land-${j}`} position={[0, (y_mid - treadThickness / 2) * IN, z_mid * IN]} castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
+          <boxGeometry args={[landingW * IN, treadThickness * IN, landingRun * IN]} />
           <meshStandardMaterial map={texture} roughness={0.7} />
         </mesh>
-      </group>
+      );
+
+      // 2. Landing Framing (2x12 Joists)
+      const framingElements = [];
+      framingElements.push(
+        <mesh key={`land-rim-l-${j}`} position={[-landingW / 2 + 0.75 * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
+          <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
+          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+        </mesh>,
+        <mesh key={`land-rim-r-${j}`} position={[(landingW / 2 - 0.75) * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
+          <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
+          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+        </mesh>
+      );
+
+      framingElements.push(
+        <mesh key={`land-rim-f-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (currentZ + 0.75) * IN]} castShadow receiveShadow>
+          <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
+          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+        </mesh>,
+        <mesh key={`land-rim-b-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (nextZ - 0.75) * IN]} castShadow receiveShadow>
+          <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
+          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+        </mesh>
+      );
+
+      const innerW = landingW - 3;
+      const numIntJoists = Math.max(0, Math.ceil(innerW / 16) - 1);
+      for (let s = 0; s < numIntJoists; s++) {
+        const x_pos = -landingW / 2 + 1.5 + (s + 1) * innerW / (numIntJoists + 1);
+        framingElements.push(
+          <mesh key={`land-int-joist-${s}-${j}`} position={[x_pos * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
+            <boxGeometry args={[1.5 * IN, stringerDepth * IN, (landingRun - 3) * IN]} />
+            <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          </mesh>
+        );
+      }
+
+      elements.push(<group key={`ramp-land-framing-${j}`}>{framingElements}</group>);
+
+      // 3. Support Posts (4 corner posts)
+      const y_top_in = y_mid - treadThickness - stringerDepth;
+      const y_bottom_in = -(height + deckTopY) - 60;
+      const postHeight_in = Math.max(12, y_top_in - y_bottom_in);
+      const y_post_center_in = y_top_in - postHeight_in / 2;
+
+      const x_left = -landingW / 2 + postActualWidth / 2;
+      const x_right = landingW / 2 - postActualWidth / 2;
+      const z_front = currentZ + postActualWidth / 2;
+      const z_back = nextZ - postActualWidth / 2;
+
+      elements.push(
+        <group key={`ramp-land-posts-${j}`}>
+          <mesh position={[x_left * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+          <mesh position={[x_right * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+          <mesh position={[x_left * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+          <mesh position={[x_right * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
+            <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
+            <meshStandardMaterial map={postTexture} roughness={0.85} />
+          </mesh>
+        </group>
+      );
+
+      currentZ = nextZ;
+      currentY = nextY;
+    }
+  }
+
+  return (
+    <group position={[groupX * IN, deckTopY * IN, groupZ * IN]} rotation={[0, rotY, 0]}>
+      {elements}
     </group>
   );
 }
@@ -854,8 +1014,10 @@ export default function Scene3D() {
                 rampCalcs={calcs.ramp} 
                 width={sec.width} 
                 depth={sec.depth} 
-                species={materials.species}
-                deckMaterial={materials.deckMaterial}
+                species={materials.species} 
+                deckMaterial={materials.deckMaterial} 
+                postSize={materials.postSize}
+                height={sec.height}
               />
               
               {sec.ledgerAttached && <HouseWall width={sec.width} height={sec.height} />}

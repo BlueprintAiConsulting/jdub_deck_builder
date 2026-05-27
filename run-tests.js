@@ -1751,12 +1751,23 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   const bomWithRamp = useDeckStore.getState().bom;
   assert.ok(bomWithRamp.find(item => item.id === 'ramp-stringers'), 'BOM must include ramp stringers when ramp is present');
   assert.ok(bomWithRamp.find(item => item.id === 'ramp-decking'), 'BOM must include ramp decking when ramp is present');
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-landing-decking'), 'BOM must include ramp landing decking when landings are present');
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-landing-framing-rim'), 'BOM must include ramp landing rim joists when landings are present');
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-landing-framing-joist'), 'BOM must include ramp landing inner joists when landings are present');
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-posts'), 'BOM must include ramp support posts when ramp is present');
+
+  const stringersItem = bomWithRamp.find(item => item.id === 'ramp-stringers');
+  const postsItem = bomWithRamp.find(item => item.id === 'ramp-posts');
+  assert.strictEqual(stringersItem.quantity, 8, 'Ramp stringer count should be 8 for 2 sloped segments');
+  assert.strictEqual(postsItem.quantity, 8, 'Ramp support post count should be 8 (4 landing posts + 4 segment posts)');
 
   // - Without ramp
   useDeckStore.getState().resetDeck();
   const bomNoRamp = useDeckStore.getState().bom;
   assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-stringers'), undefined, 'BOM must not include ramp stringers when no ramp is present');
   assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-decking'), undefined, 'BOM must not include ramp decking when no ramp is present');
+  assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-landing-decking'), undefined, 'BOM must not include ramp landing decking when no ramp is present');
+  assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-posts'), undefined, 'BOM must not include ramp support posts when no ramp is present');
 
   // 9. Hardening and boundary conditions check
   assert.strictEqual(calculateRamp(0, { mode: 'ada' }), null, 'Zero totalRise should return null');

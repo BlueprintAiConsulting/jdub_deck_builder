@@ -704,9 +704,8 @@ export default function Canvas2D({ isMobile }) {
         const rm = calcs.ramp;
         const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
         const rampW = rm.width * S;
-        const rampD = rm.run * S;
-        ctx.fillStyle = isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)';
-        ctx.strokeStyle = isLightTheme ? '#7c3aed' : '#a78bfa';
+        const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
+        const rampD = footprintRun * S;
         ctx.lineWidth = 1.5;
         let rmX, rmY;
         const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
@@ -734,10 +733,70 @@ export default function Canvas2D({ isMobile }) {
         const isVert = rampDir === 'n' || rampDir === 's';
         const rW = isVert ? rampW : rampD;
         const rD = isVert ? rampD : rampW;
-        ctx.fillRect(rmX, rmY, rW, rD);
-        ctx.strokeRect(rmX, rmY, rW, rD);
+
+        const numSegments = (rm.intermediateLandings || 0) + 1;
+        const segRun = rm.run / numSegments;
+        const landingRun = 60;
+        const rampW_in = rm.width;
+        const landingW_in = Math.max(60, rampW_in);
+        
+        let t = 0;
+        for (let j = 0; j < 2 * numSegments - 1; j++) {
+          const isLanding = j % 2 === 1;
+          const length_in = isLanding ? landingRun : segRun;
+          const width_in = isLanding ? landingW_in : rampW_in;
+          
+          const tStart = t;
+          const tEnd = t + length_in;
+          t = tEnd;
+          
+          let segX, segY, segW, segH;
+          
+          if (rampDir === 's') {
+            segX = rmX + rampW / 2 - (width_in * S) / 2;
+            segY = rmY + tStart * S;
+            segW = width_in * S;
+            segH = length_in * S;
+          } else if (rampDir === 'n') {
+            segX = rmX + rampW / 2 - (width_in * S) / 2;
+            segY = (rmY + rD) - tEnd * S;
+            segW = width_in * S;
+            segH = length_in * S;
+          } else if (rampDir === 'e') {
+            segX = rmX + tStart * S;
+            segY = rmY + rampW / 2 - (width_in * S) / 2;
+            segW = length_in * S;
+            segH = width_in * S;
+          } else { // 'w'
+            segX = (rmX + rW) - tEnd * S;
+            segY = rmY + rampW / 2 - (width_in * S) / 2;
+            segW = length_in * S;
+            segH = width_in * S;
+          }
+          
+          ctx.fillStyle = isLanding 
+            ? (isLightTheme ? 'rgba(16, 185, 129, 0.15)' : 'rgba(52, 211, 153, 0.2)')
+            : (isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)');
+          ctx.strokeStyle = isLanding
+            ? (isLightTheme ? '#10b981' : '#34d399')
+            : (isLightTheme ? '#7c3aed' : '#a78bfa');
+            
+          ctx.fillRect(segX, segY, segW, segH);
+          ctx.strokeRect(segX, segY, segW, segH);
+          
+          if (isLanding) {
+            ctx.beginPath();
+            ctx.moveTo(segX, segY);
+            ctx.lineTo(segX + segW, segY + segH);
+            ctx.moveTo(segX + segW, segY);
+            ctx.lineTo(segX, segY + segH);
+            ctx.strokeStyle = isLightTheme ? 'rgba(16, 185, 129, 0.3)' : 'rgba(52, 211, 153, 0.4)';
+            ctx.stroke();
+          }
+        }
         
         // Draw directional arrows or sloped lines inside the ramp
+        ctx.strokeStyle = isLightTheme ? '#7c3aed' : '#a78bfa';
         ctx.beginPath();
         if (isVert) {
           const startY = rampDir === 's' ? rmY : rmY + rD;

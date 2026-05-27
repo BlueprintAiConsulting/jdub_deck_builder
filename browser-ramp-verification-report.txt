@@ -1,6 +1,6 @@
 DeckForge Ramp Browser Verification Report
 ==================================================
-Date: 2026-05-27T03:57:10.286Z
+Date: 2026-05-27T04:24:52.490Z
 
 Ramp Verification Results:
 [PASS] 2D: Canvas2D element exists
@@ -28,7 +28,7 @@ Ramp Verification Results:
   - Expected: non-zero extent (> 1.0 inches)
 
 [PASS] 3D: Ramp top edge is near deck surface (36-37") and bottom edge is near ground (0")
-  - Measured: top Y: 37.00", bottom Y: 0.00"
+  - Measured: top Y: 37.50", bottom Y: 0.50"
   - Expected: top Y ~ 36-37", bottom Y ~ 0-1"
 
 [PASS] State: Placed ramp computed run is correct

@@ -232,8 +232,15 @@ export function generateBOM(config, calcs) {
   // --- Ramp (if applicable) ---
   if (calcs.ramp && config.ramp) {
     const ramp = calcs.ramp;
-    const rampStringerLen = optimalBoardLength(ramp.surfaceLength);
-    const rampStringerCount = Math.max(2, Math.ceil(ramp.width / 16) + 1);
+    const N = ramp.intermediateLandings || 0;
+    const numSegments = N + 1;
+    const segRun = ramp.run / numSegments;
+    const segRise = ramp.totalRise / numSegments;
+    const segSurfaceLength = Math.sqrt(segRun ** 2 + segRise ** 2);
+
+    const rampStringerLen = optimalBoardLength(segSurfaceLength);
+    const stringersPerSeg = Math.max(2, Math.ceil(ramp.width / 16) + 1);
+    const rampStringerCount = stringersPerSeg * numSegments;
     items.push({
       id: 'ramp-stringers',
       category: 'Framing',
@@ -248,8 +255,10 @@ export function generateBOM(config, calcs) {
     const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
     const gapWidth = 0.125;
     const boardSpacing = (deckBoardWidth + gapWidth) > 0 ? (deckBoardWidth + gapWidth) : 5.625;
+    
     const rampTreadLen = optimalBoardLength(ramp.width);
-    const boardCount = Math.ceil(Math.ceil(ramp.surfaceLength / boardSpacing) * 1.1);
+    const boardsPerSeg = Math.ceil(Math.ceil(segSurfaceLength / boardSpacing) * 1.1);
+    const boardCount = boardsPerSeg * numSegments;
     items.push({
       id: 'ramp-decking',
       category: 'Decking',
@@ -259,6 +268,65 @@ export function generateBOM(config, calcs) {
       quantity: boardCount,
       unit: 'ea',
       material: config.deckMaterial || config.species,
+    });
+
+    // Landing decking & framing
+    if (N > 0) {
+      const landingW = Math.max(60, ramp.width);
+      const landingTreadLen = optimalBoardLength(landingW);
+      const landingBoardsPerLand = Math.ceil(Math.ceil(60 / boardSpacing) * 1.1);
+      const landingBoardCount = landingBoardsPerLand * N;
+      items.push({
+        id: 'ramp-landing-decking',
+        category: 'Decking',
+        description: `${config.deckBoardSize || '5/4x6'} × ${landingTreadLen}' Ramp Landing Deck Board`,
+        size: config.deckBoardSize || '5/4x6',
+        length: landingTreadLen,
+        quantity: landingBoardCount,
+        unit: 'ea',
+        material: config.deckMaterial || config.species,
+      });
+
+      const landingWLen = optimalBoardLength(landingW);
+      const landingRunLen = optimalBoardLength(60);
+      const joistCount = Math.max(0, Math.ceil((landingW - 3) / 16) - 1);
+
+      items.push({
+        id: 'ramp-landing-framing-rim',
+        category: 'Framing',
+        description: `2x12 × ${landingWLen}' Ramp Landing Rim Joist`,
+        size: '2x12',
+        length: landingWLen,
+        quantity: 2 * N,
+        unit: 'ea',
+        material: config.species,
+      });
+
+      items.push({
+        id: 'ramp-landing-framing-joist',
+        category: 'Framing',
+        description: `2x12 × ${landingRunLen}' Ramp Landing Joist`,
+        size: '2x12',
+        length: landingRunLen,
+        quantity: (2 + joistCount) * N,
+        unit: 'ea',
+        material: config.species,
+      });
+    }
+
+    // Support posts
+    const postLen = optimalBoardLength(config.height);
+    const rampPostCount = (2 * numSegments) + (4 * N);
+    const postSizeStr = config.postSize || '4x4';
+    items.push({
+      id: 'ramp-posts',
+      category: 'Framing',
+      description: `${postSizeStr} × ${postLen}' Ramp Support Post`,
+      size: postSizeStr,
+      length: postLen,
+      quantity: rampPostCount,
+      unit: 'ea',
+      material: config.species,
     });
   }
 

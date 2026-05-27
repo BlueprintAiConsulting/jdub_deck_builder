@@ -202,53 +202,46 @@ try {
 
       if (!foundScene) return { error: 'Three.js scene not found in any chunk roots Map' };
 
-      let rampMesh = null;
+      const rampMeshes = [];
       foundScene.traverse((obj) => {
-        if (obj.isMesh && obj.geometry && obj.geometry.type === 'BoxGeometry') {
-          const params = obj.geometry.parameters;
-          // Ramp width: 36 inches -> 3.0 feet in Three.js scene
-          if (Math.abs(params.width - 3.0) < 0.1 && params.depth > 10.0) {
-            rampMesh = obj;
-          }
+        if (obj.isMesh && obj.userData && obj.userData.type === 'ramp-decking') {
+          rampMeshes.push(obj);
         }
       });
 
-      if (!rampMesh) return { error: 'Ramp mesh not found in scene graph traverse' };
+      if (rampMeshes.length === 0) return { error: 'Ramp decking meshes not found in scene graph traverse' };
 
-      // Compute bounding box in local and world space
-      rampMesh.geometry.computeBoundingBox();
-      const min = rampMesh.geometry.boundingBox.min;
-      const max = rampMesh.geometry.boundingBox.max;
-      
-      const corners = [
-        { x: min.x, y: min.y, z: min.z },
-        { x: min.x, y: min.y, z: max.z },
-        { x: min.x, y: max.y, z: min.z },
-        { x: min.x, y: max.y, z: max.z },
-        { x: max.x, y: min.y, z: min.z },
-        { x: max.x, y: min.y, z: max.z },
-        { x: max.x, y: max.y, z: min.z },
-        { x: max.x, y: max.y, z: max.z }
-      ];
-
-      rampMesh.updateMatrixWorld(true);
-      const m = rampMesh.matrixWorld.elements;
       let minWorldY = Infinity;
       let maxWorldY = -Infinity;
 
-      for (const c of corners) {
-        // matrixWorld is column-major:
-        // wy = x * m[1] + y * m[5] + z * m[9] + m[13]
-        const worldY = c.x * m[1] + c.y * m[5] + c.z * m[9] + m[13];
-        if (worldY < minWorldY) minWorldY = worldY;
-        if (worldY > maxWorldY) maxWorldY = worldY;
+      for (const rampMesh of rampMeshes) {
+        rampMesh.geometry.computeBoundingBox();
+        const min = rampMesh.geometry.boundingBox.min;
+        const max = rampMesh.geometry.boundingBox.max;
+        
+        const corners = [
+          { x: min.x, y: min.y, z: min.z },
+          { x: min.x, y: min.y, z: max.z },
+          { x: min.x, y: max.y, z: min.z },
+          { x: min.x, y: max.y, z: max.z },
+          { x: max.x, y: min.y, z: min.z },
+          { x: max.x, y: min.y, z: max.z },
+          { x: max.x, y: max.y, z: min.z },
+          { x: max.x, y: max.y, z: max.z }
+        ];
+
+        rampMesh.updateMatrixWorld(true);
+        const m = rampMesh.matrixWorld.elements;
+
+        for (const c of corners) {
+          const worldY = c.x * m[1] + c.y * m[5] + c.z * m[9] + m[13];
+          if (worldY < minWorldY) minWorldY = worldY;
+          if (worldY > maxWorldY) maxWorldY = worldY;
+        }
       }
 
       return {
         found: true,
-        widthInches: rampMesh.geometry.parameters.width * 12,
-        heightInches: rampMesh.geometry.parameters.height * 12,
-        depthInches: rampMesh.geometry.parameters.depth * 12,
         minWorldYInches: minWorldY * 12,
         maxWorldYInches: maxWorldY * 12,
         verticalExtentInches: (maxWorldY - minWorldY) * 12
