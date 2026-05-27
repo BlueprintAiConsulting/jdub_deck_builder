@@ -3,7 +3,6 @@
  * Calculates quantities and optimal board lengths for all deck components.
  */
 import { LUMBER_ACTUAL, BOARD_LENGTHS } from './spanTables';
-import { polygonArea } from '../utils/geometry';
 
 /** Find the optimal board length to minimize waste */
 function optimalBoardLength(requiredLengthIn) {
@@ -50,7 +49,6 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Beams ---
-  // approximate for non-rectangular — bounding box layout
   const beamSpan = joistOrientation === 'horizontal' ? depth : width;
   const beamLen = optimalBoardLength(beamSpan);
   const beamPly = parseInt(beams.config.split('-')[0]) || 2;
@@ -67,7 +65,6 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Posts ---
-  // approximate for non-rectangular — bounding box layout
   const postLen = optimalBoardLength(height);
   items.push({
     id: 'posts',
@@ -83,44 +80,39 @@ export function generateBOM(config, calcs) {
   // --- Deck Boards ---
   const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
   const gapWidth = 0.125; // 1/8" gap
-  const boardSpacing = (deckBoardWidth + gapWidth) > 0 ? (deckBoardWidth + gapWidth) : 5.625;
   let boardCount = 0;
   let deckBoardLen = 0;
 
-  let areaSqIn = 0;
-  try {
-    areaSqIn = polygonArea(config.vertices || []);
-  } catch (e) {
-    areaSqIn = 0;
-  }
-  const safeAreaSqIn = areaSqIn > 0 ? areaSqIn : ((width || 0) * (depth || 0));
-  const linearInchesNeeded = safeAreaSqIn / boardSpacing;
-
   if (deckingOrientation === 'diagonal') {
-    const maxDiagonal = Math.sqrt((width || 0) ** 2 + (depth || 0) ** 2) || 96;
+    const maxDiagonal = Math.sqrt(width ** 2 + depth ** 2);
     deckBoardLen = optimalBoardLength(maxDiagonal);
+    const totalAreaSqIn = width * depth;
+    const linearInchesNeeded = totalAreaSqIn / (deckBoardWidth + gapWidth);
     const singleBoardLenIn = deckBoardLen * 12;
-    const safeSingleBoardLenIn = singleBoardLenIn > 0 ? singleBoardLenIn : 96;
-    boardCount = Math.ceil((linearInchesNeeded * 1.20) / safeSingleBoardLenIn);
+    boardCount = Math.ceil((linearInchesNeeded * 1.20) / singleBoardLenIn);
   } else {
     const joistsVertical = (joistOrientation !== 'horizontal');
-    let boardRunIn;
+    let boardRunIn, boardSpanIn;
     if (joistsVertical) {
       if (deckingOrientation === 'parallel') {
         boardRunIn = depth;
+        boardSpanIn = width;
       } else { // perpendicular
         boardRunIn = width;
+        boardSpanIn = depth;
       }
     } else { // joists horizontal
       if (deckingOrientation === 'parallel') {
         boardRunIn = width;
+        boardSpanIn = depth;
       } else { // perpendicular
         boardRunIn = depth;
+        boardSpanIn = width;
       }
     }
+    const count = Math.ceil(boardSpanIn / (deckBoardWidth + gapWidth));
     deckBoardLen = optimalBoardLength(boardRunIn);
-    const safeBoardRunIn = boardRunIn > 0 ? boardRunIn : 96;
-    boardCount = Math.ceil((linearInchesNeeded / safeBoardRunIn) * 1.1); // 10% waste factor
+    boardCount = Math.ceil(count * 1.1); // 10% waste factor
   }
 
   items.push({
@@ -150,7 +142,6 @@ export function generateBOM(config, calcs) {
   }
 
   // --- Concrete (Footings) ---
-  // approximate for non-rectangular — bounding box layout
   const footingDepth = 42; // assume 42" depth
   const footingVolumeCuFt = Math.PI * (footings.diameter / 2 / 12) ** 2 * (footingDepth / 12);
   const totalConcreteCuFt = footingVolumeCuFt * footings.count;
@@ -191,7 +182,7 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Hardware: Structural Screws ---
-  const screwCount = Math.ceil((joists.count * 4) + (boardCount * Math.max(0, width || 0) / 12 * 2) + 50);
+  const screwCount = Math.ceil((joists.count * 4) + (boardCount * width / 12 * 2) + 50);
   items.push({
     id: 'screws',
     category: 'Hardware',
@@ -229,84 +220,12 @@ export function generateBOM(config, calcs) {
     });
   }
 
-  // --- Ramp (if applicable) ---
-  if (calcs.ramp && config.ramp) {
-    const ramp = calcs.ramp;
-    const rampStringerLen = optimalBoardLength(ramp.surfaceLength);
-    const rampStringerCount = Math.max(2, Math.ceil(ramp.width / 16) + 1);
-    items.push({
-      id: 'ramp-stringers',
-      category: 'Framing',
-      description: `2x12 × ${rampStringerLen}' Ramp Stringer`,
-      size: '2x12',
-      length: rampStringerLen,
-      quantity: rampStringerCount,
-      unit: 'ea',
-      material: config.species,
-    });
-
-    const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
-    const gapWidth = 0.125;
-    const boardSpacing = (deckBoardWidth + gapWidth) > 0 ? (deckBoardWidth + gapWidth) : 5.625;
-    const rampTreadLen = optimalBoardLength(ramp.width);
-    const boardCount = Math.ceil(Math.ceil(ramp.surfaceLength / boardSpacing) * 1.1);
-    items.push({
-      id: 'ramp-decking',
-      category: 'Decking',
-      description: `${config.deckBoardSize || '5/4x6'} × ${rampTreadLen}' Ramp Deck Board`,
-      size: config.deckBoardSize || '5/4x6',
-      length: rampTreadLen,
-      quantity: boardCount,
-      unit: 'ea',
-      material: config.deckMaterial || config.species,
-    });
-  }
-
   return items;
 }
 
 /** Calculate estimated total square footage */
-export function calculateSquareFootage(vertices) {
-  try {
-    const verts = Array.isArray(vertices) ? vertices : (vertices?.vertices || []);
-    const areaSqIn = polygonArea(verts);
-    if (areaSqIn > 0) {
-      return Math.round(areaSqIn / 144);
-    }
-  } catch (e) {
-    // Ignore and fall through to bounding box fallback
-  }
-
-  // Fallback to bounding-box if area is 0/degenerate or an error occurs
-  if (vertices && typeof vertices === 'object' && !Array.isArray(vertices)) {
-    const w = vertices.width || 0;
-    const d = vertices.depth || 0;
-    if (w > 0 && d > 0) {
-      return Math.round((w / 12) * (d / 12));
-    }
-  }
-
-  const verts = Array.isArray(vertices) ? vertices : (vertices?.vertices || []);
-  if (verts && verts.length >= 3) {
-    try {
-      const xs = verts.map(v => v.x).filter(x => typeof x === 'number' && !isNaN(x));
-      const ys = verts.map(v => v.y).filter(y => typeof y === 'number' && !isNaN(y));
-      if (xs.length >= 3 && ys.length >= 3) {
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        const w = maxX - minX;
-        const d = maxY - minY;
-        if (w > 0 && d > 0) {
-          return Math.round((w / 12) * (d / 12));
-        }
-      }
-    } catch (e) {
-      // Ignore
-    }
-  }
-  return 0;
+export function calculateSquareFootage(widthIn, depthIn) {
+  return Math.round((widthIn / 12) * (depthIn / 12));
 }
 
 /** Merge BOMs from multiple sections, combining identical items */

@@ -599,6 +599,56 @@ function Stairs({ stairEdge, stairCalcs, width, depth, species, deckMaterial }) 
   );
 }
 
+function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial }) {
+  if (!rampEdge || !rampCalcs) return null;
+
+  const { totalRise, run, surfaceLength, width: rampWidth } = rampCalcs;
+  const treadThickness = 1.0;
+  const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
+
+  const { color, type } = getMaterialVisuals(deckMaterial, species);
+  const texture = getProceduralTexture(color, type);
+
+  let startX, startZ, rotY;
+  const align = rampCalcs.align || 'center';
+  if (rampEdge === 's') {
+    startX = align === 'left' ? 0 : (align === 'right' ? width - rampWidth : width / 2 - rampWidth / 2);
+    startZ = depth;
+    rotY = 0;
+  } else if (rampEdge === 'n') {
+    startX = align === 'left' ? 0 : (align === 'right' ? width - rampWidth : width / 2 - rampWidth / 2);
+    startZ = 0;
+    rotY = Math.PI;
+  } else if (rampEdge === 'e') {
+    startX = width;
+    startZ = align === 'left' ? 0 : (align === 'right' ? depth - rampWidth : depth / 2 - rampWidth / 2);
+    rotY = -Math.PI / 2;
+  } else {
+    startX = 0;
+    startZ = align === 'left' ? 0 : (align === 'right' ? depth - rampWidth : depth / 2 - rampWidth / 2);
+    rotY = Math.PI / 2;
+  }
+
+  // Tilt angle around local X axis
+  const theta = Math.atan2(totalRise, run);
+
+  // Position at top-center of the ramp (at the deck edge)
+  const groupX = (rampEdge === 's' || rampEdge === 'n') ? startX + rampWidth / 2 : startX;
+  const groupZ = (rampEdge === 'e' || rampEdge === 'w') ? startZ + rampWidth / 2 : startZ;
+
+  return (
+    <group position={[groupX * IN, deckTopY * IN, groupZ * IN]} rotation={[0, rotY, 0]}>
+      {/* Tilted ramp surface */}
+      <group rotation={[theta, 0, 0]}>
+        <mesh position={[0, -treadThickness / 2 * IN, surfaceLength / 2 * IN]} castShadow receiveShadow>
+          <boxGeometry args={[rampWidth * IN, treadThickness * IN, surfaceLength * IN]} />
+          <meshStandardMaterial map={texture} roughness={0.7} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 function HouseWall({ width, height }) {
   const wallHeight = Math.max(height, 96);
   const wallThick = 6;
@@ -793,6 +843,15 @@ export default function Scene3D() {
               <Stairs 
                 stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} 
                 stairCalcs={calcs.stairs} 
+                width={sec.width} 
+                depth={sec.depth} 
+                species={materials.species}
+                deckMaterial={materials.deckMaterial}
+              />
+              
+              <Ramp 
+                rampEdge={typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp?.direction)} 
+                rampCalcs={calcs.ramp} 
                 width={sec.width} 
                 depth={sec.depth} 
                 species={materials.species}

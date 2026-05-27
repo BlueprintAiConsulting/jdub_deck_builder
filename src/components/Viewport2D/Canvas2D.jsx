@@ -146,24 +146,25 @@ export default function Canvas2D({ isMobile }) {
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
-  const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
-  const materials = useDeckStore((s) => s.materials);
+  const attachStairs = useDeckStore((s) => s.attachStairs);
+  const attachRamp = useDeckStore((s) => s.attachRamp);
+  const removeVertex = useDeckStore((s) => s.removeVertex);
   const showGrid = useDeckStore((s) => s.showGrid);
   const showDimensions = useDeckStore((s) => s.showDimensions);
   const selectedTool = useDeckStore((s) => s.selectedTool);
   const interaction = useDeckStore((s) => s.interaction);
   const selectSection = useDeckStore((s) => s.selectSection);
+  const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
+  const materials = useDeckStore((s) => s.materials);
   const addSection = useDeckStore((s) => s.addSection);
   const moveSection = useDeckStore((s) => s.moveSection);
   const finishMove = useDeckStore((s) => s.finishMove);
   const resizeSection = useDeckStore((s) => s.resizeSection);
   const setInteraction = useDeckStore((s) => s.setInteraction);
   const toggleRailing = useDeckStore((s) => s.toggleRailing);
-  const attachStairs = useDeckStore((s) => s.attachStairs);
   const dragVertex = useDeckStore((s) => s.dragVertex);
   const finishVertexDrag = useDeckStore((s) => s.finishVertexDrag);
   const addVertex = useDeckStore((s) => s.addVertex);
-  const removeVertex = useDeckStore((s) => s.removeVertex);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -225,16 +226,17 @@ export default function Canvas2D({ isMobile }) {
       return;
     }
 
-    if (selectedTool === 'railing' || selectedTool === 'stairs') {
+    if (selectedTool === 'railing' || selectedTool === 'stairs' || selectedTool === 'ramp') {
       const hitId = hitTestSection(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h);
       if (hitId) {
         const sec = sections.find((s) => s.id === hitId);
         const edge = getNearestEdge(mx, my, sec, S, panOffset.x, panOffset.y, size.w, size.h);
         if (selectedTool === 'railing') toggleRailing(hitId, edge);
-        else attachStairs(hitId, edge);
+        else if (selectedTool === 'stairs') attachStairs(hitId, edge);
+        else attachRamp(hitId, edge);
       }
     }
-  }, [selectedTool, sections, selectedSectionId, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs]);
+  }, [selectedTool, sections, selectedSectionId, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp]);
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning) {
@@ -697,6 +699,70 @@ export default function Canvas2D({ isMobile }) {
         }
       }
 
+      // Ramps
+      if (sec.ramp && calcs.ramp) {
+        const rm = calcs.ramp;
+        const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
+        const rampW = rm.width * S;
+        const rampD = rm.run * S;
+        ctx.fillStyle = isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)';
+        ctx.strokeStyle = isLightTheme ? '#7c3aed' : '#a78bfa';
+        ctx.lineWidth = 1.5;
+        let rmX, rmY;
+        const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
+        if (rampDir === 's') {
+          if (align === 'left') rmX = sx;
+          else if (align === 'right') rmX = sx + sw - rampW;
+          else rmX = sx + sw / 2 - rampW / 2;
+          rmY = sy + sd;
+        } else if (rampDir === 'n') {
+          if (align === 'left') rmX = sx;
+          else if (align === 'right') rmX = sx + sw - rampW;
+          else rmX = sx + sw / 2 - rampW / 2;
+          rmY = sy - rampD;
+        } else if (rampDir === 'e') {
+          rmX = sx + sw;
+          if (align === 'left') rmY = sy;
+          else if (align === 'right') rmY = sy + sd - rampW;
+          else rmY = sy + sd / 2 - rampW / 2;
+        } else {
+          rmX = sx - rampD;
+          if (align === 'left') rmY = sy;
+          else if (align === 'right') rmY = sy + sd - rampW;
+          else rmY = sy + sd / 2 - rampW / 2;
+        }
+        const isVert = rampDir === 'n' || rampDir === 's';
+        const rW = isVert ? rampW : rampD;
+        const rD = isVert ? rampD : rampW;
+        ctx.fillRect(rmX, rmY, rW, rD);
+        ctx.strokeRect(rmX, rmY, rW, rD);
+        
+        // Draw directional arrows or sloped lines inside the ramp
+        ctx.beginPath();
+        if (isVert) {
+          const startY = rampDir === 's' ? rmY : rmY + rD;
+          const endY = rampDir === 's' ? rmY + rD : rmY;
+          const arrowX = rmX + rW / 2;
+          ctx.moveTo(arrowX, startY);
+          ctx.lineTo(arrowX, endY);
+          const dy = rampDir === 's' ? -8 : 8;
+          ctx.moveTo(arrowX - 6, endY + dy);
+          ctx.lineTo(arrowX, endY);
+          ctx.lineTo(arrowX + 6, endY + dy);
+        } else {
+          const startX = rampDir === 'e' ? rmX : rmX + rW;
+          const endX = rampDir === 'e' ? rmX + rW : rmX;
+          const arrowY = rmY + rD / 2;
+          ctx.moveTo(startX, arrowY);
+          ctx.lineTo(endX, arrowY);
+          const dx = rampDir === 'e' ? -8 : 8;
+          ctx.moveTo(endX + dx, arrowY - 6);
+          ctx.lineTo(endX, arrowY);
+          ctx.lineTo(endX + dx, arrowY + 6);
+        }
+        ctx.stroke();
+      }
+
       // Dimension labels
       if (showDimensions) {
         // Draw top edge dimension line
@@ -890,19 +956,20 @@ export default function Canvas2D({ isMobile }) {
     }
 
     // Legend (with roundRect polyfill)
-    const lx = 16, ly = size.h - 106;
+    const lx = 16, ly = size.h - 123;
     ctx.font = '500 10px Inter';
     ctx.textAlign = 'left';
     ctx.fillStyle = isLightTheme ? 'rgba(255, 255, 255, 0.9)' : 'rgba(8, 14, 28, 0.85)';
     const legendBorder = isLightTheme ? 'rgba(15, 23, 42, 0.08)' : 'rgba(78, 142, 247, 0.12)';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 98, 8); ctx.fill(); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.stroke(); }
-    else { ctx.fillRect(lx - 8, ly - 8, 114, 98); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 98); }
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 115, 8); ctx.fill(); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.stroke(); }
+    else { ctx.fillRect(lx - 8, ly - 8, 114, 115); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 115); }
     const legendItems = [
       { color: isLightTheme ? '#0284c7' : '#4e8ef7', label: 'Joists' },
       { color: isLightTheme ? '#d97706' : '#f5a623', label: 'Beams' },
       { color: '#f87171', label: 'Posts' },
       { color: isLightTheme ? '#16a34a' : '#34d399', label: 'Railings' },
       { color: isLightTheme ? '#db2777' : '#f472b6', label: 'Stairs' },
+      { color: isLightTheme ? '#7c3aed' : '#a78bfa', label: 'Ramps' },
     ];
     legendItems.forEach((item, i) => {
       ctx.fillStyle = item.color; ctx.fillRect(lx, ly + i * 17, 14, 3);
@@ -919,6 +986,9 @@ export default function Canvas2D({ isMobile }) {
     } else if (selectedTool === 'stairs') {
       ctx.fillStyle = isLightTheme ? 'rgba(219,39,119,0.95)' : 'rgba(236,72,153,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText('Click a deck edge to attach stairs', size.w / 2, 24);
+    } else if (selectedTool === 'ramp') {
+      ctx.fillStyle = isLightTheme ? 'rgba(124,58,237,0.95)' : 'rgba(139,92,246,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillText('Click a deck edge to attach ramp', size.w / 2, 24);
     } else if (selectedTool === 'landing') {
       ctx.fillStyle = isLightTheme ? 'rgba(2,132,199,0.95)' : 'rgba(14,165,233,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText(isMobile ? 'Tap to place a landing' : 'Click & drag or click to place a landing', size.w / 2, 24);

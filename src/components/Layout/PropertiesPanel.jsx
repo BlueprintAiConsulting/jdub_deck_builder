@@ -128,6 +128,8 @@ export default function PropertiesPanel({ isMobile }) {
   const toggleRailing = useDeckStore((s) => s.toggleRailing);
   const attachStairs = useDeckStore((s) => s.attachStairs);
   const updateStairs = useDeckStore((s) => s.updateStairs);
+  const attachRamp = useDeckStore((s) => s.attachRamp);
+  const updateRamp = useDeckStore((s) => s.updateRamp);
 
   if (!calcs) return null;
   const joistSpanOk = calcs.joists.maxSpan >= deck.depth;
@@ -140,6 +142,12 @@ export default function PropertiesPanel({ isMobile }) {
     ? currentSection.stairs
     : (typeof currentSection.stairs === 'string'
       ? { direction: currentSection.stairs, width: 36, numberOfSteps: 5, rise: 7.25, run: 10 }
+      : null);
+
+  const rampObj = typeof currentSection.ramp === 'object' && currentSection.ramp !== null
+    ? currentSection.ramp
+    : (typeof currentSection.ramp === 'string'
+      ? { direction: currentSection.ramp, mode: 'ada', width: 36, run: currentSection.height * 12, align: 'center' }
       : null);
 
   const Tag = isMobile ? 'div' : 'aside';
@@ -388,6 +396,103 @@ export default function PropertiesPanel({ isMobile }) {
             }}
           />
         )}
+
+        <div className="props-panel__divider-thin" style={{ margin: '16px 0', borderTop: '1px dashed rgba(255,255,255,0.1)' }} />
+        
+        {rampObj ? (
+          <>
+            <h4 style={{ margin: '0 0 10px 0', color: 'var(--accent-green)' }}>Ramp Configuration</h4>
+            <SelectField
+              id="sel-ramp-dir"
+              label="Ramp Direction"
+              value={rampObj.direction || 's'}
+              options={[
+                { value: 'n', label: '↑ North Edge', disabled: currentSection.ledgerAttached },
+                { value: 's', label: '↓ South Edge' },
+                { value: 'e', label: '→ East Edge' },
+                { value: 'w', label: '← West Edge' },
+              ]}
+              onChange={(v) => updateRamp(selectedSectionId, { direction: v })}
+            />
+            <SelectField
+              id="sel-ramp-align"
+              label="Ramp Alignment"
+              value={rampObj.align || 'center'}
+              options={[
+                { value: 'center', label: 'Center' },
+                { value: 'left', label: 'Left / Top Edge' },
+                { value: 'right', label: 'Right / Bottom Edge' },
+              ]}
+              onChange={(v) => updateRamp(selectedSectionId, { align: v })}
+            />
+            <SelectField
+              id="sel-ramp-mode"
+              label="Ramp Mode"
+              value={rampObj.mode || 'ada'}
+              options={[
+                { value: 'ada', label: 'ADA Compliance (1:12)' },
+                { value: 'utility', label: 'Utility Mode' },
+              ]}
+              onChange={(v) => {
+                const nextRun = v === 'ada' ? currentSection.height * 12 : currentSection.height * 8;
+                updateRamp(selectedSectionId, { mode: v, run: nextRun });
+              }}
+            />
+            <div className="prop-field">
+              <label className="label" htmlFor="ramp-width">Ramp Width (in)</label>
+              <input
+                id="ramp-width"
+                className="input input--sm"
+                type="number"
+                min="36"
+                max="96"
+                value={rampObj.width || 36}
+                onChange={(e) => updateRamp(selectedSectionId, { width: Number(e.target.value) })}
+              />
+            </div>
+            <div className="prop-field">
+              <label className="label" htmlFor="ramp-run">Ramp Run (in)</label>
+              <input
+                id="ramp-run"
+                className="input input--sm"
+                type="number"
+                min="12"
+                max="1000"
+                value={rampObj.mode === 'ada' ? (currentSection.height * 12) : (rampObj.run || currentSection.height * 8)}
+                readOnly={rampObj.mode === 'ada'}
+                disabled={rampObj.mode === 'ada'}
+                style={rampObj.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                onChange={(e) => updateRamp(selectedSectionId, { run: Number(e.target.value) })}
+              />
+            </div>
+            <button
+              className="btn btn--secondary btn--full btn--sm"
+              style={{ color: 'var(--accent-red)', marginTop: '8px' }}
+              onClick={() => attachRamp(selectedSectionId, rampObj.direction)}
+              id="btn-remove-ramp"
+            >
+              Remove Ramp
+            </button>
+          </>
+        ) : (
+          <SelectField
+            id="sel-ramp"
+            label="Add Ramp"
+            value="none"
+            options={[
+              { value: 'none', label: 'None' },
+              { value: 'n', label: '↑ North Edge', disabled: currentSection.ledgerAttached },
+              { value: 's', label: '↓ South Edge' },
+              { value: 'e', label: '→ East Edge' },
+              { value: 'w', label: '← West Edge' },
+            ]}
+            onChange={(v) => {
+              if (v !== 'none') {
+                attachRamp(selectedSectionId, v);
+              }
+            }}
+          />
+        )}
       </CollapsibleSection>
 
       <div className="divider" />
@@ -444,10 +549,47 @@ export default function PropertiesPanel({ isMobile }) {
               </div>
             </>
           )}
+          {calcs.ramp && (
+            <>
+              <div className="props-info__divider" />
+              <div className="props-info__row">
+                <span>Ramp Mode</span>
+                <span className="font-mono">{calcs.ramp.mode.toUpperCase()}</span>
+              </div>
+              <div className="props-info__row">
+                <span>Ramp Slope</span>
+                <span className="font-mono">{calcs.ramp.slopeRatio}</span>
+              </div>
+              <div className="props-info__row">
+                <span>Ramp Run</span>
+                <span className="font-mono">{formatDimension(calcs.ramp.run)}</span>
+              </div>
+              <div className="props-info__row">
+                <span>Ramp Length</span>
+                <span className="font-mono">{formatDimension(calcs.ramp.surfaceLength)}</span>
+              </div>
+              {calcs.ramp.intermediateLandings > 0 && (
+                <div className="props-info__row">
+                  <span>ADA Landings</span>
+                  <span className="font-mono">{calcs.ramp.intermediateLandings}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
         {!joistSpanOk && (
           <div className="props-warning">
             ⚠ Deck depth exceeds max joist span. An interior beam has been added automatically.
+          </div>
+        )}
+        {calcs.ramp && calcs.ramp.mode === 'ada' && calcs.ramp.maxSlopeExceeded && (
+          <div className="props-warning">
+            ⚠ ADA Ramp slope exceeds 1:12 limit! Max slope exceeded.
+          </div>
+        )}
+        {calcs.ramp && calcs.ramp.mode === 'ada' && calcs.ramp.doesNotFit && (
+          <div className="props-warning">
+            ⚠ ADA Ramp does not fit in the available space! Overlaps other sections.
           </div>
         )}
       </CollapsibleSection>

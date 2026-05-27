@@ -7,59 +7,6 @@ import { calculateAll } from '../engine/structuralCalc';
 import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator';
 import { validateSectionsState } from '../utils/geometry';
 
-function doesRampOverlap(sec, rampCalcs, sections) {
-  if (!sec.ramp || !rampCalcs) return false;
-  const rampDir = typeof sec.ramp === 'string' ? sec.ramp : sec.ramp.direction;
-  const rampW = rampCalcs.width;
-  const rampD = rampCalcs.run;
-  const align = sec.ramp.align || 'center';
-  
-  let rx, ry, rw, rd;
-  
-  if (rampDir === 's') {
-    if (align === 'left') rx = sec.x;
-    else if (align === 'right') rx = sec.x + sec.width - rampW;
-    else rx = sec.x + sec.width / 2 - rampW / 2;
-    ry = sec.y + sec.depth;
-    rw = rampW;
-    rd = rampD;
-  } else if (rampDir === 'n') {
-    if (align === 'left') rx = sec.x;
-    else if (align === 'right') rx = sec.x + sec.width - rampW;
-    else rx = sec.x + sec.width / 2 - rampW / 2;
-    ry = sec.y - rampD;
-    rw = rampW;
-    rd = rampD;
-  } else if (rampDir === 'e') {
-    rx = sec.x + sec.width;
-    if (align === 'left') ry = sec.y;
-    else if (align === 'right') ry = sec.y + sec.depth - rampW;
-    else ry = sec.y + sec.depth / 2 - rampW / 2;
-    rw = rampD;
-    rd = rampW;
-  } else {
-    rx = sec.x - rampD;
-    if (align === 'left') ry = sec.y;
-    else if (align === 'right') ry = sec.y + sec.depth - rampW;
-    else ry = sec.y + sec.depth / 2 - rampW / 2;
-    rw = rampD;
-    rd = rampW;
-  }
-
-  // Check overlap with all other sections' bounding boxes
-  for (const other of sections) {
-    if (other.id === sec.id) continue;
-    
-    // Check bounding box overlap between (rx, ry, rw, rd) and other section (other.x, other.y, other.width, other.depth)
-    const xOverlap = rx < other.x + other.width && rx + rw > other.x;
-    const yOverlap = ry < other.y + other.depth && ry + rd > other.y;
-    if (xOverlap && yOverlap) {
-      return true; // Overlaps!
-    }
-  }
-  return false;
-}
-
 // Initialize theme on load to prevent flash of wrong theme
 if (typeof window !== 'undefined') {
   const savedTheme = localStorage.getItem('deckforge_theme') || 'dark';
@@ -106,7 +53,6 @@ function createSection(overrides = {}) {
     ledgerAttached: true,
     railings: { n: false, s: false, e: false, w: false },
     stairs: null,    // null | 'n' | 's' | 'e' | 'w'
-    ramp: null,      // null | object
     type: 'deck',    // 'deck' | 'landing'
     joistOrientation: 'vertical', // 'vertical' | 'horizontal'
     deckingOrientation: 'perpendicular', // 'perpendicular' | 'parallel' | 'diagonal'
@@ -167,32 +113,12 @@ function recalculateSection(section, materials, allSections = []) {
       stairRiseHeight = section.height - adjacent.height;
     }
   }
-
-  let rampObj = section.ramp;
-  if (typeof rampObj === 'string') {
-    rampObj = {
-      type: 'ramp',
-      mode: 'ada',
-      width: 36,
-      direction: rampObj,
-      align: 'center',
-    };
-  }
-  let rampRiseHeight = section.height;
-  if (rampObj && rampObj.direction && allSections.length > 0) {
-    const adjacent = findAdjacentSection(section, rampObj.direction, allSections);
-    if (adjacent && section.height > adjacent.height) {
-      rampRiseHeight = section.height - adjacent.height;
-    }
-  }
-
-  const config = { ...materials, ...section, stairs: stairObj, ramp: rampObj };
+  const config = { ...materials, ...section, stairs: stairObj };
   const calcs = calculateAll({
     width: section.width,
     depth: section.depth,
     height: section.height,
     stairRiseHeight,
-    rampRiseHeight,
     joistSize: materials.joistSize,
     joistSpacing: materials.joistSpacing,
     species: materials.species,
@@ -200,12 +126,8 @@ function recalculateSection(section, materials, allSections = []) {
     postSize: materials.postSize,
     soilCapacity: materials.soilCapacity,
     stairs: stairObj,
-    ramp: rampObj,
     joistOrientation: section.joistOrientation || 'vertical',
   });
-  if (calcs.ramp && rampObj) {
-    calcs.ramp.doesNotFit = doesRampOverlap(section, calcs.ramp, allSections);
-  }
   const bom = generateBOM(config, calcs);
   return { calcs, bom };
 }
@@ -219,7 +141,7 @@ function recalculateAll(sections, materials) {
     const result = recalculateSection(sec, materials, sections);
     sectionCalcs[sec.id] = result.calcs;
     allBoms.push(result.bom);
-    totalSqft += calculateSquareFootage(sec.vertices);
+    totalSqft += calculateSquareFootage(sec.width, sec.depth);
   });
 
   const mergedBom = mergeBOMs(allBoms);
@@ -607,79 +529,6 @@ export const useDeckStore = create((set, get) => ({
     set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
 
-  attachRamp: (sectionId, edge) => {
-    const state = get();
-    let blocked = false;
-    const newSections = state.sections.map((s) => {
-      if (s.id !== sectionId) return s;
-      if (edge === 'n' && s.ledgerAttached) {
-        blocked = true;
-        return s;
-      }
-      const alreadyHasRampOnEdge = s.ramp && (s.ramp.direction === edge || s.ramp === edge);
-      return {
-        ...s,
-        ramp: alreadyHasRampOnEdge
-          ? null
-          : {
-              type: 'ramp',
-              mode: 'ada',
-              width: 36,
-              direction: edge,
-              align: 'center',
-            },
-      };
-    });
-    if (blocked) {
-      state.showToast("Cannot attach ramp to house wall", "warning");
-      return;
-    }
-    const results = recalculateAll(newSections, state.materials);
-    const currentSecCalcs = results.sectionCalcs[sectionId];
-    if (currentSecCalcs && currentSecCalcs.ramp && currentSecCalcs.ramp.mode === 'ada') {
-      if (currentSecCalcs.ramp.maxSlopeExceeded) {
-        state.showToast("ADA Ramp slope exceeds 1:12 limit!", "warning");
-      }
-      if (currentSecCalcs.ramp.doesNotFit) {
-        state.showToast("ADA Ramp does not fit in the available space!", "warning");
-      }
-    }
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
-    newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
-  },
-
-  updateRamp: (sectionId, updates) => {
-    const state = get();
-    const newSections = state.sections.map((s) => {
-      if (s.id !== sectionId) return s;
-      if (!s.ramp) return s;
-      let rampObj = s.ramp;
-      if (typeof rampObj === 'string') {
-        rampObj = {
-          type: 'ramp',
-          mode: 'ada',
-          width: 36,
-          direction: rampObj,
-        };
-      }
-      return { ...s, ramp: { ...rampObj, ...updates } };
-    });
-    const results = recalculateAll(newSections, state.materials);
-    const currentSecCalcs = results.sectionCalcs[sectionId];
-    if (currentSecCalcs && currentSecCalcs.ramp && currentSecCalcs.ramp.mode === 'ada') {
-      if (currentSecCalcs.ramp.maxSlopeExceeded) {
-        state.showToast("ADA Ramp slope exceeds 1:12 limit!", "warning");
-      }
-      if (currentSecCalcs.ramp.doesNotFit) {
-        state.showToast("ADA Ramp does not fit in the available space!", "warning");
-      }
-    }
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
-    newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
-  },
-
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
@@ -700,9 +549,6 @@ export const useDeckStore = create((set, get) => ({
         updated.railings = { ...updated.railings, n: false };
         if (updated.stairs && (updated.stairs === 'n' || updated.stairs.direction === 'n')) {
           updated.stairs = null;
-        }
-        if (updated.ramp && (updated.ramp === 'n' || updated.ramp.direction === 'n')) {
-          updated.ramp = null;
         }
       }
       updated.vertices = [
@@ -786,19 +632,20 @@ export const useDeckStore = create((set, get) => ({
     const normalizedSections = sections.map(s => {
       const type = s.type || 'deck';
       let stairObj = s.stairs;
-      let rampObj = s.ramp || null;
-      if (typeof rampObj === 'string') {
-        rampObj = {
-          type: 'ramp',
-          mode: 'ada',
+      if (typeof stairObj === 'string') {
+        stairObj = {
+          type: 'stair',
           width: 36,
-          direction: rampObj,
+          numberOfSteps: 5,
+          rise: 7.25,
+          run: 10,
+          direction: stairObj,
           align: 'center',
         };
-      } else if (rampObj && typeof rampObj === 'object') {
-        rampObj = {
+      } else if (stairObj && typeof stairObj === 'object') {
+        stairObj = {
           align: 'center',
-          ...rampObj,
+          ...stairObj,
         };
       }
       const vertices = s.vertices || [
@@ -813,7 +660,6 @@ export const useDeckStore = create((set, get) => ({
         ...s,
         type,
         stairs: stairObj,
-        ramp: rampObj,
         vertices
       };
       if (normalizedSection.ledgerAttached === true) {
@@ -824,9 +670,6 @@ export const useDeckStore = create((set, get) => ({
         }
         if (normalizedSection.stairs && (normalizedSection.stairs === 'n' || normalizedSection.stairs.direction === 'n')) {
           normalizedSection.stairs = null;
-        }
-        if (normalizedSection.ramp && (normalizedSection.ramp === 'n' || normalizedSection.ramp.direction === 'n')) {
-          normalizedSection.ramp = null;
         }
       }
       return normalizedSection;
