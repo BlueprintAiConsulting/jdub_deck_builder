@@ -124,6 +124,8 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
   const designWidth = maxX - minX;
   const designDepth = maxY - minY;
 
+  if (designWidth <= 0 || designDepth <= 0) return;
+
   // Calculate scale S to fit the layout into the printing area (with 80px margin)
   const margin = 80;
   const availW = width - margin * 2;
@@ -170,32 +172,38 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
     // 2. Draw joists
     ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 1;
-    calcs.joists.positions.forEach((xIn) => {
-      const x = sx + xIn * S;
-      ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
-    });
+    if (calcs.joists && Array.isArray(calcs.joists.positions)) {
+      calcs.joists.positions.forEach((xIn) => {
+        const x = sx + xIn * S;
+        ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
+      });
+    }
 
     // 3. Draw Beams
     ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 2.5;
-    calcs.beams.positions.forEach((yIn) => {
-      const y = sy + yIn * S;
-      ctx.beginPath(); ctx.moveTo(sx - 4, y); ctx.lineTo(sx + sw + 4, y); ctx.stroke();
-    });
+    if (calcs.beams && Array.isArray(calcs.beams.positions)) {
+      calcs.beams.positions.forEach((yIn) => {
+        const y = sy + yIn * S;
+        ctx.beginPath(); ctx.moveTo(sx - 4, y); ctx.lineTo(sx + sw + 4, y); ctx.stroke();
+      });
+    }
 
     // 4. Draw Posts
-    calcs.posts.posts.forEach((post) => {
-      const px = sx + post.x * S;
-      const py = sy + post.y * S;
-      // Post footing circle
-      ctx.strokeStyle = '#f87171';
-      ctx.lineWidth = 0.8;
-      ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.stroke();
+    if (calcs.posts && Array.isArray(calcs.posts.posts)) {
+      calcs.posts.posts.forEach((post) => {
+        const px = sx + post.x * S;
+        const py = sy + post.y * S;
+        // Post footing circle
+        ctx.strokeStyle = '#f87171';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI * 2); ctx.stroke();
 
-      // Physical post square
-      ctx.fillStyle = '#dc2626';
-      ctx.fillRect(px - 3, py - 3, 6, 6);
-    });
+        // Physical post square
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(px - 3, py - 3, 6, 6);
+      });
+    }
 
     // 5. Draw Railings
     Object.entries(sec.railings).forEach(([edge, on]) => {
@@ -236,8 +244,8 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
       const st = sec.stairs;
       const stairDir = st.direction;
       const align = st.align || 'center';
-      const stairW = st.width * S;
-      const stairD = (st.numberOfSteps * st.run) * S;
+      const stairW = (st.width || 36) * S;
+      const stairD = ((st.numberOfSteps || st.numTreads || 5) * (st.run || 10)) * S;
 
       ctx.fillStyle = '#fafafa';
       ctx.strokeStyle = '#db2777';
@@ -310,7 +318,7 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
     }
 
     // 10. Post-to-post dimension spacing
-    if (showDimensions && calcs.posts.posts.length > 1) {
+    if (showDimensions && calcs.posts && Array.isArray(calcs.posts.posts) && calcs.posts.posts.length > 1) {
       const postsByY = {};
       calcs.posts.posts.forEach((post) => {
         const yKey = Math.round(post.y);
@@ -397,9 +405,14 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
 
   ctx.fillStyle = '#0f172a';
   ctx.font = 'bold 10px "Inter", sans-serif';
-  ctx.fillText((projectName || 'UNTITLED PROJECT').toUpperCase(), col2 + 15, tY + 28);
-  ctx.fillText((materials.species || 'SYP (SOUTHERN YELLOW PINE)').toUpperCase(), col2 + 15, tY + 44);
-  ctx.fillText(`${materials.joistSize} @ ${materials.joistSpacing}" O.C.`, col2 + 15, tY + 60);
+  const displayProjName = projectName || 'UNTITLED PROJECT';
+  const truncatedName = displayProjName.length > 30 ? displayProjName.slice(0, 27) + '...' : displayProjName;
+  const displaySpecies = (materials && materials.species) ? materials.species : 'SYP';
+  const displayJoistSize = (materials && materials.joistSize) ? materials.joistSize : '2x8';
+  const displayJoistSpacing = (materials && materials.joistSpacing) ? materials.joistSpacing : 16;
+  ctx.fillText(truncatedName.toUpperCase(), col2 + 15, tY + 28);
+  ctx.fillText(displaySpecies.toUpperCase(), col2 + 15, tY + 44);
+  ctx.fillText(`${displayJoistSize} @ ${displayJoistSpacing}" O.C.`, col2 + 15, tY + 60);
 
   // Column 3: Stats
   ctx.fillStyle = '#475569';
@@ -411,9 +424,10 @@ export function renderBlueprint(canvas, sections, sectionCalcs, materials, showD
   ctx.fillStyle = '#0f172a';
   ctx.font = 'bold 10px "Inter", sans-serif';
   const totalSqft = sections.reduce((sum, s) => sum + (s.width * s.depth / 144), 0);
+  const displayBeamConfig = (materials && materials.beamConfig) ? materials.beamConfig : 'DOUBLE 2x10';
   ctx.fillText(`${Math.round(totalSqft)} SQ FT`, col3 + 15, tY + 28);
-  ctx.fillText(materials.beamConfig || 'DOUBLE 2x10', col3 + 15, tY + 44);
-  const footingSize = sectionCalcs[sections[0]?.id]?.footings?.diameter || 12;
+  ctx.fillText(displayBeamConfig, col3 + 15, tY + 44);
+  const footingSize = (sections[0] && sectionCalcs[sections[0].id] && sectionCalcs[sections[0].id].footings) ? sectionCalcs[sections[0].id].footings.diameter : 12;
   ctx.fillText(`${footingSize}" DIAMETER`, col3 + 15, tY + 60);
 
   // Column 4: Stamp / Date / Scale
