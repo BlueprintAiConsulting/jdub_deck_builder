@@ -188,10 +188,10 @@ export function calculateStairs(totalRiseIn, stairOpt) {
 
 /** Calculate ramp geometry */
 export function calculateRamp(totalRiseIn, rampOpt) {
-  if (totalRiseIn <= 0 || !rampOpt) return null;
+  if (typeof totalRiseIn !== 'number' || isNaN(totalRiseIn) || totalRiseIn <= 0 || !rampOpt) return null;
 
-  const mode = rampOpt.mode || 'ada';
-  const width = typeof rampOpt.width === 'number' ? rampOpt.width : 36;
+  const mode = (rampOpt.mode === 'ada' || rampOpt.mode === 'utility') ? rampOpt.mode : 'ada';
+  const width = Math.max(12, typeof rampOpt.width === 'number' && !isNaN(rampOpt.width) ? rampOpt.width : 36);
   const totalRise = totalRiseIn;
   let run = 0;
   let intermediateLandings = 0;
@@ -201,13 +201,13 @@ export function calculateRamp(totalRiseIn, rampOpt) {
   if (mode === 'ada') {
     const requiredRun = totalRise * 12;
     run = requiredRun;
-    if (typeof rampOpt.run === 'number' && rampOpt.run < requiredRun) {
+    if (typeof rampOpt.run === 'number' && !isNaN(rampOpt.run) && rampOpt.run < requiredRun) {
       maxSlopeExceeded = true;
     }
     intermediateLandings = Math.floor(totalRise / 30);
     slopeRatio = '1:12';
   } else {
-    run = typeof rampOpt.run === 'number' ? rampOpt.run : (totalRise * 8);
+    run = Math.max(12, typeof rampOpt.run === 'number' && !isNaN(rampOpt.run) ? rampOpt.run : (totalRise * 8));
     intermediateLandings = 0;
     maxSlopeExceeded = false;
     const computedRatio = totalRise > 0 ? (run / totalRise) : 0;
@@ -225,8 +225,8 @@ export function calculateRamp(totalRiseIn, rampOpt) {
     intermediateLandings,
     slopeRatio,
     maxSlopeExceeded,
-    direction: rampOpt.direction,
-    align: rampOpt.align || 'center',
+    direction: ['n', 's', 'e', 'w'].includes(rampOpt.direction) ? rampOpt.direction : 's',
+    align: ['left', 'center', 'right'].includes(rampOpt.align) ? rampOpt.align : 'center',
   };
 }
 

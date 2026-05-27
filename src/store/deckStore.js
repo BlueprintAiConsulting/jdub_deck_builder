@@ -10,9 +10,10 @@ import { validateSectionsState } from '../utils/geometry';
 function doesRampOverlap(sec, rampCalcs, sections) {
   if (!sec.ramp || !rampCalcs) return false;
   const rampDir = typeof sec.ramp === 'string' ? sec.ramp : sec.ramp.direction;
-  const rampW = rampCalcs.width;
-  const rampD = rampCalcs.run;
-  const align = sec.ramp.align || 'center';
+  if (!['n', 's', 'e', 'w'].includes(rampDir)) return false;
+  const rampW = typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36;
+  const rampD = typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) ? rampCalcs.run : 0;
+  const align = ['left', 'center', 'right'].includes(sec.ramp.align) ? sec.ramp.align : 'center';
   
   let rx, ry, rw, rd;
   
@@ -651,6 +652,7 @@ export const useDeckStore = create((set, get) => ({
 
   updateRamp: (sectionId, updates) => {
     const state = get();
+    if (!updates || typeof updates !== 'object') return;
     const newSections = state.sections.map((s) => {
       if (s.id !== sectionId) return s;
       if (!s.ramp) return s;
@@ -661,9 +663,26 @@ export const useDeckStore = create((set, get) => ({
           mode: 'ada',
           width: 36,
           direction: rampObj,
+          align: 'center',
         };
       }
-      return { ...s, ramp: { ...rampObj, ...updates } };
+      const sanitizedUpdates = {};
+      if (updates.mode !== undefined) {
+        sanitizedUpdates.mode = (updates.mode === 'ada' || updates.mode === 'utility') ? updates.mode : 'ada';
+      }
+      if (updates.width !== undefined) {
+        sanitizedUpdates.width = typeof updates.width === 'number' && !isNaN(updates.width) ? Math.max(12, updates.width) : rampObj.width;
+      }
+      if (updates.run !== undefined) {
+        sanitizedUpdates.run = typeof updates.run === 'number' && !isNaN(updates.run) ? Math.max(12, updates.run) : rampObj.run;
+      }
+      if (updates.direction !== undefined) {
+        sanitizedUpdates.direction = ['n', 's', 'e', 'w'].includes(updates.direction) ? updates.direction : rampObj.direction;
+      }
+      if (updates.align !== undefined) {
+        sanitizedUpdates.align = ['left', 'center', 'right'].includes(updates.align) ? updates.align : rampObj.align;
+      }
+      return { ...s, ramp: { ...rampObj, ...sanitizedUpdates } };
     });
     const results = recalculateAll(newSections, state.materials);
     const currentSecCalcs = results.sectionCalcs[sectionId];

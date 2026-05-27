@@ -1752,6 +1752,51 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   assert.ok(loadedDeck.ramp, 'Loaded deck should have a ramp object');
   assert.strictEqual(loadedDeck.ramp.mode, 'ada', 'Loaded ramp should preserve ADA mode');
   assert.strictEqual(loadedDeck.ramp.direction, 's', 'Loaded ramp should preserve direction');
+
+  // 6. Hardening and boundary conditions check
+  // - Negative and zero vertical rise check
+  assert.strictEqual(calculateRamp(0, { mode: 'ada' }), null, 'Zero totalRise should return null');
+  assert.strictEqual(calculateRamp(-10, { mode: 'ada' }), null, 'Negative totalRise should return null');
+  assert.strictEqual(calculateRamp(NaN, { mode: 'ada' }), null, 'NaN totalRise should return null');
+  assert.strictEqual(calculateRamp(36, null), null, 'Null rampOpt should return null');
+
+  // - Invalid mode check (should default to 'ada')
+  const invalidModeRamp = calculateRamp(36, { mode: 'garbage-mode', width: 36 });
+  assert.strictEqual(invalidModeRamp.mode, 'ada', 'Invalid mode should fall back to ada');
+
+  // - Clamping invalid width (negative, zero, NaN) to minimum of 12 inches
+  const zeroWidthRamp = calculateRamp(36, { mode: 'ada', width: 0 });
+  assert.strictEqual(zeroWidthRamp.width, 36, 'Width 0 should default to 36');
+  const negativeWidthRamp = calculateRamp(36, { mode: 'ada', width: -10 });
+  assert.strictEqual(negativeWidthRamp.width, 12, 'Negative width should be clamped to minimum 12');
+  const nanWidthRamp = calculateRamp(36, { mode: 'ada', width: NaN });
+  assert.strictEqual(nanWidthRamp.width, 36, 'NaN width should default to 36');
+
+  // - Clamping invalid run in utility mode
+  const negativeRunRamp = calculateRamp(36, { mode: 'utility', run: -5 });
+  assert.strictEqual(negativeRunRamp.run, 12, 'Negative run should be clamped to minimum 12');
+  const nanRunRamp = calculateRamp(36, { mode: 'utility', run: NaN });
+  assert.strictEqual(nanRunRamp.run, 36 * 8, 'NaN run should default to 8x rise');
+
+  // - Invalid direction check (should default to 's')
+  const invalidDirRamp = calculateRamp(36, { mode: 'ada', direction: 'invalid-dir' });
+  assert.strictEqual(invalidDirRamp.direction, 's', 'Invalid direction should fall back to s');
+
+  // - Invalid alignment check (should default to 'center')
+  const invalidAlignRamp = calculateRamp(36, { mode: 'ada', align: 'invalid-align' });
+  assert.strictEqual(invalidAlignRamp.align, 'center', 'Invalid alignment should fall back to center');
+
+  // - store updates sanitization check
+  useDeckStore.getState().resetDeck();
+  const deckSecId = useDeckStore.getState().sections[0].id;
+  useDeckStore.getState().attachRamp(deckSecId, 's');
+
+  // Update with negative width and NaN run
+  useDeckStore.getState().updateRamp(deckSecId, { width: -5, run: NaN, mode: 'utility' });
+  const updatedRampObj = useDeckStore.getState().sections.find(s => s.id === deckSecId).ramp;
+  assert.strictEqual(updatedRampObj.width, 12, 'updateRamp should clamp negative width to minimum 12');
+  assert.strictEqual(updatedRampObj.run, 36 * 8, 'updateRamp should replace NaN run with default run');
+  assert.strictEqual(updatedRampObj.mode, 'utility', 'updateRamp should successfully update mode');
 });
 
 // ─── EXECUTE ALL TESTS ───
