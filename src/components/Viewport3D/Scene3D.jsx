@@ -256,17 +256,22 @@ function Stairs({ stairEdge, stairCalcs, width, depth }) {
 
   // Determine stair starting position and direction
   let startX, startZ, dirX, dirZ, rotY;
+  const align = stairCalcs.align || 'center';
   if (stairEdge === 's') {
-    startX = width / 2 - stairWidth / 2; startZ = depth;
+    startX = align === 'left' ? 0 : (align === 'right' ? width - stairWidth : width / 2 - stairWidth / 2);
+    startZ = depth;
     dirX = 0; dirZ = 1; rotY = 0;
   } else if (stairEdge === 'n') {
-    startX = width / 2 - stairWidth / 2; startZ = 0;
+    startX = align === 'left' ? 0 : (align === 'right' ? width - stairWidth : width / 2 - stairWidth / 2);
+    startZ = 0;
     dirX = 0; dirZ = -1; rotY = Math.PI;
   } else if (stairEdge === 'e') {
-    startX = width; startZ = depth / 2 - stairWidth / 2;
+    startX = width;
+    startZ = align === 'left' ? 0 : (align === 'right' ? depth - stairWidth : depth / 2 - stairWidth / 2);
     dirX = 1; dirZ = 0; rotY = -Math.PI / 2;
   } else {
-    startX = 0; startZ = depth / 2 - stairWidth / 2;
+    startX = 0;
+    startZ = align === 'left' ? 0 : (align === 'right' ? depth - stairWidth : depth / 2 - stairWidth / 2);
     dirX = -1; dirZ = 0; rotY = Math.PI / 2;
   }
 

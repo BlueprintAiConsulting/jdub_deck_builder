@@ -611,10 +611,28 @@ export default function Canvas2D({ isMobile }) {
         ctx.strokeStyle = isLightTheme ? '#db2777' : '#ec4899';
         ctx.lineWidth = 1.5;
         let stX, stY;
-        if (stairDir === 's') { stX = sx + sw / 2 - stairW / 2; stY = sy + sd; }
-        else if (stairDir === 'n') { stX = sx + sw / 2 - stairW / 2; stY = sy - stairD; }
-        else if (stairDir === 'e') { stX = sx + sw; stY = sy + sd / 2 - stairW / 2; }
-        else { stX = sx - stairD; stY = sy + sd / 2 - stairW / 2; }
+        const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
+        if (stairDir === 's') {
+          if (align === 'left') stX = sx;
+          else if (align === 'right') stX = sx + sw - stairW;
+          else stX = sx + sw / 2 - stairW / 2;
+          stY = sy + sd;
+        } else if (stairDir === 'n') {
+          if (align === 'left') stX = sx;
+          else if (align === 'right') stX = sx + sw - stairW;
+          else stX = sx + sw / 2 - stairW / 2;
+          stY = sy - stairD;
+        } else if (stairDir === 'e') {
+          stX = sx + sw;
+          if (align === 'left') stY = sy;
+          else if (align === 'right') stY = sy + sd - stairW;
+          else stY = sy + sd / 2 - stairW / 2;
+        } else {
+          stX = sx - stairD;
+          if (align === 'left') stY = sy;
+          else if (align === 'right') stY = sy + sd - stairW;
+          else stY = sy + sd / 2 - stairW / 2;
+        }
         const isVert = stairDir === 'n' || stairDir === 's';
         const sW = isVert ? stairW : stairD;
         const sD = isVert ? stairD : stairW;

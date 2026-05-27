@@ -56,7 +56,31 @@ function createSection(overrides = {}) {
   return merged;
 }
 
-function recalculateSection(section, materials) {
+function findAdjacentSection(sec, edge, allSections) {
+  for (const other of allSections) {
+    if (other.id === sec.id) continue;
+    if (edge === 'e') {
+      const touch = Math.abs((sec.x + sec.width) - other.x) <= 2;
+      const overlap = Math.max(sec.y, other.y) < Math.min(sec.y + sec.depth, other.y + other.depth);
+      if (touch && overlap) return other;
+    } else if (edge === 'w') {
+      const touch = Math.abs(sec.x - (other.x + other.width)) <= 2;
+      const overlap = Math.max(sec.y, other.y) < Math.min(sec.y + sec.depth, other.y + other.depth);
+      if (touch && overlap) return other;
+    } else if (edge === 's') {
+      const touch = Math.abs((sec.y + sec.depth) - other.y) <= 2;
+      const overlap = Math.max(sec.x, other.x) < Math.min(sec.x + sec.width, other.x + other.width);
+      if (touch && overlap) return other;
+    } else if (edge === 'n') {
+      const touch = Math.abs(sec.y - (other.y + other.depth)) <= 2;
+      const overlap = Math.max(sec.x, other.x) < Math.min(sec.x + sec.width, other.x + other.width);
+      if (touch && overlap) return other;
+    }
+  }
+  return null;
+}
+
+function recalculateSection(section, materials, allSections = []) {
   let stairObj = section.stairs;
   if (typeof stairObj === 'string') {
     stairObj = {
@@ -66,13 +90,22 @@ function recalculateSection(section, materials) {
       rise: 7.25,
       run: 10,
       direction: stairObj,
+      align: 'center',
     };
+  }
+  let stairRiseHeight = section.height;
+  if (stairObj && stairObj.direction && allSections.length > 0) {
+    const adjacent = findAdjacentSection(section, stairObj.direction, allSections);
+    if (adjacent && section.height > adjacent.height) {
+      stairRiseHeight = section.height - adjacent.height;
+    }
   }
   const config = { ...materials, ...section, stairs: stairObj };
   const calcs = calculateAll({
     width: section.width,
     depth: section.depth,
     height: section.height,
+    stairRiseHeight,
     joistSize: materials.joistSize,
     joistSpacing: materials.joistSpacing,
     species: materials.species,
@@ -91,7 +124,7 @@ function recalculateAll(sections, materials) {
   let totalSqft = 0;
 
   sections.forEach((sec) => {
-    const result = recalculateSection(sec, materials);
+    const result = recalculateSection(sec, materials, sections);
     sectionCalcs[sec.id] = result.calcs;
     allBoms.push(result.bom);
     totalSqft += calculateSquareFootage(sec.width, sec.depth);
@@ -431,6 +464,7 @@ export const useDeckStore = create((set, get) => ({
               rise: 7.25,
               run: 10,
               direction: edge,
+              align: 'center',
             },
       };
     });
@@ -578,6 +612,12 @@ export const useDeckStore = create((set, get) => ({
           rise: 7.25,
           run: 10,
           direction: stairObj,
+          align: 'center',
+        };
+      } else if (stairObj && typeof stairObj === 'object') {
+        stairObj = {
+          align: 'center',
+          ...stairObj,
         };
       }
       const vertices = s.vertices || [

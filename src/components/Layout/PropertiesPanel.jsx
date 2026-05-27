@@ -297,6 +297,17 @@ export default function PropertiesPanel({ isMobile }) {
               ]}
               onChange={(v) => updateStairs(selectedSectionId, { direction: v })}
             />
+            <SelectField
+              id="sel-stairs-align"
+              label="Stair Alignment"
+              value={stairObj.align || 'center'}
+              options={[
+                { value: 'center', label: 'Center' },
+                { value: 'left', label: 'Left / Top Edge' },
+                { value: 'right', label: 'Right / Bottom Edge' },
+              ]}
+              onChange={(v) => updateStairs(selectedSectionId, { align: v })}
+            />
             <div className="prop-field">
               <label className="label" htmlFor="stair-width">Stair Width (in)</label>
               <input

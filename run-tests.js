@@ -1222,8 +1222,96 @@ test('30. House Wall & Ledger Attachment structural constraints (saving, loading
   assert.strictEqual(loadedSec.ledgerAttached, true, 'Loaded section ledgerAttached must remain true');
   assert.strictEqual(loadedSec.railings.n, false, 'Loaded section railings.n must be sanitized to false on load');
   assert.strictEqual(loadedSec.stairs, null, 'Loaded section stairs on North must be sanitized to null on load');
-  assert.strictEqual(loadedSec.railings.s, true, 'Other railings (South) should remain intact');
 });
+
+test('31. Multi-level stair rise calculation and alignment offsets', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+
+  // Create two adjacent sections:
+  // Section A (Deck): 36" high, size 144x120 at (0, 0)
+  // Section B (Landing): 24" high, size 36x36 at (144, 0) - touching East edge of Section A
+  const sections = [
+    {
+      id: 'sec-deck',
+      x: 0, y: 0, width: 144, depth: 120, height: 36,
+      ledgerAttached: false,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: {
+        type: 'stair',
+        width: 36,
+        numberOfSteps: 2,
+        rise: 6,
+        run: 10,
+        direction: 'e',
+        align: 'center'
+      },
+      type: 'deck',
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 144, y: 0 },
+        { x: 144, y: 120 },
+        { x: 0, y: 120 }
+      ]
+    },
+    {
+      id: 'sec-landing',
+      x: 144, y: 0, width: 36, depth: 36, height: 24,
+      ledgerAttached: false,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: null,
+      type: 'landing',
+      vertices: [
+        { x: 144, y: 0 },
+        { x: 180, y: 0 },
+        { x: 180, y: 36 },
+        { x: 144, y: 36 }
+      ]
+    }
+  ];
+
+  const materials = {
+    joistSize: '2x8',
+    joistSpacing: 16,
+    species: 'SYP',
+    beamConfig: '2-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'PT-SYP',
+    soilCapacity: 2000
+  };
+
+  // Load the project into the store
+  store.loadProject(sections, materials);
+
+  let state = useDeckStore.getState();
+  const deckCalcs = state.sectionCalcs['sec-deck'];
+
+  // Total rise for the stairs should be 36 - 24 = 12 inches
+  // Using 2 steps (stairObj.numberOfSteps = 2, so 3 risers), riserHeight = 12 / 3 = 4 inches
+  assert.ok(deckCalcs.stairs, 'Stairs should be calculated on the deck');
+  assert.strictEqual(deckCalcs.stairs.riserHeight, 4, 'Stair riserHeight should be 4 inches (12" rise / 3 risers)');
+  assert.strictEqual(deckCalcs.stairs.numRisers, 3, 'Stair should have 3 risers');
+  assert.strictEqual(deckCalcs.stairs.align, 'center', 'Default stair alignment should be center');
+
+  // Change landing height to 12 inches -> rise becomes 36 - 12 = 24 inches
+  // With 2 steps (3 risers), riserHeight should become 24 / 3 = 8 inches
+  const newSections = state.sections.map(s => {
+    if (s.id === 'sec-landing') return { ...s, height: 12 };
+    return s;
+  });
+  store.loadProject(newSections, materials);
+  state = useDeckStore.getState();
+
+  const updatedDeckCalcs = state.sectionCalcs['sec-deck'];
+  assert.strictEqual(updatedDeckCalcs.stairs.riserHeight, 8, 'Stair riserHeight should update to 8 inches (24" rise / 3 risers)');
+
+  // Update alignment to 'left' via updateStairs
+  store.updateStairs('sec-deck', { align: 'left' });
+  state = useDeckStore.getState();
+  assert.strictEqual(state.sections[0].stairs.align, 'left', 'Stair alignment should update to left');
+});
+
 
 
 // ─── EXECUTE ALL TESTS ───

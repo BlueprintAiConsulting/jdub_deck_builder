@@ -92,10 +92,10 @@ export function calculateStairs(totalRiseIn, stairOpt) {
     const width = stairOpt.width || 36;
     const numTreads = stairOpt.numberOfSteps !== undefined ? stairOpt.numberOfSteps : 5;
     const numRisers = numTreads + 1;
-    const riserHeight = stairOpt.rise || 7.25;
+    const riserHeight = totalRiseIn / numRisers;
     const treadDepth = stairOpt.run || 10;
     const totalRun = treadDepth * numTreads;
-    const totalRise = riserHeight * numRisers;
+    const totalRise = totalRiseIn;
     const stringerLength = Math.sqrt(totalRise ** 2 + totalRun ** 2);
     const stringerCount = Math.max(2, Math.ceil(width / 16) + 1);
     return {
@@ -108,6 +108,7 @@ export function calculateStairs(totalRiseIn, stairOpt) {
       stringerLength: Math.round(stringerLength * 100) / 100,
       stringerCount,
       direction: stairOpt.direction,
+      align: stairOpt.align || 'center',
     };
   }
 
@@ -132,11 +133,12 @@ export function calculateStairs(totalRiseIn, stairOpt) {
 
 /** Run all structural calculations for a deck config */
 export function calculateAll(config) {
-  const { width, depth, height, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt } = config;
+  const { width, depth, height, stairRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt } = config;
   const joists = calculateJoists(width, depth, joistSize, joistSpacing, species);
   const beams = calculateBeams(width, depth, joistSize, joistSpacing, species, beamConfig);
   const posts = calculatePosts(beams, height, postSize);
   const footings = calculateFootings(posts, joistSpacing, beams.maxSpan, soilCapacity);
-  const stairs = height > 0 ? calculateStairs(height, stairOpt) : null;
+  const stairsRise = stairRiseHeight !== undefined ? stairRiseHeight : height;
+  const stairs = stairsRise > 0 ? calculateStairs(stairsRise, stairOpt) : null;
   return { joists, beams, posts, footings, stairs };
 }
