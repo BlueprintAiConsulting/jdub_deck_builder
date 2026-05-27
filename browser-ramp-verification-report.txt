@@ -1,0 +1,42 @@
+DeckForge Ramp Browser Verification Report
+==================================================
+Date: 2026-05-27T03:41:50.585Z
+
+Ramp Verification Results:
+[PASS] 2D: Canvas2D element exists
+  - Measured: Exists
+  - Expected: Exists
+
+[PASS] 2D: Canvas2D element has non-zero size
+  - Measured: 898x846
+  - Expected: non-zero width & height
+
+[PASS] 2D: Ramp UI controls DOM element exists
+  - Measured: Exists
+  - Expected: Exists
+
+[PASS] 2D: Ramp UI element has non-zero size
+  - Measured: 275x28
+  - Expected: non-zero width & height
+
+[PASS] 3D: Ramp mesh exists in Three.js scene graph
+  - Measured: Found
+  - Expected: Found
+
+[PASS] 3D: Ramp mesh bounding box has non-zero vertical extent (is sloped)
+  - Measured: 37.00 inches
+  - Expected: non-zero extent (> 1.0 inches)
+
+[PASS] 3D: Ramp top edge is near deck surface (36-37") and bottom edge is near ground (0")
+  - Measured: top Y: 37.00", bottom Y: 0.00"
+  - Expected: top Y ~ 36-37", bottom Y ~ 0-1"
+
+[PASS] State: Placed ramp computed run is correct
+  - Measured: 432 inches
+  - Expected: 432 inches (36ft)
+
+==================================================
+Final Result: ALL PASSED
+Screenshots captured:
+  - 2D: screenshots/ramp-verification-2d.png
+  - 3D: screenshots/ramp-verification-3d.png
