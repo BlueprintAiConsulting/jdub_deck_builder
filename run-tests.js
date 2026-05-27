@@ -55,7 +55,31 @@ global.document = {
     const el = {
       tagName: tagName.toUpperCase(),
       click() { this.clicked = true; },
-      setAttribute(name, val) { this[name] = val; }
+      setAttribute(name, val) { this[name] = val; },
+      getContext(type) {
+        return {
+          clearRect() {},
+          fillRect() {},
+          strokeRect() {},
+          beginPath() {},
+          moveTo() {},
+          lineTo() {},
+          stroke() {},
+          fill() {},
+          arc() {},
+          fillText() {},
+          save() {},
+          restore() {},
+          translate() {},
+          rotate() {},
+          setLineDash() {},
+          measureText() { return { width: 50 }; },
+          createRadialGradient() {
+            return { addColorStop() {} };
+          }
+        };
+      },
+      toDataURL() { return 'data:image/png;base64,mock'; }
     };
     createdElements.push(el);
     return el;
@@ -79,6 +103,7 @@ const {
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
 const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/components/Viewport2D/Canvas2D.jsx');
+const { renderBlueprint } = await import('./src/utils/blueprintRenderer.js');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -1366,8 +1391,41 @@ test('32. Edge alignment snapping and autosave draft clearing on manual save', (
   assert.strictEqual(mockLocalStorage.getItem('deckforge_autosave_draft'), null, 'Autosave draft must be cleared on successful manual save');
 });
 
+test('33. Blueprint rendering and dimension toggling', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
 
+  // 1. Verify default dimensions state
+  assert.strictEqual(store.showDimensions, true, 'showDimensions should default to true');
 
+  // 2. Verify toggleDimensions action
+  store.toggleDimensions();
+  assert.strictEqual(useDeckStore.getState().showDimensions, false, 'showDimensions should toggle to false');
+
+  store.toggleDimensions();
+  assert.strictEqual(useDeckStore.getState().showDimensions, true, 'showDimensions should toggle back to true');
+
+  // 3. Verify renderBlueprint executes without crash
+  const canvas = document.createElement('canvas');
+  canvas.width = 1050;
+  canvas.height = 700;
+  
+  const state = useDeckStore.getState();
+  const currentSections = state.sections;
+  const currentCalcs = state.sectionCalcs;
+  const currentMaterials = state.materials;
+
+  assert.doesNotThrow(() => {
+    renderBlueprint(
+      canvas,
+      currentSections,
+      currentCalcs,
+      currentMaterials,
+      state.showDimensions,
+      'Test Project Title'
+    );
+  }, 'renderBlueprint should execute successfully on the mock canvas without throwing errors');
+});
 
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');

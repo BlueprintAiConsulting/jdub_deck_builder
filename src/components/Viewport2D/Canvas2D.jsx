@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useDeckStore } from '../../store/deckStore';
 import { formatDimension } from '../../utils/units';
 import { WOOD_COLORS } from '../Materials/materialData';
+import { drawDimensionLine } from '../../utils/blueprintRenderer';
 import './Canvas2D.css';
 
 const SCALE = 3;
@@ -148,6 +149,7 @@ export default function Canvas2D({ isMobile }) {
   const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
   const materials = useDeckStore((s) => s.materials);
   const showGrid = useDeckStore((s) => s.showGrid);
+  const showDimensions = useDeckStore((s) => s.showDimensions);
   const selectedTool = useDeckStore((s) => s.selectedTool);
   const interaction = useDeckStore((s) => s.interaction);
   const selectSection = useDeckStore((s) => s.selectSection);
@@ -650,15 +652,71 @@ export default function Canvas2D({ isMobile }) {
       }
 
       // Dimension labels
-      ctx.fillStyle = isLightTheme ? '#0f172a' : '#e8edf5';
-      ctx.font = '600 11px "JetBrains Mono"';
-      ctx.textAlign = 'center';
-      ctx.fillText(formatDimension(sec.width), sx + sw / 2, sy - 8);
-      ctx.save();
-      ctx.translate(sx + sw + 14, sy + sd / 2);
-      ctx.rotate(Math.PI / 2);
-      ctx.fillText(formatDimension(sec.depth), 0, 0);
-      ctx.restore();
+      if (showDimensions) {
+        // Draw top edge dimension line
+        drawDimensionLine(
+          ctx,
+          { x: sx, y: sy },
+          { x: sx + sw, y: sy },
+          formatDimension(sec.width),
+          -18, // offset above
+          isLightTheme
+        );
+        // Draw right edge dimension line
+        drawDimensionLine(
+          ctx,
+          { x: sx + sw, y: sy },
+          { x: sx + sw, y: sy + sd },
+          formatDimension(sec.depth),
+          18, // offset to the right
+          isLightTheme
+        );
+
+        // Draw post-to-post dimension spacing along beams
+        if (calcs.posts.posts.length > 1) {
+          const postsByY = {};
+          calcs.posts.posts.forEach((post) => {
+            const yKey = Math.round(post.y);
+            if (!postsByY[yKey]) postsByY[yKey] = [];
+            postsByY[yKey].push(post);
+          });
+
+          Object.keys(postsByY).forEach((yKey) => {
+            const beamPosts = postsByY[yKey];
+            beamPosts.sort((a, b) => a.x - b.x);
+
+            for (let i = 0; i < beamPosts.length - 1; i++) {
+              const p1 = beamPosts[i];
+              const p2 = beamPosts[i+1];
+              const px1 = sx + p1.x * S;
+              const py1 = sy + p1.y * S;
+              const px2 = sx + p2.x * S;
+              const py2 = sy + p2.y * S;
+              const distance = p2.x - p1.x;
+
+              drawDimensionLine(
+                ctx,
+                { x: px1, y: py1 },
+                { x: px2, y: py2 },
+                formatDimension(distance),
+                14, // offset below posts
+                isLightTheme
+              );
+            }
+          });
+        }
+      } else {
+        // Fallback to simple labels if dimensions are hidden
+        ctx.fillStyle = isLightTheme ? '#0f172a' : '#e8edf5';
+        ctx.font = '600 11px "JetBrains Mono"';
+        ctx.textAlign = 'center';
+        ctx.fillText(formatDimension(sec.width), sx + sw / 2, sy - 8);
+        ctx.save();
+        ctx.translate(sx + sw + 14, sy + sd / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.fillText(formatDimension(sec.depth), 0, 0);
+        ctx.restore();
+      }
 
       // Section number badge
       const secIdx = sections.indexOf(sec);
@@ -717,6 +775,54 @@ export default function Canvas2D({ isMobile }) {
       }
     });
 
+    // Overall Footprint Dimensions
+    if (showDimensions && sections.length > 0) {
+      const xs = [];
+      const xMaxs = [];
+      const ys = [];
+      const yMaxs = [];
+
+      sections.forEach(s => {
+        xs.push(s.x);
+        xMaxs.push(s.x + s.width);
+        ys.push(s.y);
+        yMaxs.push(s.y + s.depth);
+      });
+
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xMaxs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...yMaxs);
+
+      const overallW = maxX - minX;
+      const overallD = maxY - minY;
+
+      const leftmostX = minX * S + ox;
+      const rightmostX = maxX * S + ox;
+      const topY = minY * S + oy;
+      const bottomY = maxY * S + oy;
+
+      // Draw overall width line at the top (offset above topmost section)
+      drawDimensionLine(
+        ctx,
+        { x: leftmostX, y: topY },
+        { x: rightmostX, y: topY },
+        `OVERALL WIDTH: ${formatDimension(overallW)}`,
+        -36, // offset above
+        isLightTheme
+      );
+
+      // Draw overall depth line at the left (offset to the left of leftmost section)
+      drawDimensionLine(
+        ctx,
+        { x: leftmostX, y: topY },
+        { x: leftmostX, y: bottomY },
+        `OVERALL DEPTH: ${formatDimension(overallD)}`,
+        -36, // offset to the left
+        isLightTheme
+      );
+    }
+
     // Ghost rectangle while placing
     if (interaction.mode === 'placing' && interaction.ghostRect) {
       const g = interaction.ghostRect;
@@ -772,7 +878,7 @@ export default function Canvas2D({ isMobile }) {
       ctx.fillText(isMobile ? 'Tap to place a landing' : 'Click & drag or click to place a landing', size.w / 2, 24);
     }
 
-  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S]);
+  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, showDimensions, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S]);
 
   const cursor = interaction.mode === 'placing' ? 'crosshair' :
     interaction.mode === 'moving' || interaction.mode === 'dragging_vertex' ? 'grabbing' :

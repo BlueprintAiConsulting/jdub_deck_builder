@@ -41,6 +41,8 @@ export default function ToolPanel({ isMobile, onClose }) {
   const setSelectedTool = useDeckStore((s) => s.setSelectedTool);
   const showGrid = useDeckStore((s) => s.showGrid);
   const toggleGrid = useDeckStore((s) => s.toggleGrid);
+  const showDimensions = useDeckStore((s) => s.showDimensions);
+  const toggleDimensions = useDeckStore((s) => s.toggleDimensions);
   const resetDeck = useDeckStore((s) => s.resetDeck);
 
   const handleToolSelect = (toolId) => {
@@ -72,20 +74,34 @@ export default function ToolPanel({ isMobile, onClose }) {
 
         <div className="tool-mobile__section">
           <span className="label">View</span>
-          <button
-            className={`tool-mobile__btn tool-mobile__btn--wide ${showGrid ? 'tool-mobile__btn--active' : ''}`}
-            onClick={toggleGrid}
-            id="btn-toggle-grid"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="1"/>
-              <line x1="3" y1="9" x2="21" y2="9"/>
-              <line x1="3" y1="15" x2="21" y2="15"/>
-              <line x1="9" y1="3" x2="9" y2="21"/>
-              <line x1="15" y1="3" x2="15" y2="21"/>
-            </svg>
-            <span>Grid</span>
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              className={`tool-mobile__btn tool-mobile__btn--wide ${showGrid ? 'tool-mobile__btn--active' : ''}`}
+              onClick={toggleGrid}
+              id="btn-toggle-grid"
+              style={{ flex: 1 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="1"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="3" y1="15" x2="21" y2="15"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
+                <line x1="15" y1="3" x2="15" y2="21"/>
+              </svg>
+              <span>Grid</span>
+            </button>
+            <button
+              className={`tool-mobile__btn tool-mobile__btn--wide ${showDimensions ? 'tool-mobile__btn--active' : ''}`}
+              onClick={toggleDimensions}
+              id="btn-toggle-dimensions"
+              style={{ flex: 1 }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M5 3v18M19 3v18M5 12h14"/>
+              </svg>
+              <span>Dimensions</span>
+            </button>
+          </div>
         </div>
 
         <div className="divider" />
@@ -132,20 +148,32 @@ export default function ToolPanel({ isMobile, onClose }) {
 
       <div className="tool-panel__section">
         <span className="label">View</span>
-        <button
-          className={`tool-panel__btn tool-panel__btn--wide ${showGrid ? 'tool-panel__btn--active' : ''}`}
-          onClick={toggleGrid}
-          id="btn-toggle-grid"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="1"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="3" y1="15" x2="21" y2="15"/>
-            <line x1="9" y1="3" x2="9" y2="21"/>
-            <line x1="15" y1="3" x2="15" y2="21"/>
-          </svg>
-          <span>Grid</span>
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <button
+            className={`tool-panel__btn tool-panel__btn--wide ${showGrid ? 'tool-panel__btn--active' : ''}`}
+            onClick={toggleGrid}
+            id="btn-toggle-grid"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="1"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="3" y1="15" x2="21" y2="15"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+              <line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>
+            <span>Grid</span>
+          </button>
+          <button
+            className={`tool-panel__btn tool-panel__btn--wide ${showDimensions ? 'tool-panel__btn--active' : ''}`}
+            onClick={toggleDimensions}
+            id="btn-toggle-dimensions"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 3v18M19 3v18M5 12h14"/>
+            </svg>
+            <span>Dimensions</span>
+          </button>
+        </div>
       </div>
 
       <div className="divider" />

@@ -198,6 +198,7 @@ export const useDeckStore = create((set, get) => ({
   viewMode: '2d',
   selectedTool: 'select',
   showGrid: true,
+  showDimensions: true,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
 
@@ -231,6 +232,7 @@ export const useDeckStore = create((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setSelectedTool: (tool) => set({ selectedTool: tool }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  toggleDimensions: () => set((s) => ({ showDimensions: !s.showDimensions })),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
   toggleTheme: () => {
