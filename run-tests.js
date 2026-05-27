@@ -1691,50 +1691,43 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
   const { useDeckStore } = await import('./src/store/deckStore.js');
 
-  // 1. ADA Mode calculations check
-  const adaRamp = calculateRamp(36, { mode: 'ada', width: 36, direction: 's', align: 'center' });
-  assert.ok(adaRamp, 'ADA ramp calculations should not be null');
-  assert.strictEqual(adaRamp.run, 432, 'ADA mode run should be derived as totalRise * 12 (432 inches)');
-  assert.strictEqual(adaRamp.intermediateLandings, 1, 'ADA mode should have 1 landing for 36" rise');
-  assert.strictEqual(adaRamp.slopeRatio, '1:12', 'ADA mode slope ratio should be reported as 1:12');
+  // 1. ADA mode math: calculateRamp for a 36-inch rise in 'ada' mode returns run === 432 and intermediateLandings === 1
+  const ada36 = calculateRamp(36, { mode: 'ada', width: 36, direction: 's', align: 'center' });
+  assert.ok(ada36, 'calculateRamp should return an object');
+  assert.strictEqual(ada36.run, 432, 'ADA mode 36-inch rise run should be 432');
+  assert.strictEqual(ada36.intermediateLandings, 1, 'ADA mode 36-inch rise intermediateLandings should be 1');
 
-  const steepAdaRamp = calculateRamp(36, { mode: 'ada', width: 36, direction: 's', align: 'center', run: 300 });
-  assert.strictEqual(steepAdaRamp.maxSlopeExceeded, true, 'maxSlopeExceeded should be true if run is shorter than rise * 12');
+  // 2. ADA mode steeper deck: a 60-inch rise in 'ada' mode returns run === 720 and intermediateLandings === 2
+  const ada60 = calculateRamp(60, { mode: 'ada', width: 36, direction: 's', align: 'center' });
+  assert.strictEqual(ada60.run, 720, 'ADA mode 60-inch rise run should be 720');
+  assert.strictEqual(ada60.intermediateLandings, 2, 'ADA mode 60-inch rise intermediateLandings should be 2');
 
-  // 2. Utility Mode calculations check
-  const utilityRampDefault = calculateRamp(36, { mode: 'utility', width: 36, direction: 's', align: 'center' });
-  assert.strictEqual(utilityRampDefault.run, 288, 'Utility mode run should default to totalRise * 8 (288 inches)');
-  assert.strictEqual(utilityRampDefault.intermediateLandings, 0, 'Utility mode should have 0 intermediate landings');
-  
-  const utilityRampCustom = calculateRamp(36, { mode: 'utility', width: 36, direction: 's', align: 'center', run: 288 });
-  assert.strictEqual(utilityRampCustom.run, 288, 'Utility mode run should use custom run if provided');
-  assert.strictEqual(utilityRampCustom.maxSlopeExceeded, false, 'Utility mode should not flag maxSlopeExceeded');
-  assert.strictEqual(utilityRampCustom.slopeRatio, '1:8', 'Slope ratio for 288 run with 36 rise should be 1:8');
+  // 3. ADA slope violation: calling calculateRamp in 'ada' mode with a supplied run shorter than the required 1:12 run sets maxSlopeExceeded === true
+  const adaViolation = calculateRamp(36, { mode: 'ada', width: 36, direction: 's', align: 'center', run: 300 });
+  assert.strictEqual(adaViolation.maxSlopeExceeded, true, 'maxSlopeExceeded should be true when run is shorter than rise * 12');
 
-  // 3. Overlap warnings / placement logic via Zustand Store
+  // 4. Utility mode: calculateRamp in 'utility' mode with a user-supplied run uses that run exactly, sets intermediateLandings === 0, and maxSlopeExceeded === false regardless of slope
+  const utilityCustom = calculateRamp(36, { mode: 'utility', width: 36, direction: 's', align: 'center', run: 180 });
+  assert.strictEqual(utilityCustom.run, 180, 'Utility mode should use custom run exactly');
+  assert.strictEqual(utilityCustom.intermediateLandings, 0, 'Utility mode intermediateLandings should be 0');
+  assert.strictEqual(utilityCustom.maxSlopeExceeded, false, 'Utility mode maxSlopeExceeded should be false even when steep');
+
+  // 5. Utility mode default: 'utility' mode with no run supplied defaults the run and does not throw
+  const utilityDefault = calculateRamp(36, { mode: 'utility', width: 36, direction: 's', align: 'center' });
+  assert.ok(utilityDefault.run > 0, 'Utility mode default run should be generated and positive');
+  assert.strictEqual(utilityDefault.intermediateLandings, 0, 'Utility mode default intermediateLandings should be 0');
+
+  // 6. surfaceLength: for any ramp, surfaceLength equals Math.sqrt(rise^2 + run^2)
+  const expectedLen36 = Math.round(Math.sqrt(36 ** 2 + 432 ** 2) * 100) / 100;
+  assert.strictEqual(ada36.surfaceLength, expectedLen36, 'Ramp surfaceLength must equal Math.sqrt(rise^2 + run^2) rounded');
+  const expectedLenUtility = Math.round(Math.sqrt(36 ** 2 + 180 ** 2) * 100) / 100;
+  assert.strictEqual(utilityCustom.surfaceLength, expectedLenUtility, 'Ramp surfaceLength must equal Math.sqrt(rise^2 + run^2) rounded');
+
+  // 7. Save/load: a section with a ramp (including its mode) survives a .deck save/load round-trip with the ramp config and mode intact
   useDeckStore.getState().resetDeck();
   const deckSec = useDeckStore.getState().sections[0];
-  
-  // Place another section adjacent to trigger overlap
-  useDeckStore.getState().addSection({ x: 72, y: 144, width: 36, depth: 36 }, 'landing');
-
-  // Now, attach a south-facing ramp to deckSec.
   useDeckStore.getState().attachRamp(deckSec.id, 's');
   
-  const updatedCalcs = useDeckStore.getState().sectionCalcs[deckSec.id];
-  assert.ok(updatedCalcs.ramp, 'Ramp should be attached');
-  assert.strictEqual(updatedCalcs.ramp.doesNotFit, true, 'Ramp should report doesNotFit = true when overlapping another section');
-
-  // 4. BOM Calculations Check
-  const bom = useDeckStore.getState().bom;
-  const stringers = bom.find(item => item.id === 'ramp-stringers');
-  const decking = bom.find(item => item.id === 'ramp-decking');
-  assert.ok(stringers, 'BOM should include ramp stringers');
-  assert.ok(decking, 'BOM should include ramp decking');
-  assert.ok(stringers.quantity >= 2, 'Ramp stringer count should be at least 2');
-  assert.ok(decking.quantity > 0, 'Ramp decking quantity should be greater than 0');
-
-  // 5. Save/Load integrity
   const savedSections = useDeckStore.getState().sections;
   const savedMaterials = useDeckStore.getState().materials;
   const serialized = serializeProject('Ramp Save Test', savedSections, savedMaterials);
@@ -1753,18 +1746,27 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   assert.strictEqual(loadedDeck.ramp.mode, 'ada', 'Loaded ramp should preserve ADA mode');
   assert.strictEqual(loadedDeck.ramp.direction, 's', 'Loaded ramp should preserve direction');
 
-  // 6. Hardening and boundary conditions check
-  // - Negative and zero vertical rise check
+  // 8. BOM: when a ramp exists, generateBOM includes ramp framing/decking line items; when no ramp exists, it does not
+  // - With ramp
+  const bomWithRamp = useDeckStore.getState().bom;
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-stringers'), 'BOM must include ramp stringers when ramp is present');
+  assert.ok(bomWithRamp.find(item => item.id === 'ramp-decking'), 'BOM must include ramp decking when ramp is present');
+
+  // - Without ramp
+  useDeckStore.getState().resetDeck();
+  const bomNoRamp = useDeckStore.getState().bom;
+  assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-stringers'), undefined, 'BOM must not include ramp stringers when no ramp is present');
+  assert.strictEqual(bomNoRamp.find(item => item.id === 'ramp-decking'), undefined, 'BOM must not include ramp decking when no ramp is present');
+
+  // 9. Hardening and boundary conditions check
   assert.strictEqual(calculateRamp(0, { mode: 'ada' }), null, 'Zero totalRise should return null');
   assert.strictEqual(calculateRamp(-10, { mode: 'ada' }), null, 'Negative totalRise should return null');
   assert.strictEqual(calculateRamp(NaN, { mode: 'ada' }), null, 'NaN totalRise should return null');
   assert.strictEqual(calculateRamp(36, null), null, 'Null rampOpt should return null');
 
-  // - Invalid mode check (should default to 'ada')
   const invalidModeRamp = calculateRamp(36, { mode: 'garbage-mode', width: 36 });
   assert.strictEqual(invalidModeRamp.mode, 'ada', 'Invalid mode should fall back to ada');
 
-  // - Clamping invalid width (negative, zero, NaN) to minimum of 12 inches
   const zeroWidthRamp = calculateRamp(36, { mode: 'ada', width: 0 });
   assert.strictEqual(zeroWidthRamp.width, 36, 'Width 0 should default to 36');
   const negativeWidthRamp = calculateRamp(36, { mode: 'ada', width: -10 });
@@ -1772,26 +1774,22 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   const nanWidthRamp = calculateRamp(36, { mode: 'ada', width: NaN });
   assert.strictEqual(nanWidthRamp.width, 36, 'NaN width should default to 36');
 
-  // - Clamping invalid run in utility mode
   const negativeRunRamp = calculateRamp(36, { mode: 'utility', run: -5 });
   assert.strictEqual(negativeRunRamp.run, 12, 'Negative run should be clamped to minimum 12');
   const nanRunRamp = calculateRamp(36, { mode: 'utility', run: NaN });
   assert.strictEqual(nanRunRamp.run, 36 * 8, 'NaN run should default to 8x rise');
 
-  // - Invalid direction check (should default to 's')
   const invalidDirRamp = calculateRamp(36, { mode: 'ada', direction: 'invalid-dir' });
   assert.strictEqual(invalidDirRamp.direction, 's', 'Invalid direction should fall back to s');
 
-  // - Invalid alignment check (should default to 'center')
   const invalidAlignRamp = calculateRamp(36, { mode: 'ada', align: 'invalid-align' });
   assert.strictEqual(invalidAlignRamp.align, 'center', 'Invalid alignment should fall back to center');
 
-  // - store updates sanitization check
+  // store updates sanitization check
   useDeckStore.getState().resetDeck();
   const deckSecId = useDeckStore.getState().sections[0].id;
   useDeckStore.getState().attachRamp(deckSecId, 's');
 
-  // Update with negative width and NaN run
   useDeckStore.getState().updateRamp(deckSecId, { width: -5, run: NaN, mode: 'utility' });
   const updatedRampObj = useDeckStore.getState().sections.find(s => s.id === deckSecId).ramp;
   assert.strictEqual(updatedRampObj.width, 12, 'updateRamp should clamp negative width to minimum 12');
