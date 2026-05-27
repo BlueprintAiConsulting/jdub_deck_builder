@@ -18,6 +18,8 @@ export function generateBOM(config, calcs) {
   const items = [];
   const { width, depth, height } = config;
   const { joists, beams, posts, footings, stairs } = calcs;
+  const joistOrientation = config.joistOrientation || 'vertical';
+  const deckingOrientation = config.deckingOrientation || 'perpendicular';
 
   // --- Joists ---
   const joistBoardLen = optimalBoardLength(joists.length);
@@ -33,7 +35,8 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Rim Joists (2 sides) ---
-  const rimLen = optimalBoardLength(width);
+  const rimSpan = joistOrientation === 'horizontal' ? depth : width;
+  const rimLen = optimalBoardLength(rimSpan);
   items.push({
     id: 'rim-joists',
     category: 'Framing',
@@ -46,7 +49,8 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Beams ---
-  const beamLen = optimalBoardLength(beams.length);
+  const beamSpan = joistOrientation === 'horizontal' ? depth : width;
+  const beamLen = optimalBoardLength(beamSpan);
   const beamPly = parseInt(beams.config.split('-')[0]) || 2;
   const beamSize = beams.config.split('-').slice(1).join('-') || '2x10';
   items.push({
@@ -76,15 +80,48 @@ export function generateBOM(config, calcs) {
   // --- Deck Boards ---
   const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
   const gapWidth = 0.125; // 1/8" gap
-  const boardCount = Math.ceil(depth / (deckBoardWidth + gapWidth));
-  const deckBoardLen = optimalBoardLength(width);
+  let boardCount = 0;
+  let deckBoardLen = 0;
+
+  if (deckingOrientation === 'diagonal') {
+    const maxDiagonal = Math.sqrt(width ** 2 + depth ** 2);
+    deckBoardLen = optimalBoardLength(maxDiagonal);
+    const totalAreaSqIn = width * depth;
+    const linearInchesNeeded = totalAreaSqIn / (deckBoardWidth + gapWidth);
+    const singleBoardLenIn = deckBoardLen * 12;
+    boardCount = Math.ceil((linearInchesNeeded * 1.20) / singleBoardLenIn);
+  } else {
+    const joistsVertical = (joistOrientation !== 'horizontal');
+    let boardRunIn, boardSpanIn;
+    if (joistsVertical) {
+      if (deckingOrientation === 'parallel') {
+        boardRunIn = depth;
+        boardSpanIn = width;
+      } else { // perpendicular
+        boardRunIn = width;
+        boardSpanIn = depth;
+      }
+    } else { // joists horizontal
+      if (deckingOrientation === 'parallel') {
+        boardRunIn = width;
+        boardSpanIn = depth;
+      } else { // perpendicular
+        boardRunIn = depth;
+        boardSpanIn = width;
+      }
+    }
+    const count = Math.ceil(boardSpanIn / (deckBoardWidth + gapWidth));
+    deckBoardLen = optimalBoardLength(boardRunIn);
+    boardCount = Math.ceil(count * 1.1); // 10% waste factor
+  }
+
   items.push({
     id: 'deck-boards',
     category: 'Decking',
     description: `${config.deckBoardSize || '5/4x6'} × ${deckBoardLen}' Deck Board`,
     size: config.deckBoardSize || '5/4x6',
     length: deckBoardLen,
-    quantity: Math.ceil(boardCount * 1.1), // 10% waste factor
+    quantity: boardCount,
     unit: 'ea',
     material: config.deckMaterial || config.species,
   });

@@ -29,6 +29,17 @@ const DEFAULT_MATERIALS = {
   deckBoardSize: '5/4x6',
   deckMaterial: 'PT-SYP',
   soilCapacity: 2000,
+  unitPrices: {
+    '2x8': 1.20,
+    '2x10': 1.50,
+    '2x12': 2.00,
+    '6x6': 3.00,
+    '5/4x6': 0.80,
+    'concrete': 6.00,
+    'joist-hangers': 1.50,
+    'post-bases': 7.50,
+    'screws': 0.08,
+  }
 };
 
 function createSection(overrides = {}) {
@@ -43,6 +54,8 @@ function createSection(overrides = {}) {
     railings: { n: false, s: false, e: false, w: false },
     stairs: null,    // null | 'n' | 's' | 'e' | 'w'
     type: 'deck',    // 'deck' | 'landing'
+    joistOrientation: 'vertical', // 'vertical' | 'horizontal'
+    deckingOrientation: 'perpendicular', // 'perpendicular' | 'parallel' | 'diagonal'
   };
   const merged = { ...base, ...overrides };
   if (!merged.vertices) {
@@ -113,6 +126,7 @@ function recalculateSection(section, materials, allSections = []) {
     postSize: materials.postSize,
     soilCapacity: materials.soilCapacity,
     stairs: stairObj,
+    joistOrientation: section.joistOrientation || 'vertical',
   });
   const bom = generateBOM(config, calcs);
   return { calcs, bom };
@@ -516,7 +530,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -638,6 +652,8 @@ export const useDeckStore = create((set, get) => ({
         { x: s.x, y: s.y + s.depth }
       ];
       const normalizedSection = {
+        joistOrientation: 'vertical',
+        deckingOrientation: 'perpendicular',
         ...s,
         type,
         stairs: stairObj,
@@ -656,7 +672,15 @@ export const useDeckStore = create((set, get) => ({
       return normalizedSection;
     });
 
-    const results = recalculateAll(normalizedSections, materials);
+    const normalizedMaterials = {
+      ...materials,
+      unitPrices: {
+        ...DEFAULT_MATERIALS.unitPrices,
+        ...(materials.unitPrices || {})
+      }
+    };
+
+    const results = recalculateAll(normalizedSections, normalizedMaterials);
     
     // Dynamically update nextId to avoid conflicts with existing section IDs
     let maxId = 0;
@@ -672,9 +696,9 @@ export const useDeckStore = create((set, get) => ({
     set({
       sections: normalizedSections.map((s) => ({ ...s })),
       selectedSectionId: normalizedSections[0]?.id || null,
-      materials: { ...materials },
+      materials: normalizedMaterials,
       ...results,
-      history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: { ...materials } }],
+      history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: normalizedMaterials }],
       historyIndex: 0,
       isDirty: false,
     });

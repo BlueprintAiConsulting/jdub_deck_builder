@@ -14,13 +14,17 @@ function getJoistSpanBucket(joistSpanFt) {
 }
 
 /** Calculate joist layout for a given deck */
-export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species) {
+export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, joistOrientation = 'vertical') {
+  const isHorizontal = joistOrientation === 'horizontal';
+  const width = isHorizontal ? deckDepthIn : deckWidthIn;
+  const depth = isHorizontal ? deckWidthIn : deckDepthIn;
+
   const spans = JOIST_SPANS[species]?.[joistSize];
   const maxSpan = spans?.[joistSpacing] || 120;
   const actual = LUMBER_ACTUAL[joistSize];
-  const joistCount = Math.ceil(deckWidthIn / joistSpacing) + 1;
-  const joistLength = Math.min(deckDepthIn, maxSpan);
-  const needsInteriorBeam = deckDepthIn > maxSpan;
+  const joistCount = Math.ceil(width / joistSpacing) + 1;
+  const joistLength = Math.min(depth, maxSpan);
+  const needsInteriorBeam = depth > maxSpan;
   return {
     count: joistCount,
     length: joistLength,
@@ -33,33 +37,42 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
 }
 
 /** Calculate beam layout */
-export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig) {
-  const joistSpanFt = (deckDepthIn / 12);
+export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical') {
+  const isHorizontal = joistOrientation === 'horizontal';
+  const width = isHorizontal ? deckDepthIn : deckWidthIn;
+  const depth = isHorizontal ? deckWidthIn : deckDepthIn;
+
+  const joistSpanFt = (depth / 12);
   const bucket = getJoistSpanBucket(joistSpanFt);
   const config = beamConfig || '2-2x10';
   const maxBeamSpan = BEAM_SPANS[bucket]?.[config] || 96;
-  const beamCount = deckDepthIn > JOIST_SPANS[species]?.[joistSize]?.[joistSpacing]
+  const beamCount = depth > JOIST_SPANS[species]?.[joistSize]?.[joistSpacing]
     ? 2 : 1;
   return {
     config,
     count: beamCount,
     maxSpan: maxBeamSpan,
-    length: deckWidthIn,
+    length: width,
     positions: beamCount === 1
-      ? [deckDepthIn]
-      : [deckDepthIn / 2, deckDepthIn],
+      ? [depth]
+      : [depth / 2, depth],
   };
 }
 
 /** Calculate post layout */
-export function calculatePosts(beams, deckHeightIn, postSize) {
+export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation = 'vertical') {
+  const isHorizontal = joistOrientation === 'horizontal';
   const post = POST_SIZES[postSize] || POST_SIZES['6x6'];
   const posts = [];
-  beams.positions.forEach((beamY) => {
+  beams.positions.forEach((beamCoord) => {
     const count = Math.ceil(beams.length / beams.maxSpan) + 1;
     const spacing = beams.length / (count - 1);
     for (let i = 0; i < count; i++) {
-      posts.push({ x: i * spacing, y: beamY, height: deckHeightIn });
+      if (isHorizontal) {
+        posts.push({ x: beamCoord, y: i * spacing, height: deckHeightIn });
+      } else {
+        posts.push({ x: i * spacing, y: beamCoord, height: deckHeightIn });
+      }
     }
   });
   return { posts, size: postSize, nominalWidth: post.nominalWidth };
@@ -133,10 +146,11 @@ export function calculateStairs(totalRiseIn, stairOpt) {
 
 /** Run all structural calculations for a deck config */
 export function calculateAll(config) {
-  const { width, depth, height, stairRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt } = config;
-  const joists = calculateJoists(width, depth, joistSize, joistSpacing, species);
-  const beams = calculateBeams(width, depth, joistSize, joistSpacing, species, beamConfig);
-  const posts = calculatePosts(beams, height, postSize);
+  const { width, depth, height, stairRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, joistOrientation } = config;
+  const joistOrient = joistOrientation || 'vertical';
+  const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient);
+  const beams = calculateBeams(width, depth, joistSize, joistSpacing, species, beamConfig, joistOrient);
+  const posts = calculatePosts(beams, height, postSize, joistOrient);
   const footings = calculateFootings(posts, joistSpacing, beams.maxSpan, soilCapacity);
   const stairsRise = stairRiseHeight !== undefined ? stairRiseHeight : height;
   const stairs = stairsRise > 0 ? calculateStairs(stairsRise, stairOpt) : null;

@@ -218,6 +218,7 @@ export default function PropertiesPanel({ isMobile }) {
             <SelectField id="sel-species" label="Lumber Species" value={deck.species} options={SPECIES_OPTIONS} onChange={(v) => updateDeck({ species: v })} swatch={speciesSwatch} />
             <SelectField id="sel-joist-size" label="Joist Size" value={deck.joistSize} options={JOIST_SIZES.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ joistSize: v })} />
             <SelectField id="sel-joist-spacing" label="Joist Spacing" value={deck.joistSpacing} options={JOIST_SPACINGS.map((s) => ({ value: s, label: `${s}" o.c.` }))} onChange={(v) => updateDeck({ joistSpacing: Number(v) })} />
+            <SelectField id="sel-joist-orient" label="Joist Direction" value={deck.joistOrientation || 'vertical'} options={[{ value: 'vertical', label: 'Vertical (N-S)' }, { value: 'horizontal', label: 'Horizontal (E-W)' }]} onChange={(v) => updateDeck({ joistOrientation: v })} />
             <SelectField id="sel-beam-config" label="Beam Config" value={deck.beamConfig} options={BEAM_CONFIGS} onChange={(v) => updateDeck({ beamConfig: v })} />
             <SelectField id="sel-post-size" label="Post Size" value={deck.postSize} options={POST_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ postSize: v })} />
           </CollapsibleSection>
@@ -232,6 +233,7 @@ export default function PropertiesPanel({ isMobile }) {
           >
             <SelectField id="sel-board-size" label="Board Size" value={deck.deckBoardSize} options={DECK_BOARD_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ deckBoardSize: v })} />
             <SelectField id="sel-deck-material" label="Deck Material" value={deck.deckMaterial} options={DECK_MATERIALS} onChange={(v) => updateDeck({ deckMaterial: v })} />
+            <SelectField id="sel-decking-orient" label="Decking Direction" value={deck.deckingOrientation || 'perpendicular'} options={[{ value: 'perpendicular', label: 'Perpendicular to Joists' }, { value: 'parallel', label: 'Parallel to Joists' }, { value: 'diagonal', label: '45° Diagonal' }]} onChange={(v) => updateDeck({ deckingOrientation: v })} />
           </CollapsibleSection>
 
           <div className="divider" />
@@ -448,6 +450,46 @@ export default function PropertiesPanel({ isMobile }) {
             ⚠ Deck depth exceeds max joist span. An interior beam has been added automatically.
           </div>
         )}
+      </CollapsibleSection>
+
+      <div className="divider" />
+
+      {/* Unit Prices */}
+      <CollapsibleSection
+        title="Unit Prices"
+        accentColor="#10b981"
+        icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="2" y1="12" x2="22" y2="12"/></svg>}
+        defaultOpen={false}
+      >
+        <div className="props-prices">
+          {Object.entries(deck.unitPrices || {}).map(([key, val]) => {
+            let label = key;
+            if (key === 'concrete') label = 'Concrete Mix ($/bag)';
+            else if (key === 'joist-hangers') label = 'Joist Hangers ($/ea)';
+            else if (key === 'post-bases') label = 'Post Bases ($/ea)';
+            else if (key === 'screws') label = 'Screws ($/ea)';
+            else label = `${key} Lumber ($/LF)`;
+
+            return (
+              <div className="prop-field" key={key}>
+                <label className="label" htmlFor={`price-${key}`}>{label}</label>
+                <input
+                  id={`price-${key}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="input input--sm font-mono"
+                  value={val}
+                  onChange={(e) => {
+                    const numVal = Math.max(0, parseFloat(e.target.value) || 0);
+                    const updatedPrices = { ...(deck.unitPrices || {}), [key]: numVal };
+                    updateDeck({ unitPrices: updatedPrices });
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
       </CollapsibleSection>
     </Tag>
   );

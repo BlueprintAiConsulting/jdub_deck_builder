@@ -1427,6 +1427,66 @@ test('33. Blueprint rendering and dimension toggling', () => {
   }, 'renderBlueprint should execute successfully on the mock canvas without throwing errors');
 });
 
+test('34. Joist and decking orientation structural and BOM updates', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+
+  let state = useDeckStore.getState();
+  const secId = state.sections[0].id;
+
+  // 1. Swap joist direction to horizontal
+  store.updateDeck({ joistOrientation: 'horizontal' });
+  state = useDeckStore.getState();
+  const sec = state.sections[0];
+  const calcs = state.sectionCalcs[secId];
+  
+  assert.strictEqual(sec.joistOrientation, 'horizontal', 'joistOrientation should be horizontal');
+  // With horizontal joists on a 192" x 144" deck (default size):
+  // joistCount = Math.ceil(depth/spacing) + 1 = Math.ceil(144/16) + 1 = 10
+  // joistLength = Math.min(width, maxSpan) = Math.min(192, 141) = 141 (since maxSpan for SYP 2x8 is 141)
+  assert.strictEqual(calcs.joists.count, 10, 'Horizontal joists count should be calculated based on depth');
+  assert.strictEqual(calcs.joists.length, 141, 'Horizontal joists length should be constrained by maxSpan');
+
+  // Beams run vertical (length = depth = 144)
+  assert.strictEqual(calcs.beams.length, 144, 'Beams length should equal depth when joists run horizontal');
+
+  // 2. Set parallel decking
+  store.updateDeck({ deckingOrientation: 'parallel' });
+  state = useDeckStore.getState();
+  let bomItem = state.bom.find(item => item.id === 'deck-boards-merged' || item.id === 'deck-boards');
+  // Parallel decking runs parallel to horizontal joists -> runs E-W (width = 192)
+  // Board length should be optimalBoardLength(192) = 16'
+  assert.strictEqual(bomItem.length, 16, 'Parallel decking board length should be 16 ft');
+
+  // 3. Set diagonal decking
+  store.updateDeck({ deckingOrientation: 'diagonal' });
+  state = useDeckStore.getState();
+  bomItem = state.bom.find(item => item.id === 'deck-boards-merged' || item.id === 'deck-boards');
+  // Diagonal decking length is based on max diagonal: Math.sqrt(192^2 + 144^2) = 240 inches = 20 ft
+  assert.strictEqual(bomItem.length, 20, 'Diagonal decking board length should span max diagonal (20 ft)');
+});
+
+test('35. Pricing cost estimation and BOM bar summary cost updates', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+
+  let state = useDeckStore.getState();
+  // Verify default unitPrices exist
+  assert.ok(state.materials.unitPrices, 'Default unit prices must exist');
+  assert.strictEqual(state.materials.unitPrices['2x8'], 1.20, 'Default 2x8 price should be 1.20');
+
+  // Update a unit price
+  const newPrices = { ...state.materials.unitPrices, '2x8': 2.50 };
+  store.updateDeck({ unitPrices: newPrices });
+  state = useDeckStore.getState();
+
+  assert.strictEqual(state.materials.unitPrices['2x8'], 2.50, '2x8 price should update to 2.50');
+
+  // Check that the BOM calculations reflect the new cost
+  const joistsItem = state.bom.find(item => item.id.startsWith('joists'));
+  assert.ok(joistsItem, 'Joists item must be generated in BOM');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

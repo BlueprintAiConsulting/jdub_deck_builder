@@ -543,8 +543,37 @@ export default function Canvas2D({ isMobile }) {
         const bw = 5.5 * S, gap = 0.125 * S;
         ctx.strokeStyle = isLightTheme ? woodColor + '60' : woodColor + '40';
         ctx.lineWidth = 0.5;
-        for (let y = minY; y < maxY; y += bw + gap) {
-          ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
+
+        const deckingOpt = sec.deckingOrientation || 'perpendicular';
+        const joistsVertical = (sec.joistOrientation !== 'horizontal');
+        
+        let drawMode = 'horizontal';
+        if (deckingOpt === 'diagonal') {
+          drawMode = 'diagonal';
+        } else {
+          if (joistsVertical) {
+            drawMode = (deckingOpt === 'parallel') ? 'vertical' : 'horizontal';
+          } else {
+            drawMode = (deckingOpt === 'parallel') ? 'horizontal' : 'vertical';
+          }
+        }
+
+        if (drawMode === 'horizontal') {
+          for (let y = minY; y < maxY; y += bw + gap) {
+            ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
+          }
+        } else if (drawMode === 'vertical') {
+          for (let x = minX; x < maxX; x += bw + gap) {
+            ctx.beginPath(); ctx.moveTo(x, minY); ctx.lineTo(x, maxY); ctx.stroke();
+          }
+        } else if (drawMode === 'diagonal') {
+          const step = (bw + gap) * Math.sqrt(2);
+          for (let offset = minX + minY - (maxX - minX); offset < maxX + maxY + (maxX - minX); offset += step) {
+            ctx.beginPath();
+            ctx.moveTo(minX, offset - minX);
+            ctx.lineTo(maxX, offset - maxX);
+            ctx.stroke();
+          }
         }
         ctx.restore();
       }
@@ -564,22 +593,39 @@ export default function Canvas2D({ isMobile }) {
         ctx.textBaseline = 'alphabetic';
       }
 
+      const joistsVertical = (sec.joistOrientation !== 'horizontal');
+
       // Joists
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 1.5;
-      calcs.joists.positions.forEach((xIn) => {
-        const x = sx + xIn * S;
-        if (x > sx + sw + 1) return;
-        ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
-      });
+      if (joistsVertical) {
+        calcs.joists.positions.forEach((xIn) => {
+          const x = sx + xIn * S;
+          if (x > sx + sw + 1) return;
+          ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
+        });
+      } else {
+        calcs.joists.positions.forEach((yIn) => {
+          const y = sy + yIn * S;
+          if (y > sy + sd + 1) return;
+          ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx + sw, y); ctx.stroke();
+        });
+      }
 
       // Beams
       ctx.strokeStyle = isLightTheme ? '#d97706' : '#f59e0b';
       ctx.lineWidth = 3;
-      calcs.beams.positions.forEach((yIn) => {
-        const y = sy + yIn * S;
-        ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
-      });
+      if (joistsVertical) {
+        calcs.beams.positions.forEach((yIn) => {
+          const y = sy + yIn * S;
+          ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
+        });
+      } else {
+        calcs.beams.positions.forEach((xIn) => {
+          const x = sx + xIn * S;
+          ctx.beginPath(); ctx.moveTo(x, sy - 6); ctx.lineTo(x, sy + sd + 6); ctx.stroke();
+        });
+      }
 
       // Posts
       calcs.posts.posts.forEach((post) => {

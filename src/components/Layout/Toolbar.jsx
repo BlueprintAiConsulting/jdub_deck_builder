@@ -21,6 +21,25 @@ function exportPDF() {
     const deck = { ...state.materials, ...sec };
     const calcs = state.sectionCalcs[sec.id];
     const { bom, sqft } = state;
+    const unitPrices = state.materials.unitPrices || {};
+
+    const getItemCost = (item) => {
+      const priceKey = (unitPrices && (unitPrices[item.size] !== undefined))
+        ? item.size
+        : item.id;
+      const unitPrice = (unitPrices && unitPrices[priceKey] !== undefined)
+        ? unitPrices[priceKey]
+        : 1.00;
+      const total = item.length
+        ? unitPrice * item.length * item.quantity
+        : unitPrice * item.quantity;
+      return { unitPrice, total };
+    };
+
+    const grandTotalCost = bom.reduce((sum, item) => {
+      const { total } = getItemCost(item);
+      return sum + total;
+    }, 0);
 
     // Create a high-res offscreen canvas to render the blueprint
     const canvas = document.createElement('canvas');
@@ -55,8 +74,13 @@ function exportPDF() {
     doc.setTextColor(139, 157, 195);
     doc.setFontSize(10);
     doc.text('Deck Design & Material Report', 14, 25);
+    
     doc.setTextColor(245, 166, 35);
-    doc.text(`${formatDimension(deck.width)} × ${formatDimension(deck.depth)}  •  ${sqft} sq ft`, 160, 18);
+    doc.setFontSize(9);
+    doc.text(`${formatDimension(deck.width)} × ${formatDimension(deck.depth)}  •  ${sqft} sq ft`, 140, 15);
+    doc.setTextColor(16, 185, 129); // Green
+    doc.setFontSize(10);
+    doc.text(`EST. COST: $${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 140, 22);
 
     let y = 40;
     doc.setTextColor(30, 41, 59);
@@ -124,15 +148,17 @@ function exportPDF() {
     doc.text('Bill of Materials', 14, y);
     y += 8;
 
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(100, 116, 139);
     doc.text('Description', 14, y);
-    doc.text('Size', 100, y);
-    doc.text('Length', 120, y);
-    doc.text('Qty', 145, y);
-    doc.text('Unit', 160, y);
-    doc.text('Material', 175, y);
+    doc.text('Size', 78, y);
+    doc.text('Length', 95, y);
+    doc.text('Qty', 112, y);
+    doc.text('Unit', 123, y);
+    doc.text('Unit Price', 133, y);
+    doc.text('Total Cost', 158, y);
+    doc.text('Material', 183, y);
     y += 2;
     doc.setDrawColor(200, 210, 220);
     doc.line(14, y, 200, y);
@@ -142,17 +168,28 @@ function exportPDF() {
     doc.setTextColor(30, 41, 59);
     bom.forEach((item) => {
       if (y > 260) { doc.addPage(); y = 20; }
+      const { unitPrice, total } = getItemCost(item);
       doc.text(item.description, 14, y);
-      doc.text(item.size, 100, y);
-      doc.text(item.length ? `${item.length}'` : '—', 120, y);
+      doc.text(item.size, 78, y);
+      doc.text(item.length ? `${item.length}'` : '—', 95, y);
+      
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(245, 166, 35);
-      doc.text(String(item.quantity), 145, y);
+      doc.text(String(item.quantity), 112, y);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(30, 41, 59);
-      doc.text(item.unit, 160, y);
-      doc.text(item.material, 175, y);
-      y += 5;
+      
+      doc.text(item.unit, 123, y);
+      doc.text(`$${unitPrice.toFixed(2)}${item.length ? '/LF' : ''}`, 133, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(16, 185, 129); // Green
+      doc.text(`$${total.toFixed(2)}`, 158, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      
+      doc.text(item.material, 183, y);
+      y += 5.5;
     });
 
     y += 3;
@@ -160,10 +197,14 @@ function exportPDF() {
     doc.line(14, y, 200, y);
     y += 5;
     doc.setFont('helvetica', 'bold');
-    doc.text('Total Parts:', 100, y);
-    doc.setTextColor(245, 166, 35);
+    doc.text('Total Parts / Cost:', 60, y);
+    
     const totalParts = bom.reduce((sum, item) => sum + item.quantity, 0);
-    doc.text(totalParts.toLocaleString(), 145, y);
+    doc.setTextColor(245, 166, 35);
+    doc.text(`${totalParts.toLocaleString()} pcs`, 112, y);
+    
+    doc.setTextColor(16, 185, 129); // Green
+    doc.text(`$${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 158, y);
 
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {

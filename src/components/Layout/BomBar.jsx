@@ -5,6 +5,7 @@ import './BomBar.css';
 export default function BomBar({ isMobile, expanded: forceExpanded }) {
   const bom = useDeckStore((s) => s.bom);
   const sqft = useDeckStore((s) => s.sqft);
+  const unitPrices = useDeckStore((s) => s.materials.unitPrices);
   const [expanded, setExpanded] = useState(false);
 
   const isExpanded = forceExpanded || expanded;
@@ -18,14 +19,33 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
   const lineItems = bom.length;
   const totalParts = bom.reduce((sum, item) => sum + item.quantity, 0);
 
+  const getItemCost = (item) => {
+    const priceKey = (unitPrices && (unitPrices[item.size] !== undefined))
+      ? item.size
+      : item.id;
+    const unitPrice = (unitPrices && unitPrices[priceKey] !== undefined)
+      ? unitPrices[priceKey]
+      : 1.00;
+    const total = item.length
+      ? unitPrice * item.length * item.quantity
+      : unitPrice * item.quantity;
+    return { unitPrice, total };
+  };
+
+  const grandTotalCost = bom.reduce((sum, item) => {
+    const { total } = getItemCost(item);
+    return sum + total;
+  }, 0);
+
   // Mobile BOM renders directly as a list of cards
   if (isMobile) {
     return (
       <div className="bom-mobile" id="bom-bar">
         <div className="bom-mobile__summary">
           <span className="badge">{lineItems} items</span>
-          <span className="bom-bar__parts-count">{totalParts.toLocaleString()} pcs total</span>
+          <span className="bom-bar__parts-count">{totalParts.toLocaleString()} pcs</span>
           <span className="bom-bar__sqft font-mono">{sqft} sq ft</span>
+          <span className="bom-bar__total-cost font-mono" style={{ color: '#10b981', fontWeight: 'bold', marginLeft: 'auto' }}>${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
 
         <div className="bom-mobile__chips">
@@ -39,21 +59,28 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
 
         {/* Card-based BOM for mobile */}
         <div className="bom-mobile__list">
-          {bom.map((item) => (
-            <div key={item.id} className="bom-card">
-              <div className="bom-card__header">
-                <span className={`badge badge--${item.category.toLowerCase()} badge--sm`}>{item.category}</span>
-                <span className="bom-card__qty font-mono">{item.quantity.toLocaleString()}</span>
+          {bom.map((item) => {
+            const { unitPrice, total } = getItemCost(item);
+            return (
+              <div key={item.id} className="bom-card">
+                <div className="bom-card__header">
+                  <span className={`badge badge--${item.category.toLowerCase()} badge--sm`}>{item.category}</span>
+                  <span className="bom-card__qty font-mono">{item.quantity.toLocaleString()}</span>
+                </div>
+                <div className="bom-card__desc">{item.description}</div>
+                <div className="bom-card__meta">
+                  <span className="font-mono">{item.size}</span>
+                  {item.length && <span className="font-mono">{item.length}'</span>}
+                  <span>{item.unit}</span>
+                  <span className="text-tertiary">{item.material}</span>
+                </div>
+                <div className="bom-card__price font-mono" style={{ fontSize: '11px', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Unit: ${unitPrice.toFixed(2)}{item.length ? '/LF' : ''}</span>
+                  <span style={{ color: '#10b981', fontWeight: 'bold' }}>Cost: ${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
-              <div className="bom-card__desc">{item.description}</div>
-              <div className="bom-card__meta">
-                <span className="font-mono">{item.size}</span>
-                {item.length && <span className="font-mono">{item.length}'</span>}
-                <span>{item.unit}</span>
-                <span className="text-tertiary">{item.material}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="bom-mobile__total">
@@ -98,6 +125,7 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
         </div>
 
         <div className="bom-bar__right">
+          <span className="bom-bar__total-cost font-mono" style={{ color: '#10b981', fontWeight: 'bold', marginRight: '16px', fontSize: '14px' }}>Total: ${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           <span className="bom-bar__sqft font-mono">{sqft} sq ft</span>
           <button
             className="btn btn--ghost btn--icon bom-bar__toggle"
@@ -124,26 +152,34 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
                 <th className="text-right">Qty</th>
                 <th>Unit</th>
                 <th>Material</th>
+                <th className="text-right">Unit Price</th>
+                <th className="text-right">Total Cost</th>
               </tr>
             </thead>
             <tbody>
-              {bom.map((item) => (
-                <tr key={item.id}>
-                  <td><span className={`badge badge--${item.category.toLowerCase()}`}>{item.category}</span></td>
-                  <td>{item.description}</td>
-                  <td className="font-mono">{item.size}</td>
-                  <td className="font-mono">{item.length ? `${item.length}'` : '—'}</td>
-                  <td className="font-mono bom-bar__qty">{item.quantity.toLocaleString()}</td>
-                  <td>{item.unit}</td>
-                  <td className="text-tertiary">{item.material}</td>
-                </tr>
-              ))}
+              {bom.map((item) => {
+                const { unitPrice, total } = getItemCost(item);
+                return (
+                  <tr key={item.id}>
+                    <td><span className={`badge badge--${item.category.toLowerCase()}`}>{item.category}</span></td>
+                    <td>{item.description}</td>
+                    <td className="font-mono">{item.size}</td>
+                    <td className="font-mono">{item.length ? `${item.length}'` : '—'}</td>
+                    <td className="font-mono bom-bar__qty">{item.quantity.toLocaleString()}</td>
+                    <td>{item.unit}</td>
+                    <td className="text-tertiary">{item.material}</td>
+                    <td className="font-mono text-right">${unitPrice.toFixed(2)}{item.length ? '/LF' : ''}</td>
+                    <td className="font-mono text-right" style={{ color: '#10b981', fontWeight: '500' }}>${total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="bom-bar__total-row">
-                <td colSpan="4" className="text-right"><strong>Total Parts</strong></td>
+                <td colSpan="4" className="text-right"><strong>Total Parts / Cost</strong></td>
                 <td className="font-mono bom-bar__qty"><strong>{totalParts.toLocaleString()}</strong></td>
-                <td colSpan="2"></td>
+                <td colSpan="3"></td>
+                <td className="font-mono text-right" style={{ color: '#10b981', fontSize: '13px' }}><strong>${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
               </tr>
             </tfoot>
           </table>

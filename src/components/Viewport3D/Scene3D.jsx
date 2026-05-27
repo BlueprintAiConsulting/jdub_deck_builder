@@ -37,44 +37,154 @@ export function getHorizontalIntersections(y, vertices) {
   return segments;
 }
 
-function DeckBoards({ vertices, secX, secY, species, deckBoardSize }) {
+export function getVerticalIntersections(x, vertices) {
+  const intersections = [];
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i];
+    const b = vertices[(i + 1) % vertices.length];
+    
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    
+    if (x >= minX && x <= maxX && minX !== maxX) {
+      const y = a.y + ((x - a.x) * (b.y - a.y)) / (b.x - a.x);
+      intersections.push(y);
+    }
+  }
+  
+  const sorted = intersections.sort((a, b) => a - b);
+  const unique = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (unique.length === 0 || Math.abs(sorted[i] - unique[unique.length - 1]) > 0.001) {
+      unique.push(sorted[i]);
+    }
+  }
+  
+  const segments = [];
+  for (let i = 0; i < unique.length - 1; i += 2) {
+    segments.push({ startY: unique[i], endY: unique[i + 1] });
+  }
+  return segments;
+}
+
+function DeckBoards({ vertices, secX, secY, species, deckBoardSize, joistOrientation, deckingOrientation }) {
   const color = WOOD_COLORS[species] || '#c4a35a';
-  const boardW = LUMBER_ACTUAL[deckBoardSize]?.depth || 5.5;
-  const boardH = LUMBER_ACTUAL[deckBoardSize]?.width || 1.0;
+  const boardW = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.depth || 5.5;
+  const boardH = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.width || 1.0;
   const gap = 0.125;
 
   const boards = useMemo(() => {
     if (!vertices || vertices.length === 0) return [];
     
     const localVertices = vertices.map(v => ({ x: v.x - secX, y: v.y - secY }));
-    const localYs = localVertices.map(v => v.y);
-    const localMinY = Math.min(...localYs);
-    const localMaxY = Math.max(...localYs);
-    
+    const joistOrient = joistOrientation || 'vertical';
+    const deckingOpt = deckingOrientation || 'perpendicular';
+
     const arr = [];
-    let y = localMinY, idx = 0;
-    while (y < localMaxY) {
-      const bw = Math.min(boardW, localMaxY - y);
-      const boardCenterY = y + bw / 2;
-      const segments = getHorizontalIntersections(boardCenterY, localVertices);
+    if (deckingOpt === 'diagonal') {
+      const theta = Math.PI / 4;
+      const cosNeg = Math.cos(-theta);
+      const sinNeg = Math.sin(-theta);
+      const rotatedVertices = localVertices.map(v => ({
+        x: v.x * cosNeg - v.y * sinNeg,
+        y: v.x * sinNeg + v.y * cosNeg
+      }));
+      const localYs = rotatedVertices.map(v => v.y);
+      const localMinY = Math.min(...localYs);
+      const localMaxY = Math.max(...localYs);
       
-      segments.forEach((seg, sIdx) => {
-        const boardWidth = seg.endX - seg.startX;
-        if (boardWidth > 0.5) {
-          arr.push({ id: `${idx}-${sIdx}`, y: boardCenterY, bw, startX: seg.startX, boardWidth });
+      let y = localMinY, idx = 0;
+      while (y < localMaxY) {
+        const bw = Math.min(boardW, localMaxY - y);
+        const boardCenterY = y + bw / 2;
+        const segments = getHorizontalIntersections(boardCenterY, rotatedVertices);
+        
+        segments.forEach((seg, sIdx) => {
+          const boardLength = seg.endX - seg.startX;
+          if (boardLength > 0.5) {
+            const rotatedCenterX = (seg.startX + seg.endX) / 2;
+            const rotatedCenterY = boardCenterY;
+            const cosPos = Math.cos(theta);
+            const sinPos = Math.sin(theta);
+            const posX = rotatedCenterX * cosPos - rotatedCenterY * sinPos;
+            const posZ = rotatedCenterX * sinPos + rotatedCenterY * cosPos;
+            arr.push({
+              id: `${idx}-${sIdx}`,
+              posX,
+              posZ,
+              sizeX: boardLength,
+              sizeZ: bw,
+              rotY: -theta
+            });
+          }
+        });
+        y += boardW + gap;
+        idx++;
+      }
+    } else {
+      const joistsVertical = (joistOrient !== 'horizontal');
+      const runsVertical = joistsVertical ? (deckingOpt === 'parallel') : (deckingOpt !== 'parallel');
+      
+      if (runsVertical) {
+        const localXs = localVertices.map(v => v.x);
+        const localMinX = Math.min(...localXs);
+        const localMaxX = Math.max(...localXs);
+        let x = localMinX, idx = 0;
+        while (x < localMaxX) {
+          const bw = Math.min(boardW, localMaxX - x);
+          const boardCenterX = x + bw / 2;
+          const segments = getVerticalIntersections(boardCenterX, localVertices);
+          segments.forEach((seg, sIdx) => {
+            const boardHeight = seg.endY - seg.startY;
+            if (boardHeight > 0.5) {
+              arr.push({
+                id: `${idx}-${sIdx}`,
+                posX: boardCenterX,
+                posZ: seg.startY + boardHeight / 2,
+                sizeX: bw,
+                sizeZ: boardHeight,
+                rotY: 0
+              });
+            }
+          });
+          x += boardW + gap;
+          idx++;
         }
-      });
-      y += boardW + gap;
-      idx++;
+      } else {
+        const localYs = localVertices.map(v => v.y);
+        const localMinY = Math.min(...localYs);
+        const localMaxY = Math.max(...localYs);
+        let y = localMinY, idx = 0;
+        while (y < localMaxY) {
+          const bw = Math.min(boardW, localMaxY - y);
+          const boardCenterY = y + bw / 2;
+          const segments = getHorizontalIntersections(boardCenterY, localVertices);
+          segments.forEach((seg, sIdx) => {
+            const boardWidth = seg.endX - seg.startX;
+            if (boardWidth > 0.5) {
+              arr.push({
+                id: `${idx}-${sIdx}`,
+                posX: seg.startX + boardWidth / 2,
+                posZ: boardCenterY,
+                sizeX: boardWidth,
+                sizeZ: bw,
+                rotY: 0
+              });
+            }
+          });
+          y += boardW + gap;
+          idx++;
+        }
+      }
     }
     return arr;
-  }, [vertices, secX, secY, boardW]);
+  }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation]);
 
   return (
     <group>
-      {boards.map(({ id, y, bw, startX, boardWidth }) => (
-        <mesh key={`board-${id}`} position={[(startX + boardWidth / 2) * IN, boardH / 2 * IN, y * IN]}>
-          <boxGeometry args={[boardWidth * IN, boardH * IN, bw * IN]} />
+      {boards.map(({ id, posX, posZ, sizeX, sizeZ, rotY }) => (
+        <mesh key={`board-${id}`} position={[posX * IN, boardH / 2 * IN, posZ * IN]} rotation={[0, rotY, 0]}>
+          <boxGeometry args={[sizeX * IN, boardH * IN, sizeZ * IN]} />
           <meshStandardMaterial color={color} roughness={0.72} metalness={0.03} />
         </mesh>
       ))}
@@ -82,21 +192,29 @@ function DeckBoards({ vertices, secX, secY, species, deckBoardSize }) {
   );
 }
 
-function Joists({ positions, depth, joistSize }) {
+function Joists({ positions, width, depth, joistSize, joistOrientation }) {
   const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
+  const isHorizontal = joistOrientation === 'horizontal';
   return (
     <group>
-      {positions.map((xIn, i) => (
-        <mesh key={`joist-${i}`} position={[xIn * IN, -actual.depth / 2 * IN, depth / 2 * IN]}>
-          <boxGeometry args={[actual.width * IN, actual.depth * IN, depth * IN]} />
-          <meshStandardMaterial color="#5a4a32" roughness={0.82} />
-        </mesh>
-      ))}
+      {positions.map((coordIn, i) => {
+        const posX = isHorizontal ? width / 2 : coordIn;
+        const posZ = isHorizontal ? coordIn : depth / 2;
+        const sizeX = isHorizontal ? width : actual.width;
+        const sizeZ = isHorizontal ? actual.width : depth;
+        return (
+          <mesh key={`joist-${i}`} position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]}>
+            <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
+            <meshStandardMaterial color="#5a4a32" roughness={0.82} />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
 
-function Beams({ beamPositions, width, beamConfig, joistSize }) {
+function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrientation }) {
+  const isHorizontal = joistOrientation === 'horizontal';
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
   const actual = LUMBER_ACTUAL[beamSize] || { width: 1.5, depth: 9.25 };
   const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
@@ -105,20 +223,24 @@ function Beams({ beamPositions, width, beamConfig, joistSize }) {
 
   return (
     <group>
-      {beamPositions.map((zIn, i) => (
+      {beamPositions.map((coordIn, i) => (
         <group key={`beam-${i}`}>
           {Array.from({ length: ply }, (_, p) => {
             const offset = (p - (ply - 1) / 2) * actual.width;
+            const posX = isHorizontal ? coordIn * IN : (width / 2 + offset) * IN;
+            const posZ = isHorizontal ? (depth / 2 + offset) * IN : coordIn * IN;
+            const sizeX = isHorizontal ? actual.width * IN : width * IN;
+            const sizeZ = isHorizontal ? depth * IN : actual.width * IN;
             return (
               <mesh
                 key={`beam-${i}-${p}`}
                 position={[
-                  (width / 2 + offset) * IN,
+                  posX,
                   (beamTopY - actual.depth / 2) * IN,
-                  zIn * IN,
+                  posZ,
                 ]}
               >
-                <boxGeometry args={[width * IN, actual.depth * IN, actual.width * IN]} />
+                <boxGeometry args={[sizeX, actual.depth * IN, sizeZ]} />
                 <meshStandardMaterial color="#8b6914" roughness={0.7} />
               </mesh>
             );
@@ -398,9 +520,9 @@ export default function Scene3D() {
           if (!calcs) return null;
           return (
             <group key={sec.id} position={[sec.x * IN, sec.height * IN, sec.y * IN]}>
-              <DeckBoards vertices={sec.vertices} secX={sec.x} secY={sec.y} species={materials.species} deckBoardSize={materials.deckBoardSize} />
-              <Joists positions={calcs.joists.positions} depth={sec.depth} joistSize={materials.joistSize} />
-              <Beams beamPositions={calcs.beams.positions} width={sec.width} beamConfig={materials.beamConfig} joistSize={materials.joistSize} />
+              <DeckBoards vertices={sec.vertices} secX={sec.x} secY={sec.y} species={materials.species} deckBoardSize={materials.deckBoardSize} joistOrientation={sec.joistOrientation} deckingOrientation={sec.deckingOrientation} />
+              <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+              <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
               <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
               {/* Railings — synced from 2D */}
               <Railings railings={sec.railings} width={sec.width} depth={sec.depth} height={sec.height} />
