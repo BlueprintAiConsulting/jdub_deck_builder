@@ -484,7 +484,7 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
       const updated = { ...s, ...sectionUpdates };
-      if (sectionUpdates.ledgerAttached === true) {
+      if (updated.ledgerAttached === true) {
         updated.railings = { ...updated.railings, n: false };
         if (updated.stairs && (updated.stairs === 'n' || updated.stairs.direction === 'n')) {
           updated.stairs = null;
@@ -586,12 +586,23 @@ export const useDeckStore = create((set, get) => ({
         { x: s.x + s.width, y: s.y + s.depth },
         { x: s.x, y: s.y + s.depth }
       ];
-      return {
+      const normalizedSection = {
         ...s,
         type,
         stairs: stairObj,
         vertices
       };
+      if (normalizedSection.ledgerAttached === true) {
+        if (!normalizedSection.railings) {
+          normalizedSection.railings = { n: false, s: false, e: false, w: false };
+        } else {
+          normalizedSection.railings = { ...normalizedSection.railings, n: false };
+        }
+        if (normalizedSection.stairs && (normalizedSection.stairs === 'n' || normalizedSection.stairs.direction === 'n')) {
+          normalizedSection.stairs = null;
+        }
+      }
+      return normalizedSection;
     });
 
     const results = recalculateAll(normalizedSections, materials);
