@@ -1506,6 +1506,42 @@ test('36. Environmental lighting preset state mutations', () => {
   assert.strictEqual(state.lightingPreset, 'night', 'lightingPreset should be night');
 });
 
+test('37. Polygon area calculations and rectangle square footage equivalence', async () => {
+  const { calculateSquareFootage } = await import('./src/engine/bomGenerator.js');
+  const { polygonArea } = await import('./src/utils/geometry.js');
+
+  // 1. Rectangle: 192" x 144" (16' x 12' = 192 sqft)
+  const rectVertices = [
+    { x: 0, y: 0 },
+    { x: 192, y: 0 },
+    { x: 192, y: 144 },
+    { x: 0, y: 144 }
+  ];
+
+  const areaSqIn = polygonArea(rectVertices);
+  const sqft = calculateSquareFootage(rectVertices);
+  
+  assert.strictEqual(areaSqIn, 192 * 144, 'Rectangle Shoelace area in sqin should be width * depth');
+  assert.strictEqual(sqft, 192, 'Rectangle Shoelace area in sqft should match old math (192 sqft)');
+
+  // 2. L-Shape: 16' x 12' bounding box, but with a 6' x 4' corner cut out (192 - 24 = 168 sqft)
+  // (0,0) -> (192,0) -> (192, 96) -> (120, 96) -> (120, 144) -> (0, 144)
+  const lVertices = [
+    { x: 0, y: 0 },
+    { x: 192, y: 0 },
+    { x: 192, y: 96 },
+    { x: 120, y: 96 },
+    { x: 120, y: 144 },
+    { x: 0, y: 144 }
+  ];
+  
+  const lAreaSqIn = polygonArea(lVertices);
+  const lSqft = calculateSquareFootage(lVertices);
+
+  assert.strictEqual(lAreaSqIn, 24192, 'L-shape Shoelace area in sqin should exclude the cut-out corner');
+  assert.strictEqual(lSqft, 168, 'L-shape Shoelace area in sqft should be 168 (not bounding box area of 192)');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

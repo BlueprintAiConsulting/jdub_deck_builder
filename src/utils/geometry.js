@@ -209,3 +209,15 @@ export function validateSectionsState(sections) {
 
   return true;
 }
+
+export function polygonArea(vertices) {
+  if (!vertices || vertices.length < 3) return 0;
+  let sum = 0;
+  const n = vertices.length;
+  for (let i = 0; i < n; i++) {
+    const curr = vertices[i];
+    const next = vertices[(i + 1) % n];
+    sum += curr.x * next.y - next.x * curr.y;
+  }
+  return Math.abs(sum) / 2;
+}

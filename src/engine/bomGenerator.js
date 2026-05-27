@@ -3,6 +3,7 @@
  * Calculates quantities and optimal board lengths for all deck components.
  */
 import { LUMBER_ACTUAL, BOARD_LENGTHS } from './spanTables';
+import { polygonArea } from '../utils/geometry';
 
 /** Find the optimal board length to minimize waste */
 function optimalBoardLength(requiredLengthIn) {
@@ -224,8 +225,10 @@ export function generateBOM(config, calcs) {
 }
 
 /** Calculate estimated total square footage */
-export function calculateSquareFootage(widthIn, depthIn) {
-  return Math.round((widthIn / 12) * (depthIn / 12));
+export function calculateSquareFootage(vertices) {
+  const verts = Array.isArray(vertices) ? vertices : (vertices?.vertices || []);
+  const areaSqIn = polygonArea(verts);
+  return Math.round(areaSqIn / 144);
 }
 
 /** Merge BOMs from multiple sections, combining identical items */

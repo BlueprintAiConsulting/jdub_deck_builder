@@ -141,7 +141,7 @@ function recalculateAll(sections, materials) {
     const result = recalculateSection(sec, materials, sections);
     sectionCalcs[sec.id] = result.calcs;
     allBoms.push(result.bom);
-    totalSqft += calculateSquareFootage(sec.width, sec.depth);
+    totalSqft += calculateSquareFootage(sec.vertices);
   });
 
   const mergedBom = mergeBOMs(allBoms);
