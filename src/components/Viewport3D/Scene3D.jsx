@@ -599,10 +599,19 @@ function Stairs({ stairEdge, stairCalcs, width, depth, species, deckMaterial }) 
   );
 }
 
-function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height }) {
+function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height: rawHeight }) {
   if (!rampEdge || !rampCalcs) return null;
 
-  const { totalRise, run, surfaceLength, width: rampWidth } = rampCalcs;
+  const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) ? rawHeight : 36;
+  const safeRampWidth = Math.max(12, typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36);
+  const safeRun = Math.max(12, typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) ? rampCalcs.run : 12);
+  const safeRise = Math.max(0, typeof rampCalcs.totalRise === 'number' && !isNaN(rampCalcs.totalRise) ? rampCalcs.totalRise : 0);
+
+  const rampWidth = safeRampWidth;
+  const run = safeRun;
+  const totalRise = safeRise;
+  const height = safeHeight;
+
   const treadThickness = 1.0;
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
 

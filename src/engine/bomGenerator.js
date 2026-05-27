@@ -232,14 +232,20 @@ export function generateBOM(config, calcs) {
   // --- Ramp (if applicable) ---
   if (calcs.ramp && config.ramp) {
     const ramp = calcs.ramp;
-    const N = ramp.intermediateLandings || 0;
+    const N = typeof ramp.intermediateLandings === 'number' && !isNaN(ramp.intermediateLandings) && ramp.intermediateLandings > 0
+      ? Math.floor(ramp.intermediateLandings)
+      : 0;
     const numSegments = N + 1;
-    const segRun = ramp.run / numSegments;
-    const segRise = ramp.totalRise / numSegments;
+    const safeRun = Math.max(12, typeof ramp.run === 'number' && !isNaN(ramp.run) ? ramp.run : 12);
+    const safeRise = Math.max(0, typeof ramp.totalRise === 'number' && !isNaN(ramp.totalRise) ? ramp.totalRise : 0);
+    const safeRampWidth = Math.max(12, typeof ramp.width === 'number' && !isNaN(ramp.width) ? ramp.width : 36);
+
+    const segRun = safeRun / numSegments;
+    const segRise = safeRise / numSegments;
     const segSurfaceLength = Math.sqrt(segRun ** 2 + segRise ** 2);
 
     const rampStringerLen = optimalBoardLength(segSurfaceLength);
-    const stringersPerSeg = Math.max(2, Math.ceil(ramp.width / 16) + 1);
+    const stringersPerSeg = Math.max(2, Math.ceil(safeRampWidth / 16) + 1);
     const rampStringerCount = stringersPerSeg * numSegments;
     items.push({
       id: 'ramp-stringers',
@@ -256,7 +262,7 @@ export function generateBOM(config, calcs) {
     const gapWidth = 0.125;
     const boardSpacing = (deckBoardWidth + gapWidth) > 0 ? (deckBoardWidth + gapWidth) : 5.625;
     
-    const rampTreadLen = optimalBoardLength(ramp.width);
+    const rampTreadLen = optimalBoardLength(safeRampWidth);
     const boardsPerSeg = Math.ceil(Math.ceil(segSurfaceLength / boardSpacing) * 1.1);
     const boardCount = boardsPerSeg * numSegments;
     items.push({
@@ -272,7 +278,7 @@ export function generateBOM(config, calcs) {
 
     // Landing decking & framing
     if (N > 0) {
-      const landingW = Math.max(60, ramp.width);
+      const landingW = Math.max(60, safeRampWidth);
       const landingTreadLen = optimalBoardLength(landingW);
       const landingBoardsPerLand = Math.ceil(Math.ceil(60 / boardSpacing) * 1.1);
       const landingBoardCount = landingBoardsPerLand * N;
@@ -315,7 +321,8 @@ export function generateBOM(config, calcs) {
     }
 
     // Support posts
-    const postLen = optimalBoardLength(config.height);
+    const safeHeight = Math.max(12, typeof config.height === 'number' && !isNaN(config.height) ? config.height : 36);
+    const postLen = optimalBoardLength(safeHeight);
     const rampPostCount = (2 * numSegments) + (4 * N);
     const postSizeStr = config.postSize || '4x4';
     items.push({

@@ -13,7 +13,9 @@ function doesRampOverlap(sec, rampCalcs, sections) {
   if (!['n', 's', 'e', 'w'].includes(rampDir)) return false;
   const rampW = typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36;
   const slopedRun = typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) ? rampCalcs.run : 0;
-  const intermediateLandings = rampCalcs.intermediateLandings || 0;
+  const intermediateLandings = typeof rampCalcs.intermediateLandings === 'number' && !isNaN(rampCalcs.intermediateLandings) && rampCalcs.intermediateLandings > 0
+    ? Math.floor(rampCalcs.intermediateLandings)
+    : 0;
   const rampD = slopedRun + 60 * intermediateLandings;
   const align = ['left', 'center', 'right'].includes(sec.ramp.align) ? sec.ramp.align : 'center';
   

@@ -734,10 +734,14 @@ export default function Canvas2D({ isMobile }) {
         const rW = isVert ? rampW : rampD;
         const rD = isVert ? rampD : rampW;
 
-        const numSegments = (rm.intermediateLandings || 0) + 1;
-        const segRun = rm.run / numSegments;
+        const landingsCount = typeof rm.intermediateLandings === 'number' && !isNaN(rm.intermediateLandings) && rm.intermediateLandings > 0
+          ? Math.floor(rm.intermediateLandings)
+          : 0;
+        const numSegments = landingsCount + 1;
+        const safeRun = Math.max(12, typeof rm.run === 'number' && !isNaN(rm.run) ? rm.run : 12);
+        const segRun = safeRun / numSegments;
         const landingRun = 60;
-        const rampW_in = rm.width;
+        const rampW_in = Math.max(12, typeof rm.width === 'number' && !isNaN(rm.width) ? rm.width : 36);
         const landingW_in = Math.max(60, rampW_in);
         
         let t = 0;
