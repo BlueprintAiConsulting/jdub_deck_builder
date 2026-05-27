@@ -83,17 +83,25 @@ export function generateBOM(config, calcs) {
   // --- Deck Boards ---
   const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
   const gapWidth = 0.125; // 1/8" gap
+  const boardSpacing = (deckBoardWidth + gapWidth) > 0 ? (deckBoardWidth + gapWidth) : 5.625;
   let boardCount = 0;
   let deckBoardLen = 0;
 
-  const areaSqIn = polygonArea(config.vertices || []);
-  const linearInchesNeeded = areaSqIn / (deckBoardWidth + gapWidth);
+  let areaSqIn = 0;
+  try {
+    areaSqIn = polygonArea(config.vertices || []);
+  } catch (e) {
+    areaSqIn = 0;
+  }
+  const safeAreaSqIn = areaSqIn > 0 ? areaSqIn : ((width || 0) * (depth || 0));
+  const linearInchesNeeded = safeAreaSqIn / boardSpacing;
 
   if (deckingOrientation === 'diagonal') {
-    const maxDiagonal = Math.sqrt(width ** 2 + depth ** 2);
+    const maxDiagonal = Math.sqrt((width || 0) ** 2 + (depth || 0) ** 2) || 96;
     deckBoardLen = optimalBoardLength(maxDiagonal);
     const singleBoardLenIn = deckBoardLen * 12;
-    boardCount = Math.ceil((linearInchesNeeded * 1.20) / singleBoardLenIn);
+    const safeSingleBoardLenIn = singleBoardLenIn > 0 ? singleBoardLenIn : 96;
+    boardCount = Math.ceil((linearInchesNeeded * 1.20) / safeSingleBoardLenIn);
   } else {
     const joistsVertical = (joistOrientation !== 'horizontal');
     let boardRunIn;
@@ -111,7 +119,8 @@ export function generateBOM(config, calcs) {
       }
     }
     deckBoardLen = optimalBoardLength(boardRunIn);
-    boardCount = Math.ceil((linearInchesNeeded / boardRunIn) * 1.1); // 10% waste factor
+    const safeBoardRunIn = boardRunIn > 0 ? boardRunIn : 96;
+    boardCount = Math.ceil((linearInchesNeeded / safeBoardRunIn) * 1.1); // 10% waste factor
   }
 
   items.push({
@@ -182,7 +191,7 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Hardware: Structural Screws ---
-  const screwCount = Math.ceil((joists.count * 4) + (boardCount * width / 12 * 2) + 50);
+  const screwCount = Math.ceil((joists.count * 4) + (boardCount * Math.max(0, width || 0) / 12 * 2) + 50);
   items.push({
     id: 'screws',
     category: 'Hardware',
@@ -225,9 +234,46 @@ export function generateBOM(config, calcs) {
 
 /** Calculate estimated total square footage */
 export function calculateSquareFootage(vertices) {
+  try {
+    const verts = Array.isArray(vertices) ? vertices : (vertices?.vertices || []);
+    const areaSqIn = polygonArea(verts);
+    if (areaSqIn > 0) {
+      return Math.round(areaSqIn / 144);
+    }
+  } catch (e) {
+    // Ignore and fall through to bounding box fallback
+  }
+
+  // Fallback to bounding-box if area is 0/degenerate or an error occurs
+  if (vertices && typeof vertices === 'object' && !Array.isArray(vertices)) {
+    const w = vertices.width || 0;
+    const d = vertices.depth || 0;
+    if (w > 0 && d > 0) {
+      return Math.round((w / 12) * (d / 12));
+    }
+  }
+
   const verts = Array.isArray(vertices) ? vertices : (vertices?.vertices || []);
-  const areaSqIn = polygonArea(verts);
-  return Math.round(areaSqIn / 144);
+  if (verts && verts.length >= 3) {
+    try {
+      const xs = verts.map(v => v.x).filter(x => typeof x === 'number' && !isNaN(x));
+      const ys = verts.map(v => v.y).filter(y => typeof y === 'number' && !isNaN(y));
+      if (xs.length >= 3 && ys.length >= 3) {
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const w = maxX - minX;
+        const d = maxY - minY;
+        if (w > 0 && d > 0) {
+          return Math.round((w / 12) * (d / 12));
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+  return 0;
 }
 
 /** Merge BOMs from multiple sections, combining identical items */

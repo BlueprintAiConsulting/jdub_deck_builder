@@ -20,46 +20,52 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
   const width = isHorizontal ? deckDepthIn : deckWidthIn;
   const depth = isHorizontal ? deckWidthIn : deckDepthIn;
 
+  const safeSpacing = (typeof joistSpacing === 'number' && joistSpacing > 0) ? joistSpacing : 16;
   const spans = JOIST_SPANS[species]?.[joistSize];
-  const maxSpan = spans?.[joistSpacing] || 120;
+  const maxSpan = spans?.[safeSpacing] || 120;
   const actual = LUMBER_ACTUAL[joistSize];
-  const joistCount = Math.ceil(width / joistSpacing) + 1;
+  const joistCount = Math.ceil(width / safeSpacing) + 1;
   const joistLength = Math.min(depth, maxSpan);
   const needsInteriorBeam = depth > maxSpan;
 
-  let positions = Array.from({ length: joistCount }, (_, i) => i * joistSpacing);
+  let positions = Array.from({ length: joistCount }, (_, i) => i * safeSpacing);
   if (vertices && vertices.length >= 3) {
-    positions = positions.filter((coordIn) => {
-      let x1, y1, x2, y2;
-      if (isHorizontal) {
-        x1 = secX;
-        y1 = secY + coordIn;
-        x2 = secX + deckWidthIn;
-        y2 = secY + coordIn;
-      } else {
-        x1 = secX + coordIn;
-        y1 = secY;
-        x2 = secX + coordIn;
-        y2 = secY + deckDepthIn;
-      }
-
-      // Sample 21 points along the joist segment in global coordinates
-      for (let k = 0; k <= 20; k++) {
-        const px = x1 + (k / 20) * (x2 - x1);
-        const py = y1 + (k / 20) * (y2 - y1);
-        if (isPointInPolygon(px, py, vertices) || isPointOnPolygonBoundary({ x: px, y: py }, vertices)) {
-          return true; // Keep this joist
+    try {
+      positions = positions.filter((coordIn) => {
+        let x1, y1, x2, y2;
+        if (isHorizontal) {
+          x1 = secX;
+          y1 = secY + coordIn;
+          x2 = secX + deckWidthIn;
+          y2 = secY + coordIn;
+        } else {
+          x1 = secX + coordIn;
+          y1 = secY;
+          x2 = secX + coordIn;
+          y2 = secY + deckDepthIn;
         }
-      }
-      return false; // Drop this joist
-    });
+
+        // Sample 21 points along the joist segment in global coordinates
+        for (let k = 0; k <= 20; k++) {
+          const px = x1 + (k / 20) * (x2 - x1);
+          const py = y1 + (k / 20) * (y2 - y1);
+          if (isPointInPolygon(px, py, vertices) || isPointOnPolygonBoundary({ x: px, y: py }, vertices)) {
+            return true; // Keep this joist
+          }
+        }
+        return false; // Drop this joist
+      });
+    } catch (err) {
+      // Fallback to bounding box joist positions on error
+      positions = Array.from({ length: joistCount }, (_, i) => i * safeSpacing);
+    }
   }
 
   return {
     count: positions.length,
     length: joistLength,
     maxSpan,
-    spacing: joistSpacing,
+    spacing: safeSpacing,
     needsInteriorBeam,
     actualDimensions: actual,
     positions,
@@ -76,8 +82,9 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
   const joistSpanFt = (depth / 12);
   const bucket = getJoistSpanBucket(joistSpanFt);
   const config = beamConfig || '2-2x10';
+  const safeSpacing = (typeof joistSpacing === 'number' && joistSpacing > 0) ? joistSpacing : 16;
   const maxBeamSpan = BEAM_SPANS[bucket]?.[config] || 96;
-  const beamCount = depth > JOIST_SPANS[species]?.[joistSize]?.[joistSpacing]
+  const beamCount = depth > JOIST_SPANS[species]?.[joistSize]?.[safeSpacing]
     ? 2 : 1;
   return {
     config,
@@ -97,9 +104,10 @@ export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation =
   const post = POST_SIZES[postSize] || POST_SIZES['6x6'];
   const posts = [];
   beams.positions.forEach((beamCoord) => {
-    const count = Math.ceil(beams.length / beams.maxSpan) + 1;
-    const spacing = beams.length / (count - 1);
-    for (let i = 0; i < count; i++) {
+    const count = Math.ceil((beams.length || 0) / (beams.maxSpan || 96)) + 1;
+    const safeCount = Math.max(2, count);
+    const spacing = (beams.length || 0) / (safeCount - 1);
+    for (let i = 0; i < safeCount; i++) {
       if (isHorizontal) {
         posts.push({ x: beamCoord, y: i * spacing, height: deckHeightIn });
       } else {
@@ -114,7 +122,8 @@ export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation =
 // approximate for non-rectangular — bounding box layout
 export function calculateFootings(posts, joistSpacing, beamMaxSpan, soilCapacity) {
   const cap = soilCapacity || 2000;
-  const tributaryArea = (joistSpacing / 12) * (beamMaxSpan / 12);
+  const safeSpacing = (typeof joistSpacing === 'number' && joistSpacing > 0) ? joistSpacing : 16;
+  const tributaryArea = (safeSpacing / 12) * ((beamMaxSpan || 96) / 12);
   const footingSizes = FOOTING_SIZES[cap] || FOOTING_SIZES[2000];
   let diameter = 12;
   const areas = Object.keys(footingSizes).map(Number).sort((a, b) => a - b);
@@ -137,7 +146,7 @@ export function calculateStairs(totalRiseIn, stairOpt) {
   if (stairOpt && typeof stairOpt === 'object') {
     const width = stairOpt.width || 36;
     const numTreads = stairOpt.numberOfSteps !== undefined ? stairOpt.numberOfSteps : 5;
-    const numRisers = numTreads + 1;
+    const numRisers = Math.max(1, numTreads + 1);
     const riserHeight = totalRiseIn / numRisers;
     const treadDepth = stairOpt.run || 10;
     const totalRun = treadDepth * numTreads;

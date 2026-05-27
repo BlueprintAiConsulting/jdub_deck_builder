@@ -1623,6 +1623,68 @@ test('38. Polygon-based decking board and joist counts with rectangle byte-ident
   assert.strictEqual(lDeckBoards.quantity, 24, 'L-shape perpendicular deck boards quantity should be 24 (down from 29)');
 });
 
+test('39. Hardening: degenerate/empty vertices and zero/negative joist spacing values handle gracefully without crashes or infinite loops', async () => {
+  const { calculateSquareFootage, generateBOM } = await import('./src/engine/bomGenerator.js');
+  const { calculateJoists, calculateAll } = await import('./src/engine/structuralCalc.js');
+
+  // 1. Degenerate vertices check in calculateSquareFootage
+  // Empty vertices should fallback to width/depth if called with section config object
+  const emptySecConfig = { width: 192, depth: 144, vertices: [] };
+  const sqftEmpty = calculateSquareFootage(emptySecConfig);
+  assert.strictEqual(sqftEmpty, 192, 'Empty vertices on section config should fall back to bounding-box area (192 sqft)');
+
+  // Null vertices should fallback
+  const sqftNull = calculateSquareFootage({ width: 192, depth: 144, vertices: null });
+  assert.strictEqual(sqftNull, 192, 'Null vertices on section config should fall back to bounding box area');
+
+  // Degenerate/insufficient vertices (less than 3) should fallback
+  const sqftTwoPoints = calculateSquareFootage({
+    width: 192, depth: 144,
+    vertices: [{ x: 0, y: 0 }, { x: 192, y: 0 }]
+  });
+  assert.strictEqual(sqftTwoPoints, 192, 'Fewer than 3 vertices on section config should fall back to bounding box area');
+
+  // 2. Crash-proofing in calculateJoists point-sampling loop
+  // Malformed vertices missing x/y should trigger try/catch and fallback to full positions
+  const malformedVertices = [{ x: null }, {}, { y: undefined }];
+  const malformedCalcs = calculateJoists(192, 144, '2x8', 16, 'SYP', 'vertical', malformedVertices, 0, 0);
+  assert.strictEqual(malformedCalcs.count, 13, 'Malformed vertices should fall back to full bounding-box joist count of 13');
+  assert.deepStrictEqual(malformedCalcs.positions, Array.from({ length: 13 }, (_, i) => i * 16), 'Malformed vertices should fall back to standard bounding box positions');
+
+  // 3. Spacing validation (zero and negative values)
+  // joistSpacing <= 0 in calculateJoists should default to 16 and not run infinite loop
+  const zeroSpacingCalcs = calculateJoists(192, 144, '2x8', 0, 'SYP', 'vertical');
+  assert.strictEqual(zeroSpacingCalcs.spacing, 16, 'Zero joistSpacing should default to 16');
+  assert.strictEqual(zeroSpacingCalcs.count, 13, 'Zero joistSpacing should produce correct joist count under default spacing');
+
+  const negativeSpacingCalcs = calculateJoists(192, 144, '2x8', -12, 'SYP', 'vertical');
+  assert.strictEqual(negativeSpacingCalcs.spacing, 16, 'Negative joistSpacing should default to 16');
+  assert.strictEqual(negativeSpacingCalcs.count, 13, 'Negative joistSpacing should produce correct joist count under default spacing');
+
+  // joistSpacing <= 0 in calculateAll and generateBOM
+  const badConfig = {
+    id: 'sec-bad',
+    width: 192, depth: 144, height: 36,
+    joistSize: '2x8',
+    joistSpacing: 0,
+    species: 'SYP',
+    beamConfig: '2-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'PT-SYP',
+    joistOrientation: 'vertical',
+    deckingOrientation: 'perpendicular',
+    vertices: [],
+    ledgerAttached: true
+  };
+  const badCalcs = calculateAll(badConfig);
+  assert.strictEqual(badCalcs.joists.spacing, 16, 'calculateAll should handle zero joistSpacing by defaulting to 16');
+
+  const badBOM = generateBOM(badConfig, badCalcs);
+  const deckBoardsItem = badBOM.find(item => item.id === 'deck-boards');
+  assert.ok(deckBoardsItem.quantity > 0, 'BOM deck boards count should be valid and positive even with zero/negative inputs');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
