@@ -1542,6 +1542,87 @@ test('37. Polygon area calculations and rectangle square footage equivalence', a
   assert.strictEqual(lSqft, 168, 'L-shape Shoelace area in sqft should be 168 (not bounding box area of 192)');
 });
 
+test('38. Polygon-based decking board and joist counts with rectangle byte-identical equivalence', async () => {
+  const { generateBOM } = await import('./src/engine/bomGenerator.js');
+  const { calculateAll } = await import('./src/engine/structuralCalc.js');
+
+  const rectConfigPerp = {
+    id: 'sec-rect',
+    x: 0, y: 0,
+    width: 192, depth: 144, height: 36,
+    joistSize: '2x8',
+    joistSpacing: 16,
+    species: 'SYP',
+    beamConfig: '2-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'PT-SYP',
+    joistOrientation: 'vertical',
+    deckingOrientation: 'perpendicular',
+    vertices: [
+      { x: 0, y: 0 },
+      { x: 192, y: 0 },
+      { x: 192, y: 144 },
+      { x: 0, y: 144 }
+    ],
+    ledgerAttached: true
+  };
+
+  const rectCalcs = calculateAll(rectConfigPerp);
+  const rectBOM = generateBOM(rectConfigPerp, rectCalcs);
+
+  const rectJoists = rectBOM.find(item => item.id === 'joists');
+  assert.strictEqual(rectJoists.quantity, 13, 'Rectangle joist quantity should be 13');
+  
+  const rectDeckBoards = rectBOM.find(item => item.id === 'deck-boards');
+  assert.strictEqual(rectDeckBoards.quantity, 29, 'Rectangle perpendicular deck boards quantity should be 29');
+
+  const lConfigPerp = {
+    id: 'sec-l',
+    x: 0, y: 0,
+    width: 192, depth: 144, height: 36,
+    joistSize: '2x8',
+    joistSpacing: 16,
+    species: 'SYP',
+    beamConfig: '2-2x10',
+    postSize: '6x6',
+    deckBoardSize: '5/4x6',
+    deckMaterial: 'PT-SYP',
+    joistOrientation: 'vertical',
+    deckingOrientation: 'perpendicular',
+    vertices: [
+      { x: 0, y: 0 },
+      { x: 192, y: 0 },
+      { x: 192, y: 96 },
+      { x: 96, y: 96 },
+      { x: 96, y: 144 },
+      { x: 0, y: 144 }
+    ],
+    ledgerAttached: true
+  };
+
+  const lCalcs = calculateAll(lConfigPerp);
+  const lBOM = generateBOM(lConfigPerp, lCalcs);
+
+  const smallConfig = {
+    ...rectConfigPerp,
+    vertices: [
+      { x: 0, y: 0 },
+      { x: 96, y: 0 },
+      { x: 96, y: 96 },
+      { x: 0, y: 96 }
+    ]
+  };
+  const smallCalcs = calculateAll(smallConfig);
+  const smallBOM = generateBOM(smallConfig, smallCalcs);
+
+  const smallJoists = smallBOM.find(item => item.id === 'joists');
+  assert.strictEqual(smallJoists.quantity, 7, 'Filtered small deck joist quantity should be 7 (down from 13)');
+
+  const lDeckBoards = lBOM.find(item => item.id === 'deck-boards');
+  assert.strictEqual(lDeckBoards.quantity, 24, 'L-shape perpendicular deck boards quantity should be 24 (down from 29)');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

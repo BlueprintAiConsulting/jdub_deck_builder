@@ -50,6 +50,7 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Beams ---
+  // approximate for non-rectangular — bounding box layout
   const beamSpan = joistOrientation === 'horizontal' ? depth : width;
   const beamLen = optimalBoardLength(beamSpan);
   const beamPly = parseInt(beams.config.split('-')[0]) || 2;
@@ -66,6 +67,7 @@ export function generateBOM(config, calcs) {
   });
 
   // --- Posts ---
+  // approximate for non-rectangular — bounding box layout
   const postLen = optimalBoardLength(height);
   items.push({
     id: 'posts',
@@ -84,36 +86,32 @@ export function generateBOM(config, calcs) {
   let boardCount = 0;
   let deckBoardLen = 0;
 
+  const areaSqIn = polygonArea(config.vertices || []);
+  const linearInchesNeeded = areaSqIn / (deckBoardWidth + gapWidth);
+
   if (deckingOrientation === 'diagonal') {
     const maxDiagonal = Math.sqrt(width ** 2 + depth ** 2);
     deckBoardLen = optimalBoardLength(maxDiagonal);
-    const totalAreaSqIn = width * depth;
-    const linearInchesNeeded = totalAreaSqIn / (deckBoardWidth + gapWidth);
     const singleBoardLenIn = deckBoardLen * 12;
     boardCount = Math.ceil((linearInchesNeeded * 1.20) / singleBoardLenIn);
   } else {
     const joistsVertical = (joistOrientation !== 'horizontal');
-    let boardRunIn, boardSpanIn;
+    let boardRunIn;
     if (joistsVertical) {
       if (deckingOrientation === 'parallel') {
         boardRunIn = depth;
-        boardSpanIn = width;
       } else { // perpendicular
         boardRunIn = width;
-        boardSpanIn = depth;
       }
     } else { // joists horizontal
       if (deckingOrientation === 'parallel') {
         boardRunIn = width;
-        boardSpanIn = depth;
       } else { // perpendicular
         boardRunIn = depth;
-        boardSpanIn = width;
       }
     }
-    const count = Math.ceil(boardSpanIn / (deckBoardWidth + gapWidth));
     deckBoardLen = optimalBoardLength(boardRunIn);
-    boardCount = Math.ceil(count * 1.1); // 10% waste factor
+    boardCount = Math.ceil((linearInchesNeeded / boardRunIn) * 1.1); // 10% waste factor
   }
 
   items.push({
@@ -143,6 +141,7 @@ export function generateBOM(config, calcs) {
   }
 
   // --- Concrete (Footings) ---
+  // approximate for non-rectangular — bounding box layout
   const footingDepth = 42; // assume 42" depth
   const footingVolumeCuFt = Math.PI * (footings.diameter / 2 / 12) ** 2 * (footingDepth / 12);
   const totalConcreteCuFt = footingVolumeCuFt * footings.count;
