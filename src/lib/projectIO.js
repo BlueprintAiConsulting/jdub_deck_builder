@@ -66,6 +66,7 @@ export function saveProjectToLocalStorage(projectName, sections, materials) {
     }
 
     localStorage.setItem('deckforge_recent_projects', JSON.stringify(recent));
+    localStorage.removeItem('deckforge_autosave_draft');
   } catch (error) {
     console.error('Failed to save project to localStorage:', error);
     if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {

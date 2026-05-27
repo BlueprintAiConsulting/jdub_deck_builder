@@ -1312,6 +1312,61 @@ test('31. Multi-level stair rise calculation and alignment offsets', () => {
   assert.strictEqual(state.sections[0].stairs.align, 'left', 'Stair alignment should update to left');
 });
 
+test('32. Edge alignment snapping and autosave draft clearing on manual save', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+
+  // Set Section 1: x=0, y=0, width=144, depth=120
+  // Set Section 2: x=200, y=200, width=144, depth=120
+  const sections = [
+    {
+      id: 'sec-1',
+      x: 0, y: 0, width: 144, depth: 120, height: 36,
+      ledgerAttached: false,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: null,
+      type: 'deck',
+      vertices: [
+        { x: 0, y: 0 }, { x: 144, y: 0 }, { x: 144, y: 120 }, { x: 0, y: 120 }
+      ]
+    },
+    {
+      id: 'sec-2',
+      x: 200, y: 200, width: 144, depth: 120, height: 36,
+      ledgerAttached: false,
+      railings: { n: false, s: false, e: false, w: false },
+      stairs: null,
+      type: 'deck',
+      vertices: [
+        { x: 200, y: 200 }, { x: 344, y: 200 }, { x: 344, y: 320 }, { x: 200, y: 320 }
+      ]
+    }
+  ];
+  store.loadProject(sections, { species: 'SYP' });
+
+  // Move Section 2 to:
+  // x = 150 (abutting snap: East edge of sec-1 is at 144. diff is 6 < threshold 12, so x snaps to 144)
+  // y = 5 (alignment snap: Top edge of sec-1 is at 0. diff is 5 < threshold 12, so y snaps to 0)
+  store.moveSection('sec-2', 150, 5);
+  let state = useDeckStore.getState();
+  
+  // Section 2 should have snapped to x=144 (abutting touch) and y=0 (flush top alignment)!
+  assert.strictEqual(state.sections[1].x, 144, 'Abutting x snap should align East/West edges');
+  assert.strictEqual(state.sections[1].y, 0, 'Flush y snap should align North/North edges (Top alignment)');
+
+  // B. Verify Autosave Draft Clearing on Manual Save
+  // 1. Write an autosave draft into mockLocalStorage
+  mockLocalStorage.setItem('deckforge_autosave_draft', JSON.stringify({ test: 'data' }));
+  assert.ok(mockLocalStorage.getItem('deckforge_autosave_draft'), 'Autosave draft must be set in storage');
+
+  // 2. Perform a manual save using saveProjectToLocalStorage
+  saveProjectToLocalStorage('Test Project', state.sections, state.materials);
+
+  // 3. Verify the draft is cleaned up
+  assert.strictEqual(mockLocalStorage.getItem('deckforge_autosave_draft'), null, 'Autosave draft must be cleared on successful manual save');
+});
+
+
 
 
 // ─── EXECUTE ALL TESTS ───

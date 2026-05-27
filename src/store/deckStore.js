@@ -147,6 +147,7 @@ function findEdgeSnap(movingSection, allSections, threshold = 12) {
   for (const sec of allSections) {
     if (sec.id === m.id) continue;
 
+    // --- Edge-to-Edge Snapping (Abutting) ---
     // Right edge of moving → Left edge of target
     if (Math.abs((m.x + m.width) - sec.x) < threshold) snaps.x = sec.x - m.width;
     // Left edge of moving → Right edge of target
@@ -155,6 +156,16 @@ function findEdgeSnap(movingSection, allSections, threshold = 12) {
     if (Math.abs((m.y + m.depth) - sec.y) < threshold) snaps.y = sec.y - m.depth;
     // Top edge of moving → Bottom edge of target
     if (Math.abs(m.y - (sec.y + sec.depth)) < threshold) snaps.y = sec.y + sec.depth;
+
+    // --- Alignment Snapping (Flush edges) ---
+    // Left-to-Left alignment
+    if (snaps.x === null && Math.abs(m.x - sec.x) < threshold) snaps.x = sec.x;
+    // Right-to-Right alignment
+    if (snaps.x === null && Math.abs((m.x + m.width) - (sec.x + sec.width)) < threshold) snaps.x = sec.x + sec.width - m.width;
+    // Top-to-Top alignment
+    if (snaps.y === null && Math.abs(m.y - sec.y) < threshold) snaps.y = sec.y;
+    // Bottom-to-Bottom alignment
+    if (snaps.y === null && Math.abs((m.y + m.depth) - (sec.y + sec.depth)) < threshold) snaps.y = sec.y + sec.depth - m.depth;
   }
 
   return snaps;
@@ -338,13 +349,11 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
       const moved = { ...s };
-      moved.x = snapToGrid(newX);
-      moved.y = snapToGrid(newY);
 
-      // Edge snap
-      const snaps = findEdgeSnap(moved, state.sections);
-      if (snaps.x !== null) moved.x = snaps.x;
-      if (snaps.y !== null) moved.y = snaps.y;
+      // Find edge snaps using unsnapped coordinates first!
+      const snaps = findEdgeSnap({ ...s, x: newX, y: newY }, state.sections);
+      moved.x = snaps.x !== null ? snaps.x : snapToGrid(newX);
+      moved.y = snaps.y !== null ? snaps.y : snapToGrid(newY);
 
       // Calculate translation delta
       const dx = moved.x - s.x;
