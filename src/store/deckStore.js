@@ -215,6 +215,7 @@ export const useDeckStore = create((set, get) => ({
   showDimensions: true,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
+  lightingPreset: 'daylight',
 
   // --- Sections ---
   sections: [initialSection],
@@ -249,6 +250,7 @@ export const useDeckStore = create((set, get) => ({
   toggleDimensions: () => set((s) => ({ showDimensions: !s.showDimensions })),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
+  setLightingPreset: (preset) => set({ lightingPreset: preset }),
   toggleTheme: () => {
     const nextTheme = get().theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
@@ -618,6 +620,7 @@ export const useDeckStore = create((set, get) => ({
       selectedSectionId: sec.id,
       materials: mat,
       currentProjectName: '',
+      lightingPreset: 'daylight',
       ...results,
       history: [{ sections: [{ ...sec }], materials: { ...mat } }],
       historyIndex: 0,
