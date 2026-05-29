@@ -85,6 +85,9 @@ try {
   // Set window viewport size
   await page.setViewportSize({ width: 1280, height: 960 });
 
+  page.on('console', msg => console.log('BROWSER LOG:', msg.text()));
+  page.on('pageerror', err => console.error('BROWSER ERROR:', err.message));
+
   // Navigate to application
   console.log('Navigating to app...');
   await page.goto(serverUrl);

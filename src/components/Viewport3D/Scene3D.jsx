@@ -736,7 +736,7 @@ function Footers({ beamPositions, width, depth, joistOrientation, footerWidth, h
   const fWidth = footerWidth || 12;
   const fDepth = 12; // 12 inches deep concrete grade beam
   const fColor = '#8a8a8a';
-  const yPos = -(height + 60 + fDepth / 2);
+  const yPos = -(height + fDepth / 2);
   
   return (
     <group>
@@ -773,7 +773,7 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   return (
     <group>
       {posts.map((post, i) => {
-        const postHeight = post.height + 60 + topOfPost;
+        const postHeight = Math.max(0.1, post.height + topOfPost);
         return (
           <mesh
             key={`post-${i}`}
@@ -1106,7 +1106,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
 
       // 2. Vertical Support Posts under stringers (one pair at midpoint)
       const y_top_in = y_mid - treadThickness - stringerDepth;
-      const y_bottom_in = -(height + deckTopY) - 60;
+      const y_bottom_in = -height;
       const postHeight_in = Math.max(12, y_top_in - y_bottom_in);
       const y_post_center_in = y_top_in - postHeight_in / 2;
       
@@ -1182,7 +1182,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
 
       // 3. Support Posts (4 corner posts)
       const y_top_in = y_mid - treadThickness - stringerDepth;
-      const y_bottom_in = -(height + deckTopY) - 60;
+      const y_bottom_in = -height;
       const postHeight_in = Math.max(12, y_top_in - y_bottom_in);
       const y_post_center_in = y_top_in - postHeight_in / 2;
 
@@ -1349,7 +1349,7 @@ function GroundPlane({ heightAxis }) {
   grassTexture.repeat.set(24, 24);
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
       <planeGeometry args={[120, 120]} />
       <meshStandardMaterial 
         map={grassTexture}
@@ -1625,7 +1625,7 @@ export default function Scene3D() {
             isLightTheme ? '#cbd5e1' : '#1a2a4a', 
             isLightTheme ? '#e2e8f0' : '#111828'
           ]} 
-          position={[0, -4.99, 0]} 
+          position={[0, 0.01, 0]} 
         />
       </Canvas>
 

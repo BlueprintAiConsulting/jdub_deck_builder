@@ -218,6 +218,8 @@ export default function Canvas2D({ isMobile }) {
   const [actionPopup, setActionPopup] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState('beams');
+  const [isAddingVertex, setIsAddingVertex] = useState(false);
+  const [hoverPos, setHoverPos] = useState(null);
 
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
@@ -260,6 +262,7 @@ export default function Canvas2D({ isMobile }) {
   const placementLanding = useDeckStore((s) => s.placementLanding);
   const updateDeck = useDeckStore((s) => s.updateDeck);
   const toggleLayer = useDeckStore((s) => s.toggleLayer);
+  const showToast = useDeckStore((s) => s.showToast);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -340,11 +343,37 @@ export default function Canvas2D({ isMobile }) {
         }
       }
 
+      const ox = size.w / 2 + panOffset.x;
+      const oy = size.h / 2 + panOffset.y;
+      const lx = (mx - ox) / S;
+      const ly = (my - oy) / S;
+
+      if (isAddingVertex && selectedSectionId) {
+        const sec = sections.find((s) => s.id === selectedSectionId);
+        if (sec) {
+          const thresholdInches = 24 / S;
+          const splitIdx = findEdgeSplitIndex(lx, ly, sec.vertices, thresholdInches);
+          if (splitIdx !== -1) {
+            const newV = {
+              x: Math.round(lx / 12) * 12,
+              y: Math.round(ly / 12) * 12
+            };
+            addVertex(selectedSectionId, splitIdx + 1, newV);
+            showToast("Corner point added!", "success");
+            setIsAddingVertex(false);
+            setHoverPos(null);
+          } else {
+            showToast("Click directly on an edge of the deck boundary.", "warning");
+          }
+        }
+        return;
+      }
+
       if (sel && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
         // Check vertex handles first
         const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
         if (vIdx !== -1) {
-          setActionPopup(null);
+          setActionPopup({ x: mx, y: my, id: sel.id, type: 'vertex', vertexIndex: vIdx });
           setInteraction({
             mode: 'dragging_vertex',
             vertexIndex: vIdx,
@@ -365,7 +394,7 @@ export default function Canvas2D({ isMobile }) {
       
       const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
       if (hit) {
-        selectSection(hit.id, hit.type !== 'deck' ? hit.type : null);
+        selectSection(hit.id, (hit.type !== 'deck' && hit.type !== 'post' && hit.type !== 'beam' && hit.type !== 'joist' && !hit.type.startsWith('railing')) ? hit.type : null);
         setActionPopup({ x: mx, y: my, id: hit.id, type: hit.type });
         if (hit.type === 'stairs' || hit.type === 'ramp') {
           const sec = sections.find((s) => s.id === hit.id);
@@ -398,7 +427,7 @@ export default function Canvas2D({ isMobile }) {
         else attachRamp(hitId, edge);
       }
     }
-  }, [selectedTool, sections, selectedSectionId, selectedSubObjectType, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp, updateStairs, updateRamp, sectionCalcs, removeSection]);
+  }, [selectedTool, sections, selectedSectionId, selectedSubObjectType, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp, updateStairs, updateRamp, sectionCalcs, removeSection, isAddingVertex, addVertex, showToast]);
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning) {
@@ -410,6 +439,12 @@ export default function Canvas2D({ isMobile }) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+    if (isAddingVertex) {
+      setHoverPos({ x: mx, y: my });
+    } else {
+      if (hoverPos !== null) setHoverPos(null);
+    }
 
     if (interaction.mode !== 'idle') {
       setActionPopup(null);
@@ -537,7 +572,7 @@ export default function Canvas2D({ isMobile }) {
         }
       }
     }
-  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection, dragVertex, updateStairs, updateRamp, size.w, size.h, panOffset.x, panOffset.y]);
+  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection, dragVertex, updateStairs, updateRamp, size.w, size.h, panOffset.x, panOffset.y, isAddingVertex, hoverPos]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) { setIsPanning(false); return; }
@@ -1676,9 +1711,45 @@ export default function Canvas2D({ isMobile }) {
     } else if (selectedTool === 'landing') {
       ctx.fillStyle = isLightTheme ? 'rgba(2,132,199,0.95)' : 'rgba(14,165,233,0.9)'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
       ctx.fillText(isMobile ? 'Tap to place a landing' : 'Click & drag or click to place a landing', size.w / 2, 24);
+    } else if (isAddingVertex) {
+      ctx.fillStyle = '#ff9f43'; ctx.font = '500 12px Inter'; ctx.textAlign = 'center';
+      ctx.fillText('Click anywhere on a deck edge to insert a new corner', size.w / 2, 24);
     }
 
-  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, showDimensions, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S, legendColors]);
+    // Draw preview vertex point if adding vertex
+    if (isAddingVertex && hoverPos && selectedSectionId) {
+      const sec = sections.find((s) => s.id === selectedSectionId);
+      if (sec) {
+        const hlx = (hoverPos.x - ox) / S;
+        const hly = (hoverPos.y - oy) / S;
+        const splitIdx = findEdgeSplitIndex(hlx, hly, sec.vertices, 24 / S);
+        if (splitIdx !== -1) {
+          const snapX = Math.round(hlx / 12) * 12;
+          const snapY = Math.round(hly / 12) * 12;
+          const px = ox + snapX * S;
+          const py = oy + snapY * S;
+          
+          ctx.strokeStyle = '#ff9f43';
+          ctx.fillStyle = '#ff9f43';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(px, py, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(px - 3, py);
+          ctx.lineTo(px + 3, py);
+          ctx.moveTo(px, py - 3);
+          ctx.lineTo(px, py + 3);
+          ctx.stroke();
+        }
+      }
+    }
+
+  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, showDimensions, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S, legendColors, isAddingVertex, hoverPos]);
 
   const cursor = interaction.mode === 'placing' ? 'crosshair' :
     interaction.mode === 'moving' || interaction.mode === 'dragging_vertex' ? 'grabbing' :
@@ -1706,6 +1777,20 @@ export default function Canvas2D({ isMobile }) {
     } else if (type === 'ramp' && sec.ramp) {
       attachRamp(id, sec.ramp.direction || sec.ramp);
       selectSection(id, null);
+    } else if (type === 'vertex') {
+      const vIdx = actionPopup.vertexIndex;
+      if (sec.vertices.length <= 3) {
+        showToast("Cannot remove corner: A deck must have at least 3 corners.", "error");
+      } else {
+        removeVertex(id, vIdx);
+        showToast("Corner removed successfully", "success");
+      }
+      selectSection(id, null);
+    } else if (type.startsWith('railing-')) {
+      const edge = type.split('-')[1];
+      toggleRailing(id, edge);
+      showToast("Railing removed", "success");
+      selectSection(id, null);
     } else {
       if (window.confirm("Are you sure you want to delete this deck section?")) {
         removeSection(id);
@@ -1714,7 +1799,7 @@ export default function Canvas2D({ isMobile }) {
     }
     setActionPopup(null);
     setShowSettingsModal(false);
-  }, [actionPopup, sections, attachStairs, attachRamp, removeSection, selectSection]);
+  }, [actionPopup, sections, attachStairs, attachRamp, removeSection, selectSection, removeVertex, toggleRailing, showToast]);
 
   const renderStairsSettings = (selectedSec) => {
     const stairObj = selectedSec.stairs;
@@ -2372,6 +2457,57 @@ export default function Canvas2D({ isMobile }) {
             </div>
           </div>
         </div>
+
+        <div className="settings-section-divider" style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)', margin: '4px 0' }} />
+        
+        <div className="settings-field">
+          <label className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            Deck Shape & Corners
+          </label>
+          <div className="vertex-editor-actions" style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+            <button 
+              className={`settings-action-btn ${isAddingVertex ? 'settings-action-btn--active' : ''}`}
+              onClick={() => {
+                setIsAddingVertex((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    showToast("Click on any deck edge to add a corner point.", "info");
+                  }
+                  return next;
+                });
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                background: isAddingVertex ? '#ff9f43' : 'rgba(255, 159, 67, 0.12)',
+                color: isAddingVertex ? '#fff' : '#ff9f43',
+                border: '1px solid rgba(255, 159, 67, 0.4)',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '12px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              {isAddingVertex ? 'Click Deck Edge...' : 'Add Corner (Vertex)'}
+            </button>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block', lineHeight: '1.4' }}>
+            {isAddingVertex 
+              ? 'Click anywhere on the deck boundary edge to insert a new corner point.' 
+              : 'Click "Add Corner" then click any deck boundary edge on the canvas to insert a new corner point.'}
+          </span>
+        </div>
       </div>
     );
   };
@@ -2422,26 +2558,53 @@ export default function Canvas2D({ isMobile }) {
           style={{ 
             position: 'absolute', 
             left: `${actionPopup.x}px`, 
-            top: `${actionPopup.y - 45}px`, 
+            top: `${actionPopup.y - 55}px`, 
             transform: 'translateX(-50%)',
             zIndex: 110
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className="popup-btn popup-btn--settings" onClick={() => { setShowSettingsModal(true); setActionPopup(null); }} title="Settings">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-            Settings
-          </button>
-          <button className="popup-btn popup-btn--delete" onClick={handleDeletePopupObject} title="Delete">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-            Delete
-          </button>
+          <div className="canvas-action-popup__title" style={{ fontSize: '10px', color: '#ff9f43', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '3px' }}>
+            {(() => {
+              const t = actionPopup.type;
+              if (t === 'beam') return 'Beam Selected';
+              if (t === 'post') return 'Post Selected';
+              if (t === 'joist') return 'Joist Selected';
+              if (t === 'vertex') return 'Corner Selected';
+              if (t === 'stairs') return 'Stairs Selected';
+              if (t === 'ramp') return 'Ramp Selected';
+              if (t.startsWith('railing')) {
+                const edge = t.split('-')[1]?.toUpperCase() || '';
+                return `Railing Selected (${edge})`;
+              }
+              return 'Deck Selected';
+            })()}
+          </div>
+          <div className="canvas-action-popup__actions" style={{ display: 'flex', gap: '2px' }}>
+            <button className="popup-btn popup-btn--settings" onClick={() => {
+              const t = actionPopup.type;
+              if (t === 'beam') setActiveTab('beams');
+              else if (t === 'post') setActiveTab('posts');
+              else if (t === 'joist') setActiveTab('joists');
+              else if (t === 'deck') setActiveTab('layout');
+              else if (t.startsWith('railing')) setActiveTab('layout');
+              setShowSettingsModal(true);
+              setActionPopup(null);
+            }} title="Settings">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Settings
+            </button>
+            <button className="popup-btn popup-btn--delete" onClick={handleDeletePopupObject} title="Delete">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              Delete
+            </button>
+          </div>
         </div>
       )}
 

@@ -319,16 +319,17 @@
 
 /* Action Popup overlay on canvas */
 .canvas-action-popup {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
   display: flex;
-  gap: 2px;
-  padding: 3px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  flex-direction: column;
+  padding: 6px 8px 8px 8px;
+  box-shadow: var(--shadow-lg), 0 10px 30px rgba(0, 0, 0, 0.4);
   pointer-events: auto;
+  min-width: 140px;
 }
 
 .popup-btn {
@@ -575,6 +576,46 @@
   opacity: 0.4;
   cursor: not-allowed;
   background: #64748b !important;
+}
+
+/* Premium Property Toggles */
+.prop-toggle {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-secondary, #94a3b8) !important;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  justify-content: center;
+}
+
+.prop-toggle:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: var(--text-primary, #f8fafc) !important;
+}
+
+.prop-toggle--on {
+  background: rgba(46, 204, 113, 0.1) !important;
+  border-color: rgba(46, 204, 113, 0.4) !important;
+  color: #2ecc71 !important;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.05);
+}
+
+.prop-toggle--on::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: #2ecc71;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #2ecc71;
+  margin-left: 4px;
 }
 
 

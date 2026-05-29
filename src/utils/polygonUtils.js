@@ -233,6 +233,74 @@ export function hitTestSubObject(mx, my, sections, S, panX, panY, cw, ch, sectio
     
     // Check main deck body last
     if (isPointInPolygon(lx, ly, sec.vertices)) {
+      // Check posts
+      if (calcs && calcs.posts && calcs.posts.posts) {
+        for (const post of calcs.posts.posts) {
+          const px = sec.x + post.x;
+          const py = sec.y + post.y;
+          const dist = Math.sqrt((lx - px) ** 2 + (ly - py) ** 2);
+          if (dist < 10) {
+            return { id: sec.id, type: 'post' };
+          }
+        }
+      }
+
+      // Check beams
+      if (calcs && calcs.beams && calcs.beams.positions) {
+        const joistsVertical = (sec.joistOrientation !== 'horizontal');
+        if (joistsVertical) {
+          for (const yIn of calcs.beams.positions) {
+            const by = sec.y + yIn;
+            if (lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - by) < 6) {
+              return { id: sec.id, type: 'beam' };
+            }
+          }
+        } else {
+          for (const xIn of calcs.beams.positions) {
+            const bx = sec.x + xIn;
+            if (ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - bx) < 6) {
+              return { id: sec.id, type: 'beam' };
+            }
+          }
+        }
+      }
+
+      // Check railings
+      if (sec.railings) {
+        if (sec.railings.n && lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - sec.y) < 8) {
+          return { id: sec.id, type: 'railing-n' };
+        }
+        if (sec.railings.s && lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - (sec.y + sec.depth)) < 8) {
+          return { id: sec.id, type: 'railing-s' };
+        }
+        if (sec.railings.e && ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - (sec.x + sec.width)) < 8) {
+          return { id: sec.id, type: 'railing-e' };
+        }
+        if (sec.railings.w && ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - sec.x) < 8) {
+          return { id: sec.id, type: 'railing-w' };
+        }
+      }
+
+      // Check joists
+      if (calcs && calcs.joists && calcs.joists.positions) {
+        const joistsVertical = (sec.joistOrientation !== 'horizontal');
+        if (joistsVertical) {
+          for (const xIn of calcs.joists.positions) {
+            const jx = sec.x + xIn;
+            if (ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - jx) < 4) {
+              return { id: sec.id, type: 'joist' };
+            }
+          }
+        } else {
+          for (const yIn of calcs.joists.positions) {
+            const jy = sec.y + yIn;
+            if (lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - jy) < 4) {
+              return { id: sec.id, type: 'joist' };
+            }
+          }
+        }
+      }
+
       return { id: sec.id, type: 'deck' };
     }
   }

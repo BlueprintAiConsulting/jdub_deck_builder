@@ -1,0 +1,27 @@
+DeckForge Browser Verification Report
+==================================================
+Date: 2026-05-29T02:16:00.607Z
+
+Step 1: Loaded Rectangular Project
+- Rendered 2D: c2-rectangle-2d.png
+- Rendered 3D: c2-rectangle-3d.png
+
+Step 2: Click OUTSIDE Deck (at screen 100, 300)
+- Section selected (ID): None (Correct)
+- Screenshot: c3-click-outside.png
+
+Step 3: Click INSIDE Deck (at screen 400, 300)
+- Section selected (ID): sec-verify-deck (Expected: "sec-verify-deck")
+- Screenshot: c3-click-inside.png
+
+Step 4: Rigid Drag Translation (dx: +100px, dy: +100px on screen)
+- Initial Position: x: -72, y: -60
+- Dragged Position in Store: x: -72, y: -60 (Expected: x: -36, y: -24)
+- Dragged Vertices: [{"x":-72,"y":-60},{"x":72,"y":-60},{"x":72,"y":60},{"x":-72,"y":60}]
+- Screenshots: c3-drag-before.png, c3-drag-after.png
+
+Step 5: Save, Reload, and Re-load
+- Reload Position: x: 0, y: 0 (Expected: x: 0, y: 0)
+- Restored Position: x: -72, y: -60 (Expected: x: -36, y: -24)
+- Restored Vertices: [{"x":-72,"y":-60},{"x":72,"y":-60},{"x":72,"y":60},{"x":-72,"y":60}]
+- Screenshot: c3-save-reload-load.png

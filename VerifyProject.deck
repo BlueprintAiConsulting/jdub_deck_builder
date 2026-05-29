@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "projectName": "VerifyProject",
+  "sections": [
+    {
+      "joistOrientation": "vertical",
+      "deckingOrientation": "perpendicular",
+      "beamSetback": 12,
+      "beamPlies": 2,
+      "beamSize": "2x10",
+      "beamSpecies": "SYP",
+      "beamGrade": "Grade #2",
+      "postOffset": 6,
+      "footerWidth": 12,
+      "blocking": true,
+      "blockingSpacing": 72,
+      "pictureFrame": 0,
+      "dividerCount": "auto",
+      "boardsPerDivider": 1,
+      "deckingFlipped": false,
+      "deckingLayout": "straight",
+      "deckBoardOverhang": 1,
+      "deckBoardGap": 0.125,
+      "id": "sec-verify-deck",
+      "x": -72,
+      "y": -60,
+      "width": 144,
+      "depth": 120,
+      "height": 36,
+      "ledgerAttached": true,
+      "railings": {
+        "n": false,
+        "s": false,
+        "e": false,
+        "w": false
+      },
+      "stairs": null,
+      "type": "deck",
+      "vertices": [
+        {
+          "x": -72,
+          "y": -60
+        },
+        {
+          "x": 72,
+          "y": -60
+        },
+        {
+          "x": 72,
+          "y": 60
+        },
+        {
+          "x": -72,
+          "y": 60
+        }
+      ],
+      "ramp": null
+    }
+  ],
+  "materials": {
+    "joistSize": "2x8",
+    "joistSpacing": 16,
+    "species": "SYP",
+    "beamConfig": "2-2x10",
+    "postSize": "6x6",
+    "deckBoardSize": "5/4x6",
+    "deckMaterial": "PT-SYP",
+    "soilCapacity": 2000,
+    "unitPrices": {
+      "2x8": 1.2,
+      "2x10": 1.5,
+      "2x12": 2,
+      "6x6": 3,
+      "5/4x6": 0.8,
+      "concrete": 6,
+      "joist-hangers": 1.5,
+      "post-bases": 7.5,
+      "screws": 0.08
+    },
+    "wasteFactor": 10,
+    "deckColor": "pine-natural"
+  },
+  "legendColors": {
+    "joists": "#0284c7",
+    "beams": "#d97706",
+    "posts": "#ef4444",
+    "railings": "#16a34a",
+    "stairs": "#db2777",
+    "ramps": "#7c3aed"
+  },
+  "timestamp": "2026-05-29T02:15:59.348Z"
+}

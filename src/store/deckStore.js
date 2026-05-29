@@ -131,6 +131,7 @@ function createSection(overrides = {}) {
     pictureFrame: 0,
     dividerCount: 'auto',
     boardsPerDivider: 1,
+    divider: 'auto',
     deckingFlipped: false,
     deckingLayout: 'straight',
     deckBoardOverhang: 1,
@@ -837,6 +838,40 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
+
+    // Sync divider / dividerCount / boardsPerDivider
+    const selectedSec = state.sections.find(s => s.id === state.selectedSectionId);
+    if (selectedSec) {
+      if (updates.divider !== undefined) {
+        if (updates.divider === 'none') {
+          updates.dividerCount = 0;
+          updates.boardsPerDivider = 1;
+        } else if (updates.divider === 'single') {
+          updates.dividerCount = 1;
+          updates.boardsPerDivider = 1;
+        } else if (updates.divider === 'double') {
+          updates.dividerCount = 1;
+          updates.boardsPerDivider = 2;
+        } else if (updates.divider === 'auto') {
+          updates.dividerCount = 'auto';
+          updates.boardsPerDivider = 1;
+        }
+      } else if (updates.dividerCount !== undefined || updates.boardsPerDivider !== undefined) {
+        const count = updates.dividerCount !== undefined ? updates.dividerCount : selectedSec.dividerCount;
+        const boards = updates.boardsPerDivider !== undefined ? updates.boardsPerDivider : selectedSec.boardsPerDivider;
+        
+        if (count === 'auto') {
+          updates.divider = 'auto';
+        } else if (Number(count) === 0) {
+          updates.divider = 'none';
+        } else if (Number(boards) === 2) {
+          updates.divider = 'double';
+        } else {
+          updates.divider = 'single';
+        }
+      }
+    }
+
     const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing', 'pictureFrame', 'divider', 'deckingFlipped', 'deckingLayout', 'dividerCount', 'boardsPerDivider', 'deckBoardOverhang', 'deckBoardGap'];
     const sectionUpdates = {};
     const materialUpdates = {};
