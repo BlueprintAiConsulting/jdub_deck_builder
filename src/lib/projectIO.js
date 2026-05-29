@@ -211,3 +211,84 @@ export function parseDeckFile(file) {
     reader.readAsText(file);
   });
 }
+
+/**
+ * Saves a template state to browser localStorage and updates the Custom Templates list.
+ */
+export function saveTemplateToLocalStorage(templateName, sections, materials) {
+  try {
+    const data = {
+      schemaVersion: SCHEMA_VERSION,
+      templateName,
+      sections,
+      materials,
+      timestamp: new Date().toISOString()
+    };
+    const key = `deckforge_template_${templateName}`;
+    localStorage.setItem(key, JSON.stringify(data));
+
+    let templates = [];
+    try {
+      const raw = localStorage.getItem('deckforge_custom_templates');
+      templates = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('Failed to parse custom templates list:', e);
+    }
+
+    if (!templates.includes(templateName)) {
+      templates.push(templateName);
+    }
+
+    localStorage.setItem('deckforge_custom_templates', JSON.stringify(templates));
+  } catch (error) {
+    console.error('Failed to save template to localStorage:', error);
+    if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+      throw new Error('Browser storage is full. Cannot save template.');
+    } else {
+      throw new Error('Failed to save template to browser storage.');
+    }
+  }
+}
+
+/**
+ * Loads a template state from browser localStorage.
+ */
+export function loadTemplateFromLocalStorage(templateName) {
+  const key = `deckforge_template_${templateName}`;
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    throw new Error(`Template "${templateName}" was not found in storage.`);
+  }
+  const parsed = JSON.parse(raw);
+  validateProjectData(parsed);
+  return parsed;
+}
+
+/**
+ * Deletes a template from localStorage.
+ */
+export function deleteTemplateFromLocalStorage(templateName) {
+  const key = `deckforge_template_${templateName}`;
+  localStorage.removeItem(key);
+
+  let templates = [];
+  try {
+    const raw = localStorage.getItem('deckforge_custom_templates');
+    templates = raw ? JSON.parse(raw) : [];
+  } catch (e) {}
+
+  templates = templates.filter(name => name !== templateName);
+  localStorage.setItem('deckforge_custom_templates', JSON.stringify(templates));
+}
+
+/**
+ * Lists all custom template names.
+ */
+export function listCustomTemplates() {
+  try {
+    const raw = localStorage.getItem('deckforge_custom_templates');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}

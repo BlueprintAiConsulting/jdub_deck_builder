@@ -240,3 +240,31 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
+/* Custom Templates container and actions */
+.tool-panel__template-container {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.tool-panel__template-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-default);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  width: 32px;
+  transition: all var(--transition-base);
+  color: var(--text-tertiary);
+}
+
+.tool-panel__template-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+  transform: translateY(-1px);
+}
+

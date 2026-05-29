@@ -1,5 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDeckStore } from '../../store/deckStore';
+import { 
+  saveTemplateToLocalStorage, 
+  loadTemplateFromLocalStorage, 
+  deleteTemplateFromLocalStorage, 
+  listCustomTemplates 
+} from '../../lib/projectIO';
 import './ToolPanel.css';
 
 const tools = [
@@ -58,6 +64,33 @@ export default function ToolPanel({ isMobile, onClose }) {
   const [activeLayerTab, setActiveLayerTab] = React.useState('2d');
   const activeMode = viewMode === 'split' ? activeLayerTab : (viewMode === '3d' ? '3d' : '2d');
   const visibleLayers = activeMode === '3d' ? visibleLayers3d : visibleLayers2d;
+
+  const [customTemplates, setCustomTemplates] = useState([]);
+  
+  useEffect(() => {
+    setCustomTemplates(listCustomTemplates());
+  }, []);
+
+  const handleSaveAsTemplate = () => {
+    const name = window.prompt("Enter a name for the new template:");
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    
+    if (trimmed.toLowerCase() === 'basic deck') {
+      alert("Cannot overwrite default template name 'Basic Deck'. Please use a different name.");
+      return;
+    }
+    
+    const storeState = useDeckStore.getState();
+    try {
+      saveTemplateToLocalStorage(trimmed, storeState.sections, storeState.materials);
+      setCustomTemplates(listCustomTemplates());
+      storeState.showToast(`Saved template "${trimmed}"`, 'success');
+    } catch (err) {
+      alert(err.message || "Failed to save template.");
+    }
+  };
 
   const handleToolSelect = (toolId) => {
     setSelectedTool(toolId);
@@ -193,7 +226,21 @@ export default function ToolPanel({ isMobile, onClose }) {
       <div className="divider" />
 
       <div className="tool-panel__section">
-        <span className="label">Templates</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <span className="label" style={{ margin: 0 }}>Templates</span>
+          <button 
+            className="btn btn--xs btn--ghost" 
+            onClick={handleSaveAsTemplate}
+            title="Save current layout as a reusable template"
+            id="btn-save-as-template"
+            style={{ padding: '2px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Save Current
+          </button>
+        </div>
         <button
           className="tool-panel__template"
           onClick={resetDeck}
@@ -207,6 +254,71 @@ export default function ToolPanel({ isMobile, onClose }) {
             <span className="tool-panel__template-size">16' × 12'</span>
           </div>
         </button>
+
+        {customTemplates.map((name) => {
+          let sizeLabel = '';
+          try {
+            const temp = loadTemplateFromLocalStorage(name);
+            if (temp && temp.sections && temp.sections.length > 0) {
+              const sec = temp.sections[0];
+              const ftW = Math.round(sec.width / 12);
+              const ftD = Math.round(sec.depth / 12);
+              sizeLabel = temp.sections.length > 1 
+                ? `${temp.sections.length} Sections`
+                : `${ftW}' × ${ftD}'`;
+            } else {
+              sizeLabel = '0 Sections';
+            }
+          } catch (e) {
+            sizeLabel = 'Custom Design';
+          }
+          return (
+            <div key={name} className="tool-panel__template-container">
+              <button
+                className="tool-panel__template"
+                onClick={() => {
+                  if (window.confirm(`Load template "${name}"? This will overwrite the current canvas.`)) {
+                    try {
+                      const data = loadTemplateFromLocalStorage(name);
+                      useDeckStore.getState().loadProject(data.sections, data.materials);
+                      useDeckStore.getState().showToast(`Loaded template "${name}"`, 'success');
+                    } catch (err) {
+                      alert(err.message || 'Error loading template');
+                    }
+                  }
+                }}
+                style={{ flex: 1 }}
+              >
+                <div className="tool-panel__template-preview">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                </div>
+                <div className="tool-panel__template-info">
+                  <span className="tool-panel__template-name">{name}</span>
+                  <span className="tool-panel__template-size">{sizeLabel}</span>
+                </div>
+              </button>
+              <button
+                className="tool-panel__template-delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`Are you sure you want to delete template "${name}"?`)) {
+                    deleteTemplateFromLocalStorage(name);
+                    setCustomTemplates(listCustomTemplates());
+                    useDeckStore.getState().showToast(`Deleted template "${name}"`, 'info');
+                  }
+                }}
+                title="Delete template"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <div className="divider" />

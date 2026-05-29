@@ -1585,8 +1585,44 @@ test('35. Pricing cost estimation and BOM bar summary cost updates', () => {
   const joistsItem = state.bom.find(item => item.id.startsWith('joists'));
   assert.ok(joistsItem, 'Joists item must be generated in BOM');
 });
+test('36. Custom Template CRUD operations (saving, loading, listing, deleting)', async () => {
+  const { 
+    saveTemplateToLocalStorage, 
+    loadTemplateFromLocalStorage, 
+    deleteTemplateFromLocalStorage, 
+    listCustomTemplates 
+  } = await import('./src/lib/projectIO.js');
+  
+  mockLocalStorage.clear();
 
+  const sections = [{ id: 'sec-template-test', type: 'deck', x: 10, y: 10, width: 120, depth: 120, vertices: [] }];
+  const materials = { species: 'CEDAR', joistSize: '2x10' };
 
+  // 1. Verify initially custom templates list is empty
+  let templates = listCustomTemplates();
+  assert.strictEqual(templates.length, 0, 'Should start with no templates');
+
+  // 2. Save a custom template
+  saveTemplateToLocalStorage('Beautiful Deck Template', sections, materials);
+
+  // 3. Verify templates list contains the new template
+  templates = listCustomTemplates();
+  assert.strictEqual(templates.length, 1, 'Should have exactly 1 template');
+  assert.strictEqual(templates[0], 'Beautiful Deck Template');
+
+  // 4. Load the custom template
+  const loaded = loadTemplateFromLocalStorage('Beautiful Deck Template');
+  assert.strictEqual(loaded.templateName, 'Beautiful Deck Template');
+  assert.strictEqual(loaded.sections[0].id, 'sec-template-test');
+  assert.strictEqual(loaded.materials.species, 'CEDAR');
+
+  // 5. Delete the custom template
+  deleteTemplateFromLocalStorage('Beautiful Deck Template');
+
+  // 6. Verify templates list is empty again
+  templates = listCustomTemplates();
+  assert.strictEqual(templates.length, 0, 'Should have 0 templates after deletion');
+});
 
 test('37. Polygon area calculations and rectangle square footage equivalence', async () => {
   const { calculateSquareFootage } = await import('./src/engine/bomGenerator.js');
