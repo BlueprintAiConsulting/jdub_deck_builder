@@ -589,14 +589,14 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
       {/* Risers */}
       {risers.map((r, i) => (
         <mesh key={`riser-${i}`} position={[r.x * IN, r.y * IN, r.z * IN]} castShadow receiveShadow>
-          <boxGeometry args={[stairWidth * IN, riserHeight * IN, 0.75 * IN]} />
+          <boxGeometry args={[stairWidth * IN, safeRiserHeight * IN, 0.75 * IN]} />
           <meshStandardMaterial map={texture} roughness={0.8} />
         </mesh>
       ))}
 
       {/* Left Stringer (flanking baseboard) */}
       <mesh 
-        position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (totalRun / 2) * IN]} 
+        position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
         rotation={[theta, 0, 0]} 
         castShadow 
         receiveShadow
@@ -607,7 +607,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
 
       {/* Right Stringer (flanking baseboard) */}
       <mesh 
-        position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (totalRun / 2) * IN]} 
+        position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
         rotation={[theta, 0, 0]} 
         castShadow 
         receiveShadow

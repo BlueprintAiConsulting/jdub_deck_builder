@@ -337,6 +337,28 @@ export const useDeckStore = create((set, get) => ({
   toast: null,
   isDirty: false,
 
+  placementDeck: {
+    width: 144,
+    depth: 120,
+    height: 36,
+  },
+  placementLanding: {
+    width: 36,
+    depth: 36,
+    height: 36,
+  },
+  placementStairs: {
+    width: 36,
+    numberOfSteps: 5,
+    rise: 7.25,
+    run: 10,
+  },
+  placementRamp: {
+    mode: 'ada',
+    width: 36,
+    run: 432,
+  },
+
   // --- Interaction State ---
   interaction: {
     mode: 'idle', // 'idle' | 'placing' | 'resizing' | 'moving' | 'dragging_vertex'
@@ -391,6 +413,10 @@ export const useDeckStore = create((set, get) => ({
     },
     isDirty: true
   })),
+  updatePlacementDeck: (updates) => set((s) => ({ placementDeck: { ...s.placementDeck, ...updates } })),
+  updatePlacementLanding: (updates) => set((s) => ({ placementLanding: { ...s.placementLanding, ...updates } })),
+  updatePlacementStairs: (updates) => set((s) => ({ placementStairs: { ...s.placementStairs, ...updates } })),
+  updatePlacementRamp: (updates) => set((s) => ({ placementRamp: { ...s.placementRamp, ...updates } })),
   toggleTheme: () => {
     const nextTheme = get().theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
@@ -626,10 +652,10 @@ export const useDeckStore = create((set, get) => ({
           ? null
           : {
               type: 'stair',
-              width: 36,
-              numberOfSteps: 5,
-              rise: 7.25,
-              run: 10,
+              width: state.placementStairs?.width || 36,
+              numberOfSteps: state.placementStairs?.numberOfSteps || 5,
+              rise: state.placementStairs?.rise || 7.25,
+              run: state.placementStairs?.run || 10,
               direction: edge,
               align: 'center',
             },
@@ -642,7 +668,16 @@ export const useDeckStore = create((set, get) => ({
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
+    set({
+      sections: newSections,
+      selectedSectionId: sectionId,
+      selectedSubObjectType: newSections.find(s => s.id === sectionId)?.stairs ? 'stairs' : null,
+      selectedTool: 'select',
+      ...results,
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+      isDirty: true
+    });
   },
 
   updateStairs: (sectionId, updates) => {
@@ -685,8 +720,9 @@ export const useDeckStore = create((set, get) => ({
           ? null
           : {
               type: 'ramp',
-              mode: 'ada',
-              width: 36,
+              mode: state.placementRamp?.mode || 'ada',
+              width: state.placementRamp?.width || 36,
+              run: state.placementRamp?.run || 432,
               direction: edge,
               align: 'center',
             },
@@ -708,7 +744,16 @@ export const useDeckStore = create((set, get) => ({
     }
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
-    set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
+    set({
+      sections: newSections,
+      selectedSectionId: sectionId,
+      selectedSubObjectType: newSections.find(s => s.id === sectionId)?.ramp ? 'ramp' : null,
+      selectedTool: 'select',
+      ...results,
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+      isDirty: true
+    });
   },
 
   updateRamp: (sectionId, updates) => {

@@ -245,6 +245,8 @@ export default function Canvas2D({ isMobile }) {
   const addVertex = useDeckStore((s) => s.addVertex);
   const removeSection = useDeckStore((s) => s.removeSection);
   const setSelectedTool = useDeckStore((s) => s.setSelectedTool);
+  const placementDeck = useDeckStore((s) => s.placementDeck);
+  const placementLanding = useDeckStore((s) => s.placementLanding);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -528,9 +530,10 @@ export default function Canvas2D({ isMobile }) {
       if (absW > 20 && absH > 20) {
         addSection({ x: rx, y: ry, width: absW / S, depth: absH / S }, type);
       } else {
-        const defW = type === 'landing' ? 36 : 144;
-        const defD = type === 'landing' ? 36 : 120;
-        addSection({ x: rx - defW / 2, y: ry - defD / 2, width: defW, depth: defD }, type);
+        const defW = type === 'landing' ? placementLanding.width : placementDeck.width;
+        const defD = type === 'landing' ? placementLanding.depth : placementDeck.depth;
+        const defH = type === 'landing' ? placementLanding.height : placementDeck.height;
+        addSection({ x: rx - defW / 2, y: ry - defD / 2, width: defW, depth: defD, height: defH }, type);
       }
       setInteraction({ mode: 'idle', dragStart: null, ghostRect: null });
     }
@@ -538,7 +541,7 @@ export default function Canvas2D({ isMobile }) {
     if (interaction.mode === 'moving') finishMove();
     if (interaction.mode === 'resizing') setInteraction({ mode: 'idle', dragStart: null, resizeHandle: null });
     if (interaction.mode === 'dragging_subval' || interaction.mode === 'resizing_subobject') setInteraction({ mode: 'idle', dragStart: null });
-  }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction, finishVertexDrag]);
+  }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction, finishVertexDrag, placementDeck, placementLanding, selectedTool]);
 
   // Touch handlers
   const handleTouchStart = useCallback((e) => {
@@ -547,13 +550,15 @@ export default function Canvas2D({ isMobile }) {
       const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
       if (selectedTool === 'rectangle' || selectedTool === 'landing') {
         const type = selectedTool === 'landing' ? 'landing' : 'deck';
-        const defW = type === 'landing' ? 36 : 144;
-        const defD = type === 'landing' ? 36 : 120;
+        const defW = type === 'landing' ? placementLanding.width : placementDeck.width;
+        const defD = type === 'landing' ? placementLanding.depth : placementDeck.depth;
+        const defH = type === 'landing' ? placementLanding.height : placementDeck.height;
         addSection({
           x: (mx - size.w/2 - panOffset.x) / S - defW / 2,
           y: (my - size.h/2 - panOffset.y) / S - defD / 2,
           width: defW,
-          depth: defD
+          depth: defD,
+          height: defH
         }, type);
         return;
       }
@@ -586,7 +591,7 @@ export default function Canvas2D({ isMobile }) {
     } else if (e.touches.length === 2) {
       lastTouchDistRef.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     }
-  }, [selectedTool, sections, S, panOffset, size, selectSection, addSection, setInteraction, updateStairs, updateRamp, sectionCalcs]);
+  }, [selectedTool, sections, S, panOffset, size, selectSection, addSection, setInteraction, updateStairs, updateRamp, sectionCalcs, placementDeck, placementLanding]);
 
   const handleTouchMove = useCallback((e) => {
     e.preventDefault();

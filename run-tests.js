@@ -2154,6 +2154,55 @@ test('47. updateStairs and updateRamp actions update width, steps, and run', () 
   assert.strictEqual(store.getState().sections[0].ramp.run, 150, 'Ramp run should update to 150');
 });
 
+test('48. placement configurations and auto-selection of attached stairs/ramps', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // 1. Check default placement config states exist
+  const state = store.getState();
+  assert.ok(state.placementDeck, 'placementDeck should exist');
+  assert.strictEqual(state.placementDeck.width, 144, 'Default deck placement width should be 144');
+  assert.ok(state.placementLanding, 'placementLanding should exist');
+  assert.ok(state.placementStairs, 'placementStairs should exist');
+  assert.ok(state.placementRamp, 'placementRamp should exist');
+
+  // 2. Mutate placement config states
+  store.getState().updatePlacementDeck({ width: 180, depth: 144 });
+  store.getState().updatePlacementStairs({ width: 48, numberOfSteps: 6 });
+  store.getState().updatePlacementRamp({ width: 40, mode: 'utility', run: 240 });
+
+  assert.strictEqual(store.getState().placementDeck.width, 180, 'placementDeck width should be updated');
+  assert.strictEqual(store.getState().placementStairs.width, 48, 'placementStairs width should be updated');
+  assert.strictEqual(store.getState().placementRamp.width, 40, 'placementRamp width should be updated');
+
+  // 3. Add a section
+  store.getState().addSection({ x: 0, y: 0, width: 120, depth: 120 }, 'deck');
+  const secId = store.getState().sections[0].id;
+
+  // 4. Attach stairs using mutated config and check auto-select
+  store.getState().attachStairs(secId, 's');
+  const updatedSec = store.getState().sections.find(s => s.id === secId);
+  assert.ok(updatedSec.stairs, 'Stairs should be attached');
+  assert.strictEqual(updatedSec.stairs.width, 48, 'Stair width should match the placement configuration');
+  assert.strictEqual(updatedSec.stairs.numberOfSteps, 6, 'Stair steps should match the placement configuration');
+  assert.strictEqual(store.getState().selectedSubObjectType, 'stairs', 'Sub-object should be auto-selected to stairs');
+  assert.strictEqual(store.getState().selectedTool, 'select', 'Tool should auto-switch to select');
+
+  // Remove stairs
+  store.getState().attachStairs(secId, 's');
+  assert.strictEqual(store.getState().sections[0].stairs, null, 'Stairs should be removed');
+  assert.strictEqual(store.getState().selectedSubObjectType, null, 'Sub-object selection should reset after removal');
+
+  // 5. Attach ramp using mutated config and check auto-select
+  store.getState().attachRamp(secId, 'e');
+  const secWithRamp = store.getState().sections.find(s => s.id === secId);
+  assert.ok(secWithRamp.ramp, 'Ramp should be attached');
+  assert.strictEqual(secWithRamp.ramp.width, 40, 'Ramp width should match the placement configuration');
+  assert.strictEqual(secWithRamp.ramp.run, 240, 'Ramp run should match the placement configuration');
+  assert.strictEqual(store.getState().selectedSubObjectType, 'ramp', 'Sub-object should be auto-selected to ramp');
+  assert.strictEqual(store.getState().selectedTool, 'select', 'Tool should auto-switch to select');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

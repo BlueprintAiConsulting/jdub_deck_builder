@@ -45,45 +45,54 @@ function CollapsibleSection({ title, icon, accentColor, defaultOpen = true, chil
 }
 
 function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 }) {
-  const feet = Math.round(valueInches / 12);
-  return (
-    <div className="prop-field">
-      <label className="label" htmlFor={id}>{label}</label>
-      <div className="prop-field__row">
-        <input
-          id={id}
-          name={id}
-          className="input input--sm"
-          type="number"
-          min={Math.round(min / 12)}
-          max={Math.round(max / 12)}
-          value={feet}
-          onChange={(e) => onChange(Number(e.target.value) * 12)}
-        />
-        <span className="prop-field__unit">ft</span>
-        <span className="prop-field__formatted">{formatDimension(valueInches)}</span>
-      </div>
-    </div>
-  );
-}
+  const feet = Math.floor(valueInches / 12);
+  const inches = Math.round(valueInches % 12);
+  
+  const handleFeetChange = (e) => {
+    const newFeet = Math.max(0, parseInt(e.target.value) || 0);
+    const newVal = newFeet * 12 + inches;
+    onChange(Math.max(min, Math.min(max, newVal)));
+  };
 
-function LandingDimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 }) {
+  const handleInchesChange = (e) => {
+    const newInches = Math.max(0, Math.min(11, parseInt(e.target.value) || 0));
+    const newVal = feet * 12 + newInches;
+    onChange(Math.max(min, Math.min(max, newVal)));
+  };
+
   return (
     <div className="prop-field">
-      <label className="label" htmlFor={id}>{label}</label>
-      <div className="prop-field__row">
-        <input
-          id={id}
-          name={id}
-          className="input input--sm"
-          type="number"
-          min={min}
-          max={max}
-          value={valueInches}
-          onChange={(e) => onChange(Number(e.target.value))}
-        />
-        <span className="prop-field__unit">in</span>
-        <span className="prop-field__formatted">{formatDimension(valueInches)}</span>
+      <label className="label" htmlFor={`${id}-ft`}>{label}</label>
+      <div className="prop-field__row" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+          <input
+            id={`${id}-ft`}
+            className="input input--sm"
+            type="number"
+            min={Math.floor(min / 12)}
+            max={Math.floor(max / 12)}
+            value={feet}
+            onChange={handleFeetChange}
+            style={{ width: '100%', minWidth: '45px', textAlign: 'right' }}
+          />
+          <span className="prop-field__unit" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ft</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
+          <input
+            id={`${id}-in`}
+            className="input input--sm"
+            type="number"
+            min={0}
+            max={11}
+            value={inches}
+            onChange={handleInchesChange}
+            style={{ width: '100%', minWidth: '45px', textAlign: 'right' }}
+          />
+          <span className="prop-field__unit" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>in</span>
+        </div>
+        <span className="prop-field__formatted" style={{ marginLeft: '8px', fontSize: '11px', whiteSpace: 'nowrap', opacity: 0.8 }}>
+          ({formatDimension(valueInches)})
+        </span>
       </div>
     </div>
   );
@@ -125,6 +134,16 @@ export default function PropertiesPanel({ isMobile }) {
   const updateStairs = useDeckStore((s) => s.updateStairs);
   const attachRamp = useDeckStore((s) => s.attachRamp);
   const updateRamp = useDeckStore((s) => s.updateRamp);
+  
+  const selectedTool = useDeckStore((s) => s.selectedTool);
+  const placementDeck = useDeckStore((s) => s.placementDeck);
+  const updatePlacementDeck = useDeckStore((s) => s.updatePlacementDeck);
+  const placementLanding = useDeckStore((s) => s.placementLanding);
+  const updatePlacementLanding = useDeckStore((s) => s.updatePlacementLanding);
+  const placementStairs = useDeckStore((s) => s.placementStairs);
+  const updatePlacementStairs = useDeckStore((s) => s.updatePlacementStairs);
+  const placementRamp = useDeckStore((s) => s.placementRamp);
+  const updatePlacementRamp = useDeckStore((s) => s.updatePlacementRamp);
 
   if (!calcs) return null;
   const joistSpanOk = calcs.joists.maxSpan >= deck.depth;
@@ -147,6 +166,192 @@ export default function PropertiesPanel({ isMobile }) {
 
   const Tag = isMobile ? 'div' : 'aside';
   const speciesSwatch = WOOD_COLORS[deck.species] || '#c4a35a';
+
+  if (selectedTool !== 'select') {
+    return (
+      <Tag className={`props-panel ${isMobile ? 'props-panel--mobile' : 'animate-slide-right'}`} id="properties-panel" role="complementary" aria-label="Tool configuration">
+        {selectedTool === 'rectangle' && (
+          <>
+            <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Tool Mode: Add Deck Section
+              </span>
+            </div>
+            <div style={{ padding: '16px', fontSize: '12px', lineHeight: '1.4' }} className="text-secondary">
+              Configure default dimensions for the next deck section to place. Click and drag or single-click on the canvas to place it.
+            </div>
+            <CollapsibleSection
+              title="New Deck Dimensions"
+              accentColor="var(--accent-primary)"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>}
+            >
+              <DimensionInput id="placement-deck-width" label="Width" valueInches={placementDeck.width} onChange={(v) => updatePlacementDeck({ width: v })} />
+              <DimensionInput id="placement-deck-depth" label="Depth" valueInches={placementDeck.depth} onChange={(v) => updatePlacementDeck({ depth: v })} />
+              <DimensionInput id="placement-deck-height" label="Height" valueInches={placementDeck.height} onChange={(v) => updatePlacementDeck({ height: v })} min={12} max={168} />
+            </CollapsibleSection>
+          </>
+        )}
+        {selectedTool === 'landing' && (
+          <>
+            <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Tool Mode: Add Landing
+              </span>
+            </div>
+            <div style={{ padding: '16px', fontSize: '12px', lineHeight: '1.4' }} className="text-secondary">
+              Configure default dimensions for the next landing. Click and drag or single-click on the canvas to place it.
+            </div>
+            <CollapsibleSection
+              title="New Landing Dimensions"
+              accentColor="var(--accent-primary)"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>}
+            >
+              <DimensionInput id="placement-landing-width" label="Width" valueInches={placementLanding.width} onChange={(v) => updatePlacementLanding({ width: v })} min={36} max={120} />
+              <DimensionInput id="placement-landing-depth" label="Depth" valueInches={placementLanding.depth} onChange={(v) => updatePlacementLanding({ depth: v })} min={36} max={120} />
+              <DimensionInput id="placement-landing-height" label="Height" valueInches={placementLanding.height} onChange={(v) => updatePlacementLanding({ height: v })} min={12} max={168} />
+            </CollapsibleSection>
+          </>
+        )}
+        {selectedTool === 'stairs' && (
+          <>
+            <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Tool Mode: Add Stairs
+              </span>
+            </div>
+            <div style={{ padding: '16px', fontSize: '12px', lineHeight: '1.4' }} className="text-secondary">
+              Configure default stairs settings. Then, click on any deck edge in the layout canvas to attach them.
+            </div>
+            <CollapsibleSection
+              title="New Stairs Dimensions"
+              accentColor="var(--accent-green)"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h4v-4h4v-4h4v-4h4"/></svg>}
+            >
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-stair-width">Stair Width (in)</label>
+                <input
+                  id="placement-stair-width"
+                  className="input input--sm"
+                  type="number"
+                  min="36"
+                  max="96"
+                  value={placementStairs.width}
+                  onChange={(e) => updatePlacementStairs({ width: Number(e.target.value) })}
+                />
+              </div>
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-stair-steps">Number of Steps</label>
+                <input
+                  id="placement-stair-steps"
+                  className="input input--sm"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={placementStairs.numberOfSteps}
+                  onChange={(e) => updatePlacementStairs({ numberOfSteps: Number(e.target.value) })}
+                />
+              </div>
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-stair-rise">Rise per Step (in)</label>
+                <input
+                  id="placement-stair-rise"
+                  className="input input--sm"
+                  type="number"
+                  step="0.25"
+                  min="4"
+                  max="9"
+                  value={placementStairs.rise}
+                  onChange={(e) => updatePlacementStairs({ rise: Number(e.target.value) })}
+                />
+              </div>
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-stair-run">Run per Step (in)</label>
+                <input
+                  id="placement-stair-run"
+                  className="input input--sm"
+                  type="number"
+                  step="0.25"
+                  min="8"
+                  max="14"
+                  value={placementStairs.run}
+                  onChange={(e) => updatePlacementStairs({ run: Number(e.target.value) })}
+                />
+              </div>
+            </CollapsibleSection>
+          </>
+        )}
+        {selectedTool === 'ramp' && (
+          <>
+            <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Tool Mode: Add Ramp
+              </span>
+            </div>
+            <div style={{ padding: '16px', fontSize: '12px', lineHeight: '1.4' }} className="text-secondary">
+              Configure default ramp settings. Then, click on any deck edge in the layout canvas to attach it.
+            </div>
+            <CollapsibleSection
+              title="New Ramp Dimensions"
+              accentColor="var(--accent-green)"
+              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="2" y1="20" x2="22" y2="12" /><line x1="2" y1="20" x2="22" y2="20" /></svg>}
+            >
+              <SelectField
+                id="placement-ramp-mode"
+                label="Ramp Mode"
+                value={placementRamp.mode}
+                options={[
+                  { value: 'ada', label: 'ADA Compliance (1:12)' },
+                  { value: 'utility', label: 'Utility Mode' },
+                ]}
+                onChange={(v) => {
+                  updatePlacementRamp({ mode: v });
+                }}
+              />
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-ramp-width">Ramp Width (in)</label>
+                <input
+                  id="placement-ramp-width"
+                  className="input input--sm"
+                  type="number"
+                  min="36"
+                  max="96"
+                  value={placementRamp.width}
+                  onChange={(e) => updatePlacementRamp({ width: Number(e.target.value) })}
+                />
+              </div>
+              <div className="prop-field">
+                <label className="label" htmlFor="placement-ramp-run">Ramp Run (in)</label>
+                <input
+                  id="placement-ramp-run"
+                  className="input input--sm"
+                  type="number"
+                  min="12"
+                  max="1000"
+                  value={placementRamp.run}
+                  readOnly={placementRamp.mode === 'ada'}
+                  disabled={placementRamp.mode === 'ada'}
+                  style={placementRamp.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                  onChange={(e) => updatePlacementRamp({ run: Number(e.target.value) })}
+                />
+              </div>
+            </CollapsibleSection>
+          </>
+        )}
+        {selectedTool === 'railing' && (
+          <>
+            <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                Tool Mode: Railings
+              </span>
+            </div>
+            <div style={{ padding: '16px', fontSize: '12px', lineHeight: '1.4' }} className="text-secondary">
+              Click on any deck edge in the layout canvas to toggle railings on or off for that edge.
+            </div>
+          </>
+        )}
+      </Tag>
+    );
+  }
 
   return (
     <Tag className={`props-panel ${isMobile ? 'props-panel--mobile' : 'animate-slide-right'}`} id="properties-panel" role="complementary" aria-label="Deck properties">
@@ -221,15 +426,119 @@ export default function PropertiesPanel({ isMobile }) {
       )}
 
       {/* Dimensions */}
-      {isLanding ? (
+      {selectedSubObjectType === 'stairs' ? (
+        <CollapsibleSection
+          title="Stair Dimensions"
+          accentColor="var(--accent-green)"
+          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h4v-4h4v-4h4v-4h4"/></svg>}
+        >
+          <div className="prop-field">
+            <label className="label" htmlFor="stair-width">Stair Width (in)</label>
+            <input
+              id="stair-width"
+              className="input input--sm"
+              type="number"
+              min="36"
+              max="96"
+              value={stairObj?.width || 36}
+              onChange={(e) => updateStairs(selectedSectionId, { width: Number(e.target.value) })}
+            />
+          </div>
+          <div className="prop-field">
+            <label className="label" htmlFor="stair-steps">Number of Steps</label>
+            <input
+              id="stair-steps"
+              className="input input--sm"
+              type="number"
+              min="1"
+              max="20"
+              value={stairObj?.numberOfSteps || 5}
+              onChange={(e) => updateStairs(selectedSectionId, { numberOfSteps: Number(e.target.value) })}
+            />
+          </div>
+          <div className="prop-field">
+            <label className="label" htmlFor="stair-rise">Rise per Step (in)</label>
+            <input
+              id="stair-rise"
+              className="input input--sm"
+              type="number"
+              step="0.25"
+              min="4"
+              max="9"
+              value={stairObj?.rise || 7.25}
+              onChange={(e) => updateStairs(selectedSectionId, { rise: Number(e.target.value) })}
+            />
+          </div>
+          <div className="prop-field">
+            <label className="label" htmlFor="stair-run">Run per Step (in)</label>
+            <input
+              id="stair-run"
+              className="input input--sm"
+              type="number"
+              step="0.25"
+              min="8"
+              max="14"
+              value={stairObj?.run || 10}
+              onChange={(e) => updateStairs(selectedSectionId, { run: Number(e.target.value) })}
+            />
+          </div>
+        </CollapsibleSection>
+      ) : selectedSubObjectType === 'ramp' ? (
+        <CollapsibleSection
+          title="Ramp Dimensions"
+          accentColor="var(--accent-green)"
+          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="2" y1="20" x2="22" y2="12" /><line x1="2" y1="20" x2="22" y2="20" /></svg>}
+        >
+          <SelectField
+            id="sel-ramp-mode"
+            label="Ramp Mode"
+            value={rampObj?.mode || 'ada'}
+            options={[
+              { value: 'ada', label: 'ADA Compliance (1:12)' },
+              { value: 'utility', label: 'Utility Mode' },
+            ]}
+            onChange={(v) => {
+              const nextRun = v === 'ada' ? currentSection.height * 12 : currentSection.height * 8;
+              updateRamp(selectedSectionId, { mode: v, run: nextRun });
+            }}
+          />
+          <div className="prop-field">
+            <label className="label" htmlFor="ramp-width">Ramp Width (in)</label>
+            <input
+              id="ramp-width"
+              className="input input--sm"
+              type="number"
+              min="36"
+              max="96"
+              value={rampObj?.width || 36}
+              onChange={(e) => updateRamp(selectedSectionId, { width: Number(e.target.value) })}
+            />
+          </div>
+          <div className="prop-field">
+            <label className="label" htmlFor="ramp-run">Ramp Run (in)</label>
+            <input
+              id="ramp-run"
+              className="input input--sm"
+              type="number"
+              min="12"
+              max="1000"
+              value={rampObj?.mode === 'ada' ? (currentSection.height * 12) : (rampObj?.run || currentSection.height * 8)}
+              readOnly={rampObj?.mode === 'ada'}
+              disabled={rampObj?.mode === 'ada'}
+              style={rampObj?.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+              onChange={(e) => updateRamp(selectedSectionId, { run: Number(e.target.value) })}
+            />
+          </div>
+        </CollapsibleSection>
+      ) : isLanding ? (
         <CollapsibleSection
           title="Landing Dimensions"
           accentColor="var(--accent-primary)"
           icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 3H3v18h18V3z"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>}
         >
-          <LandingDimensionInput id="dim-width" label="Width" valueInches={deck.width} onChange={(v) => setDimension('width', v)} min={36} max={120} />
-          <LandingDimensionInput id="dim-depth" label="Depth" valueInches={deck.depth} onChange={(v) => setDimension('depth', v)} min={36} max={120} />
-          <LandingDimensionInput id="dim-height" label="Height" valueInches={deck.height} onChange={(v) => setDimension('height', v)} min={12} max={168} />
+          <DimensionInput id="dim-width" label="Width" valueInches={deck.width} onChange={(v) => setDimension('width', v)} min={36} max={120} />
+          <DimensionInput id="dim-depth" label="Depth" valueInches={deck.depth} onChange={(v) => setDimension('depth', v)} min={36} max={120} />
+          <DimensionInput id="dim-height" label="Height" valueInches={deck.height} onChange={(v) => setDimension('height', v)} min={12} max={168} />
         </CollapsibleSection>
       ) : (
         <CollapsibleSection
