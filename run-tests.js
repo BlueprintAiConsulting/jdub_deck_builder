@@ -2292,6 +2292,64 @@ test('50. customizable support beam setbacks (cantilevers)', () => {
   assert.deepStrictEqual(calcs.beams.positions, [90, 180], 'Beam positions should clamp to min safe setback 0');
 });
 
+test('51. customizable support beam plies, sizes, species, and post offsets', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // 1. Add a deck section (width: 192 in = 16 ft, depth: 144 in = 12 ft)
+  store.getState().addSection({ x: 0, y: 0, width: 192, depth: 144, beamSetback: 0 }, 'deck');
+  const secId = store.getState().sections[0].id;
+
+  let state = store.getState();
+  let calcs = state.sectionCalcs[secId];
+  
+  // Default values
+  assert.strictEqual(state.sections[0].beamPlies, 2, 'Default beamPlies should be 2');
+  assert.strictEqual(state.sections[0].beamSize, '2x10', 'Default beamSize should be 2x10');
+  assert.strictEqual(state.sections[0].beamSpecies, 'SYP', 'Default beamSpecies should be SYP');
+  assert.strictEqual(state.sections[0].postOffset, 6, 'Default postOffset should be 6 inches');
+
+  // Verify default post positions with 6 in offset
+  // Beam length = 192. Beams maxSpan for SYP 2-2x10 is 102.
+  // count = Math.ceil(192 / 102) + 1 = 2 + 1 = 3 posts per beam.
+  // posts: safeOffset = 6. spanLength = 192 - 12 = 180. spacing = 180 / 2 = 90.
+  // posts coordinates: 6, 96, 186.
+  assert.strictEqual(calcs.posts.posts.length, 3, 'Beam config should yield 3 posts');
+  assert.deepStrictEqual(
+    calcs.posts.posts.map(p => p.x),
+    [6, 96, 186],
+    'Posts should be offset by 6 inches at [6, 96, 186]'
+  );
+
+  // 2. Change postOffset to 12 inches
+  store.getState().updateDeck({ postOffset: 12 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  // safeOffset = 12. spanLength = 192 - 24 = 168. spacing = 168 / 2 = 84.
+  // coordinates: 12, 96, 180.
+  assert.deepStrictEqual(
+    calcs.posts.posts.map(p => p.x),
+    [12, 96, 180],
+    'Posts should be offset by 12 inches at [12, 96, 180]'
+  );
+
+  // 3. Change beamPlies to 3 and beamSize to 2x12
+  store.getState().updateDeck({ beamPlies: 3, beamSize: '2x12' });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  // beamConfig resolved as '3-2x12'
+  // beam maxSpan for SYP 3-2x12 and joist span 12ft (144 in) is 156.
+  // count = Math.ceil(192 / 156) + 1 = 2 + 1 = 3 posts per beam.
+  // safeOffset = 12. spanLength = 192 - 24 = 168. spacing = 168 / 2 = 84.
+  // coordinates: 12, 96, 180.
+  assert.strictEqual(calcs.posts.posts.length, 3, '3-2x12 config with 192 width still requires 3 posts');
+  assert.deepStrictEqual(
+    calcs.posts.posts.map(p => p.x),
+    [12, 96, 180],
+    'Posts should be offset by 12 inches at [12, 96, 180]'
+  );
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

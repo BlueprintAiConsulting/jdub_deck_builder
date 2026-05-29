@@ -120,6 +120,11 @@ function createSection(overrides = {}) {
     deckingOrientation: 'perpendicular', // 'perpendicular' | 'parallel' | 'diagonal'
     beamCount: 'auto', // 'auto' | 1 | 2 | 3 | 4
     beamSetback: 12,
+    beamPlies: 2,
+    beamSize: '2x10',
+    beamSpecies: 'SYP',
+    beamGrade: 'Grade #2',
+    postOffset: 6,
   };
   const merged = { ...base, ...overrides };
   if (!merged.vertices) {
@@ -197,6 +202,11 @@ function recalculateSection(section, materials, allSections = []) {
   }
 
   const config = { ...materials, ...section, stairs: stairObj, ramp: rampObj };
+  
+  const plies = section.beamPlies !== undefined ? section.beamPlies : 2;
+  const beamSize = section.beamSize || '2x10';
+  const resolvedBeamConfig = `${plies}-${beamSize}`;
+
   const calcs = calculateAll({
     width: section.width,
     depth: section.depth,
@@ -206,7 +216,7 @@ function recalculateSection(section, materials, allSections = []) {
     joistSize: materials.joistSize,
     joistSpacing: materials.joistSpacing,
     species: materials.species,
-    beamConfig: materials.beamConfig,
+    beamConfig: resolvedBeamConfig,
     postSize: materials.postSize,
     soilCapacity: materials.soilCapacity,
     stairs: stairObj,
@@ -214,6 +224,8 @@ function recalculateSection(section, materials, allSections = []) {
     joistOrientation: section.joistOrientation || 'vertical',
     beamCount: section.beamCount || 'auto',
     beamSetback: section.beamSetback !== undefined ? section.beamSetback : 12,
+    postOffset: section.postOffset !== undefined ? section.postOffset : 6,
+    beamSpecies: section.beamSpecies || materials.species || 'SYP',
   });
   if (calcs.ramp && rampObj) {
     calcs.ramp.doesNotFit = doesRampOverlap(section, calcs.ramp, allSections);
@@ -813,7 +825,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -981,6 +993,11 @@ export const useDeckStore = create((set, get) => ({
         joistOrientation: 'vertical',
         deckingOrientation: 'perpendicular',
         beamSetback: 12,
+        beamPlies: 2,
+        beamSize: '2x10',
+        beamSpecies: 'SYP',
+        beamGrade: 'Grade #2',
+        postOffset: 6,
         ...s,
         type,
         stairs: stairObj,

@@ -215,6 +215,17 @@ export default function Canvas2D({ isMobile }) {
   const lastTouchDistRef = useRef(null);
   const [zoomScale, setZoomScale] = useState(1);
 
+  const [actionPopup, setActionPopup] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('beams');
+
+  useEffect(() => {
+    if (!selectedSectionId) {
+      setActionPopup(null);
+      setShowSettingsModal(false);
+    }
+  }, [selectedSectionId]);
+
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
@@ -247,6 +258,8 @@ export default function Canvas2D({ isMobile }) {
   const setSelectedTool = useDeckStore((s) => s.setSelectedTool);
   const placementDeck = useDeckStore((s) => s.placementDeck);
   const placementLanding = useDeckStore((s) => s.placementLanding);
+  const updateDeck = useDeckStore((s) => s.updateDeck);
+  const toggleLayer = useDeckStore((s) => s.toggleLayer);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -331,6 +344,7 @@ export default function Canvas2D({ isMobile }) {
         // Check vertex handles first
         const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
         if (vIdx !== -1) {
+          setActionPopup(null);
           setInteraction({
             mode: 'dragging_vertex',
             vertexIndex: vIdx,
@@ -343,6 +357,7 @@ export default function Canvas2D({ isMobile }) {
         // Check resize handles
         const handle = hitTestHandles(mx, my, sel, S, panOffset.x, panOffset.y, size.w, size.h);
         if (handle) {
+          setActionPopup(null);
           setInteraction({ mode: 'resizing', resizeHandle: handle, dragStart: { x: mx, y: my } });
           return;
         }
@@ -351,6 +366,7 @@ export default function Canvas2D({ isMobile }) {
       const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
       if (hit) {
         selectSection(hit.id, hit.type !== 'deck' ? hit.type : null);
+        setActionPopup({ x: mx, y: my, id: hit.id, type: hit.type });
         if (hit.type === 'stairs' || hit.type === 'ramp') {
           const sec = sections.find((s) => s.id === hit.id);
           const initialOffset = getSubObjectOffset(sec, hit.type);
@@ -366,6 +382,7 @@ export default function Canvas2D({ isMobile }) {
         }
       } else {
         selectSection(null);
+        setActionPopup(null);
         setInteraction({ mode: 'idle', dragStart: null, selectedVertexIndex: null });
       }
       return;
@@ -393,6 +410,10 @@ export default function Canvas2D({ isMobile }) {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+    if (interaction.mode !== 'idle') {
+      setActionPopup(null);
+    }
 
     if (interaction.mode === 'placing' && interaction.dragStart) {
       setInteraction({ ghostRect: { x: interaction.dragStart.x, y: interaction.dragStart.y, w: mx - interaction.dragStart.x, h: my - interaction.dragStart.y } });
@@ -1498,11 +1519,389 @@ export default function Canvas2D({ isMobile }) {
   const zoomOut = useCallback(() => setZoomScale((z) => Math.max(0.2, z / 1.25)), []);
   const zoomReset = useCallback(() => { setZoomScale(1); setPanOffset({ x: 0, y: 0 }); }, []);
 
-  // Scroll wheel zoom
-  const handleWheel = useCallback((e) => {
-    e.preventDefault();
-    setZoomScale((z) => Math.min(4, Math.max(0.2, z * (e.deltaY > 0 ? 0.92 : 1.08))));
-  }, []);
+  const handleDeletePopupObject = useCallback(() => {
+    if (!actionPopup) return;
+    const { id, type } = actionPopup;
+    const sec = sections.find((s) => s.id === id);
+    if (!sec) return;
+
+    if (type === 'stairs' && sec.stairs) {
+      attachStairs(id, sec.stairs.direction || sec.stairs);
+      selectSection(id, null);
+    } else if (type === 'ramp' && sec.ramp) {
+      attachRamp(id, sec.ramp.direction || sec.ramp);
+      selectSection(id, null);
+    } else {
+      if (window.confirm("Are you sure you want to delete this deck section?")) {
+        removeSection(id);
+        selectSection(null);
+      }
+    }
+    setActionPopup(null);
+    setShowSettingsModal(false);
+  }, [actionPopup, sections, attachStairs, attachRamp, removeSection, selectSection]);
+
+  const renderStairsSettings = (selectedSec) => {
+    const stairObj = selectedSec.stairs;
+    if (!stairObj) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-stair-width">Stair Width (in)</label>
+          <input
+            id="popup-stair-width"
+            className="settings-input"
+            type="number"
+            min="36"
+            max="96"
+            value={stairObj.width || 36}
+            onChange={(e) => updateStairs(selectedSec.id, { width: Number(e.target.value) })}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-stair-steps">Number of Steps</label>
+          <input
+            id="popup-stair-steps"
+            className="settings-input"
+            type="number"
+            min="1"
+            max="20"
+            value={stairObj.numberOfSteps || 5}
+            onChange={(e) => updateStairs(selectedSec.id, { numberOfSteps: Number(e.target.value) })}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-stair-rise">Rise per Step (in)</label>
+          <input
+            id="popup-stair-rise"
+            className="settings-input"
+            type="number"
+            step="0.25"
+            min="4"
+            max="9"
+            value={stairObj.rise || 7.25}
+            onChange={(e) => updateStairs(selectedSec.id, { rise: Number(e.target.value) })}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-stair-run">Run per Step (in)</label>
+          <input
+            id="popup-stair-run"
+            className="settings-input"
+            type="number"
+            step="0.25"
+            min="8"
+            max="14"
+            value={stairObj.run || 10}
+            onChange={(e) => updateStairs(selectedSec.id, { run: Number(e.target.value) })}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderRampSettings = (selectedSec) => {
+    const rampObj = selectedSec.ramp;
+    if (!rampObj) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-ramp-mode">Ramp Mode</label>
+          <select
+            id="popup-ramp-mode"
+            className="settings-select"
+            value={rampObj.mode || 'ada'}
+            onChange={(e) => {
+              const v = e.target.value;
+              const nextRun = v === 'ada' ? selectedSec.height * 12 : selectedSec.height * 8;
+              updateRamp(selectedSec.id, { mode: v, run: nextRun });
+            }}
+          >
+            <option value="ada">ADA Compliance (1:12)</option>
+            <option value="utility">Utility Mode</option>
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-ramp-width">Ramp Width (in)</label>
+          <input
+            id="popup-ramp-width"
+            className="settings-input"
+            type="number"
+            min="36"
+            max="96"
+            value={rampObj.width || 36}
+            onChange={(e) => updateRamp(selectedSec.id, { width: Number(e.target.value) })}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label" htmlFor="popup-ramp-run">Ramp Run (in)</label>
+          <input
+            id="popup-ramp-run"
+            className="settings-input"
+            type="number"
+            min="12"
+            max="1000"
+            value={rampObj.mode === 'ada' ? (selectedSec.height * 12) : (rampObj.run || selectedSec.height * 8)}
+            readOnly={rampObj.mode === 'ada'}
+            disabled={rampObj.mode === 'ada'}
+            style={rampObj.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+            onChange={(e) => updateRamp(selectedSec.id, { run: Number(e.target.value) })}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderJoistsTab = (selectedSec) => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field">
+          <label className="settings-label">Lumber Species</label>
+          <select 
+            value={materials.species} 
+            onChange={(e) => updateDeck({ species: e.target.value })}
+            className="settings-select"
+          >
+            {SPECIES_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Joist Size</label>
+          <select 
+            value={materials.joistSize} 
+            onChange={(e) => updateDeck({ joistSize: e.target.value })}
+            className="settings-select"
+          >
+            {JOIST_SIZES.map(sz => (
+              <option key={sz} value={sz}>{sz}</option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Joist Spacing</label>
+          <select 
+            value={materials.joistSpacing} 
+            onChange={(e) => updateDeck({ joistSpacing: Number(e.target.value) })}
+            className="settings-select"
+          >
+            {JOIST_SPACINGS.map(sp => (
+              <option key={sp} value={sp}>{sp}" o.c.</option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Joist Direction</label>
+          <select 
+            value={selectedSec.joistOrientation || 'vertical'} 
+            onChange={(e) => updateDeck({ joistOrientation: e.target.value })}
+            className="settings-select"
+          >
+            <option value="vertical">Vertical (N-S)</option>
+            <option value="horizontal">Horizontal (E-W)</option>
+          </select>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPostsTab = (selectedSec) => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field">
+          <label className="settings-label">Post Size</label>
+          <select 
+            value={materials.postSize} 
+            onChange={(e) => updateDeck({ postSize: e.target.value })}
+            className="settings-select"
+          >
+            {POST_SIZE_OPTIONS.map(sz => (
+              <option key={sz} value={sz}>{sz}</option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Soil Capacity</label>
+          <select 
+            value={materials.soilCapacity} 
+            onChange={(e) => updateDeck({ soilCapacity: Number(e.target.value) })}
+            className="settings-select"
+          >
+            {SOIL_CAPACITIES.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field" style={{ marginTop: '4px' }}>
+          <button
+            className={`btn btn--ghost prop-toggle ${selectedSec.ledgerAttached ? 'prop-toggle--on' : ''}`}
+            onClick={() => updateDeck({ ledgerAttached: !selectedSec.ledgerAttached })}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            {selectedSec.ledgerAttached ? '✓ Attached to house' : '✗ Freestanding deck'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderBeamsTab = (selectedSec) => {
+    const handleViewBeamLayout = () => {
+      if (!visibleLayers.framing) {
+        toggleLayer('framing', '2d');
+      }
+      useDeckStore.getState().showToast("Framing layout is visible", "info");
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field-row">
+          <label className="settings-label">Beam Material Species</label>
+          <select 
+            value={selectedSec.beamSpecies || 'SYP'} 
+            onChange={(e) => updateDeck({ beamSpecies: e.target.value })}
+            className="settings-select"
+            style={{ width: '160px' }}
+          >
+            {SPECIES_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label.split(' (')[0]}</option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="settings-field-row">
+          <label className="settings-label">Beam Material Grade</label>
+          <select 
+            value={selectedSec.beamGrade || 'Grade #2'} 
+            onChange={(e) => updateDeck({ beamGrade: e.target.value })}
+            className="settings-select"
+            style={{ width: '160px' }}
+          >
+            <option value="Grade #1">Grade #1</option>
+            <option value="Grade #2">Grade #2</option>
+            <option value="Select Structural">Select Structural</option>
+          </select>
+        </div>
+
+        <div className="settings-field-row">
+          <label className="settings-label">Material Size</label>
+          <select 
+            value={selectedSec.beamSize || '2x10'} 
+            onChange={(e) => updateDeck({ beamSize: e.target.value })}
+            className="settings-select"
+            style={{ width: '160px' }}
+          >
+            <option value="2x6">2x6</option>
+            <option value="2x8">2x8</option>
+            <option value="2x10">2x10</option>
+            <option value="2x12">2x12</option>
+          </select>
+        </div>
+
+        <div className="settings-field-row">
+          <label className="settings-label">Preferred Beam Plies</label>
+          <div className="ply-counter-row">
+            <div className="counter-btn-group">
+              <button className="counter-btn" onClick={() => updateDeck({ beamPlies: Math.min(4, (selectedSec.beamPlies || 2) + 1) })}>+</button>
+              <button className="counter-btn" onClick={() => updateDeck({ beamPlies: Math.max(1, (selectedSec.beamPlies || 2) - 1) })}>−</button>
+            </div>
+            <span className="counter-val">{selectedSec.beamPlies || 2}</span>
+          </div>
+        </div>
+
+        <div className="settings-field-row">
+          <label className="settings-label">Post Offset From Ends</label>
+          <div className="post-offset-input-wrap">
+            <input
+              type="number"
+              min="0"
+              max={Math.max(0, Math.floor((selectedSec.width - 12) / 2))}
+              value={selectedSec.postOffset !== undefined ? selectedSec.postOffset : 6}
+              onChange={(e) => updateDeck({ postOffset: Number(e.target.value) })}
+              className="settings-input"
+            />
+            <span className="unit-label">" in</span>
+          </div>
+        </div>
+
+        <button 
+          className="settings-action-btn"
+          onClick={() => updateDeck({ beamCount: 'auto' })}
+        >
+          Auto Generate Beams
+        </button>
+
+        <button 
+          className="settings-action-btn"
+          style={{ background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-primary)', border: '1px solid rgba(255, 255, 255, 0.15)', boxShadow: 'none' }}
+          onClick={handleViewBeamLayout}
+        >
+          View Beam Layout
+        </button>
+      </div>
+    );
+  };
+
+  const renderLayoutTab = (selectedSec) => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="settings-field">
+          <label className="settings-label">Width (inches)</label>
+          <input
+            className="settings-input"
+            type="number"
+            min="36"
+            max="480"
+            value={selectedSec.width}
+            onChange={(e) => {
+              const val = Math.max(36, Math.min(480, Number(e.target.value)));
+              updateDeck({ width: val });
+            }}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Depth (inches)</label>
+          <input
+            className="settings-input"
+            type="number"
+            min="36"
+            max="480"
+            value={selectedSec.depth}
+            onChange={(e) => {
+              const val = Math.max(36, Math.min(480, Number(e.target.value)));
+              updateDeck({ depth: val });
+            }}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Height (inches)</label>
+          <input
+            className="settings-input"
+            type="number"
+            min="12"
+            max="168"
+            value={selectedSec.height}
+            onChange={(e) => {
+              const val = Math.max(12, Math.min(168, Number(e.target.value)));
+              updateDeck({ height: val });
+            }}
+          />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Section Type</label>
+          <select
+            value={selectedSec.type || 'deck'}
+            onChange={(e) => updateDeck({ type: e.target.value, ledgerAttached: e.target.value === 'landing' ? false : true })}
+            className="settings-select"
+          >
+            <option value="deck">Deck</option>
+            <option value="landing">Landing</option>
+          </select>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div ref={containerRef} className="canvas-2d"
@@ -1540,6 +1939,115 @@ export default function Canvas2D({ isMobile }) {
           <span className="zoom-controls__pct" onClick={zoomReset} title="Reset zoom">{Math.round(zoomScale * 100)}%</span>
           <div className="zoom-controls__divider" />
           <button className="zoom-controls__btn" onClick={zoomIn} aria-label="Zoom in" data-tooltip="Zoom In">+</button>
+        </div>
+      )}
+
+      {/* Action Popup */}
+      {actionPopup && selectedSectionId && (
+        <div 
+          className="canvas-action-popup animate-fade-in" 
+          style={{ 
+            position: 'absolute', 
+            left: `${actionPopup.x}px`, 
+            top: `${actionPopup.y - 45}px`, 
+            transform: 'translateX(-50%)',
+            zIndex: 110
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className="popup-btn popup-btn--settings" onClick={() => { setShowSettingsModal(true); setActionPopup(null); }} title="Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Settings
+          </button>
+          <button className="popup-btn popup-btn--delete" onClick={handleDeletePopupObject} title="Delete">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            Delete
+          </button>
+        </div>
+      )}
+
+      {/* Settings Modal Overlay */}
+      {showSettingsModal && selectedSectionId && (
+        <div className="settings-overlay-modal glass-panel animate-slide-right" onClick={(e) => e.stopPropagation()}>
+          {(() => {
+            const selectedSec = sections.find((x) => x.id === selectedSectionId) || sections[0];
+            const isStairs = selectedSubObjectType === 'stairs';
+            const isRamp = selectedSubObjectType === 'ramp';
+            const isLanding = selectedSec.type === 'landing';
+            
+            if (isStairs) {
+              return (
+                <>
+                  <div className="settings-overlay-header">
+                    <div className="settings-overlay-tabs">
+                      <button className="settings-overlay-tab settings-overlay-tab--active">Stairs</button>
+                    </div>
+                    <button className="settings-overlay-close" onClick={() => setShowSettingsModal(false)}>✕</button>
+                  </div>
+                  <div className="settings-overlay-content">
+                    {renderStairsSettings(selectedSec)}
+                  </div>
+                </>
+              );
+            }
+
+            if (isRamp) {
+              return (
+                <>
+                  <div className="settings-overlay-header">
+                    <div className="settings-overlay-tabs">
+                      <button className="settings-overlay-tab settings-overlay-tab--active">Ramp</button>
+                    </div>
+                    <button className="settings-overlay-close" onClick={() => setShowSettingsModal(false)}>✕</button>
+                  </div>
+                  <div className="settings-overlay-content">
+                    {renderRampSettings(selectedSec)}
+                  </div>
+                </>
+              );
+            }
+
+            return (
+              <>
+                <div className="settings-overlay-header">
+                  <div className="settings-overlay-tabs">
+                    {isLanding ? (
+                      <button className="settings-overlay-tab settings-overlay-tab--active">Layout</button>
+                    ) : (
+                      ['joists', 'posts', 'beams', 'layout'].map((tab) => (
+                        <button
+                          key={tab}
+                          className={`settings-overlay-tab ${activeTab === tab ? 'settings-overlay-tab--active' : ''}`}
+                          onClick={() => setActiveTab(tab)}
+                        >
+                          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <button className="settings-overlay-close" onClick={() => setShowSettingsModal(false)}>✕</button>
+                </div>
+                <div className="settings-overlay-content">
+                  {isLanding ? (
+                    renderLayoutTab(selectedSec)
+                  ) : (
+                    <>
+                      {activeTab === 'joists' && renderJoistsTab(selectedSec)}
+                      {activeTab === 'posts' && renderPostsTab(selectedSec)}
+                      {activeTab === 'beams' && renderBeamsTab(selectedSec)}
+                      {activeTab === 'layout' && renderLayoutTab(selectedSec)}
+                    </>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

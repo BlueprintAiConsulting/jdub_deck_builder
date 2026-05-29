@@ -111,19 +111,25 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
 
 /** Calculate post layout */
 // approximate for non-rectangular — bounding box layout
-export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation = 'vertical') {
+export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation = 'vertical', postOffset = 6) {
   const isHorizontal = joistOrientation === 'horizontal';
   const post = POST_SIZES[postSize] || POST_SIZES['6x6'];
   const posts = [];
+  
+  const length = beams.length || 0;
+  const safeOffset = Math.max(0, Math.min(Math.max(0, (length - 12) / 2), postOffset !== undefined ? postOffset : 6));
+
   beams.positions.forEach((beamCoord) => {
-    const count = Math.ceil((beams.length || 0) / (beams.maxSpan || 96)) + 1;
+    const count = Math.ceil(length / (beams.maxSpan || 96)) + 1;
     const safeCount = Math.max(2, count);
-    const spacing = (beams.length || 0) / (safeCount - 1);
+    const spanLength = length - 2 * safeOffset;
+    const spacing = safeCount > 1 ? spanLength / (safeCount - 1) : 0;
     for (let i = 0; i < safeCount; i++) {
+      const coord = safeOffset + i * spacing;
       if (isHorizontal) {
-        posts.push({ x: beamCoord, y: i * spacing, height: deckHeightIn });
+        posts.push({ x: beamCoord, y: coord, height: deckHeightIn });
       } else {
-        posts.push({ x: i * spacing, y: beamCoord, height: deckHeightIn });
+        posts.push({ x: coord, y: beamCoord, height: deckHeightIn });
       }
     }
   });
@@ -244,11 +250,14 @@ export function calculateRamp(totalRiseIn, rampOpt) {
 
 /** Run all structural calculations for a deck config */
 export function calculateAll(config) {
-  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback } = config;
+  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback, postOffset, beamSpecies } = config;
   const joistOrient = joistOrientation || 'vertical';
   const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient, vertices, x, y);
-  const beams = calculateBeams(width, depth, joistSize, joistSpacing, species, beamConfig, joistOrient, beamCount, beamSetback);
-  const posts = calculatePosts(beams, height, postSize, joistOrient);
+  
+  const actualBeamSpecies = beamSpecies || species;
+  const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback);
+  
+  const posts = calculatePosts(beams, height, postSize, joistOrient, postOffset);
   const footings = calculateFootings(posts, joistSpacing, beams.maxSpan, soilCapacity);
   const stairsRise = stairRiseHeight !== undefined ? stairRiseHeight : height;
   const stairs = stairsRise > 0 ? calculateStairs(stairsRise, stairOpt) : null;
