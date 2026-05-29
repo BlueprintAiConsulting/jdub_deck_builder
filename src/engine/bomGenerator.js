@@ -218,33 +218,73 @@ export function generateBOM(config, calcs) {
     areaSqIn = 0;
   }
   const safeAreaSqIn = areaSqIn > 0 ? areaSqIn : ((width || 0) * (depth || 0));
-  const linearInchesNeeded = safeAreaSqIn / boardSpacing;
+
+  const pictureFrameCount = config.pictureFrame || 0;
+  const isDeckingFlipped = config.deckingFlipped === true;
+  
+  // Resolve orientation
+  let runsVertical = joistOrientation === 'vertical' ? (deckingOrientation === 'parallel') : (deckingOrientation !== 'parallel');
+  if (isDeckingFlipped) {
+    runsVertical = !runsVertical;
+  }
+
+  const frameWidth = pictureFrameCount * boardSpacing;
+  const span = runsVertical ? (depth - 2 * frameWidth) : (width - 2 * frameWidth);
+
+  let divCountVal = config.dividerCount;
+  let hasDivider = false;
+  let dividerCountNum = 0;
+
+  if (divCountVal === 'auto' || divCountVal === undefined) {
+    if (span > 240) {
+      hasDivider = true;
+      dividerCountNum = 1;
+    }
+  } else {
+    const num = Number(divCountVal);
+    if (num > 0) {
+      hasDivider = true;
+      dividerCountNum = num;
+    }
+  }
+
+  const boardsPerDiv = config.boardsPerDivider || 1;
+
+  // Calculate picture frame linear inches
+  let pfLinearInches = 0;
+  if (pictureFrameCount > 0) {
+    for (let k = 0; k < pictureFrameCount; k++) {
+      pfLinearInches += 2 * (width - 2 * k * boardSpacing) + 2 * (depth - 2 * k * boardSpacing);
+    }
+  }
+
+  // Calculate divider linear inches
+  let divLinearInches = 0;
+  if (hasDivider) {
+    const divLen = runsVertical ? (width - 2 * frameWidth) : (depth - 2 * frameWidth);
+    divLinearInches = dividerCountNum * boardsPerDiv * divLen;
+  }
+
+  // Field decking area (subtracting picture frame and divider coverage)
+  const pfArea = pfLinearInches * deckBoardWidth;
+  const divArea = divLinearInches * deckBoardWidth;
+  const fieldArea = Math.max(0, safeAreaSqIn - pfArea - divArea);
+  
+  const fieldLinearIn = fieldArea / boardSpacing;
+  const totalLinearInNeeded = fieldLinearIn + pfLinearInches + divLinearInches;
 
   if (deckingOrientation === 'diagonal') {
     const maxDiagonal = Math.sqrt((width || 0) ** 2 + (depth || 0) ** 2) || 96;
     deckBoardLen = optimalBoardLength(maxDiagonal);
     const singleBoardLenIn = deckBoardLen * 12;
     const safeSingleBoardLenIn = singleBoardLenIn > 0 ? singleBoardLenIn : 96;
-    boardCount = Math.ceil((linearInchesNeeded * (wasteMultiplier + 0.10)) / safeSingleBoardLenIn);
+    boardCount = Math.ceil((totalLinearInNeeded / safeSingleBoardLenIn) * (wasteMultiplier + 0.10));
   } else {
-    const joistsVertical = (joistOrientation !== 'horizontal');
-    let boardRunIn;
-    if (joistsVertical) {
-      if (deckingOrientation === 'parallel') {
-        boardRunIn = depth;
-      } else { // perpendicular
-        boardRunIn = width;
-      }
-    } else { // joists horizontal
-      if (deckingOrientation === 'parallel') {
-        boardRunIn = width;
-      } else { // perpendicular
-        boardRunIn = depth;
-      }
-    }
-    deckBoardLen = optimalBoardLength(boardRunIn);
-    const safeBoardRunIn = boardRunIn > 0 ? boardRunIn : 96;
-    boardCount = Math.ceil((linearInchesNeeded / safeBoardRunIn) * wasteMultiplier);
+    let boardRunIn = runsVertical ? depth : width;
+    const minOrderLen = Math.max(width, depth, boardRunIn);
+    deckBoardLen = optimalBoardLength(minOrderLen);
+    const safeBoardRunIn = deckBoardLen * 12;
+    boardCount = Math.ceil((totalLinearInNeeded / safeBoardRunIn) * wasteMultiplier);
   }
 
   const deckingItem = {

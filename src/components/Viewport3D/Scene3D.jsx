@@ -24,12 +24,93 @@ export function getProceduralTexture(colorHex, type) {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  // Base fill
-  ctx.fillStyle = colorHex;
-  ctx.fillRect(0, 0, 512, 512);
-
-  if (type === 'composite') {
-    // Composite/PVC extrusion stripes
+  if (type === 'siding') {
+    const numSlats = 16;
+    const slatH = 512 / numSlats;
+    const baseColor = new THREE.Color(colorHex);
+    
+    for (let i = 0; i < numSlats; i++) {
+      const y = i * slatH;
+      // Draw linear gradient shadow for lap siding
+      const grad = ctx.getContext('2d').createLinearGradient(0, y, 0, y + slatH);
+      const colStart = baseColor.clone().multiplyScalar(1.05).getStyle();
+      const colMid = baseColor.getStyle();
+      const colEnd = baseColor.clone().multiplyScalar(0.85).getStyle();
+      
+      grad.addColorStop(0, colStart);
+      grad.addColorStop(0.15, colMid);
+      grad.addColorStop(0.85, colMid);
+      grad.addColorStop(1.0, colEnd);
+      
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, y, 512, slatH);
+      
+      // Bottom overlap shadow highlight line
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+      ctx.fillRect(0, y + slatH - 1.5, 512, 1.5);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(0, y, 512, 0.5);
+    }
+  } else if (type === 'shingles') {
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 512, 512);
+    
+    const rowH = 32;
+    const colW = 64;
+    for (let r = 0; r < 16; r++) {
+      const y = r * rowH;
+      const offset = (r % 2) * (colW / 2);
+      for (let c = -1; c < 9; c++) {
+        const x = c * colW + offset;
+        const factor = 1 - (Math.random() * 0.12 - 0.06);
+        const shColor = new THREE.Color(colorHex).multiplyScalar(factor);
+        
+        ctx.fillStyle = shColor.getStyle();
+        ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
+        
+        // Shadow lines
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(x, y + rowH - 1, colW, 1);
+        ctx.fillRect(x + colW - 1, y, 1, rowH);
+      }
+    }
+  } else if (type === 'grass') {
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 512, 512);
+    
+    // Draw fine grass blades
+    for (let i = 0; i < 18000; i++) {
+      const x = Math.random() * 512;
+      const y = Math.random() * 512;
+      const len = Math.random() * 3 + 2;
+      const angle = (Math.random() * 20 - 10) * Math.PI / 180;
+      
+      const greenVal = Math.floor(75 + Math.random() * 55);
+      const redVal = Math.floor(40 + Math.random() * 25);
+      ctx.strokeStyle = `rgb(${redVal}, ${greenVal}, 25)`;
+      ctx.lineWidth = 1;
+      
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len * Math.sin(angle), y - len * Math.cos(angle));
+      ctx.stroke();
+    }
+  } else if (type === 'concrete') {
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 512, 512);
+    
+    for (let i = 0; i < 6000; i++) {
+      const x = Math.random() * 512;
+      const y = Math.random() * 512;
+      const alpha = Math.random() * 0.08;
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+      ctx.fillRect(x, y, Math.random() * 2 + 1, Math.random() * 2 + 1);
+    }
+  } else if (type === 'composite') {
+    // Base fill
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 512, 512);
+    
     for (let i = 0; i < 4000; i++) {
       const x = Math.random() * 512;
       const y = Math.random() * 512;
@@ -37,46 +118,46 @@ export function getProceduralTexture(colorHex, type) {
       ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
       ctx.fillRect(x, y, 1, 1);
     }
+    
     ctx.strokeStyle = 'rgba(0,0,0,0.1)';
     ctx.lineWidth = 1;
     for (let y = 0; y < 512; y += 8) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
     }
+    
     ctx.strokeStyle = 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
     for (let y = 4; y < 512; y += 8) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(512, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
     }
   } else {
-    // Wood grain lines
-    for (let y = 0; y < 512; y += Math.random() * 3 + 1) {
-      const darkAlpha = Math.random() * 0.06;
-      ctx.fillStyle = `rgba(0,0,0,${darkAlpha})`;
-      ctx.fillRect(0, y, 512, Math.random() * 1.5 + 0.5);
+    // Base fill
+    ctx.fillStyle = colorHex;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Wood grain lines (including light/dark contrast lines)
+    for (let y = 0; y < 512; y += Math.random() * 4 + 2) {
+      const alpha = Math.random() * 0.05;
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha * 0.4})` : `rgba(0,0,0,${alpha})`;
+      ctx.fillRect(0, y, 512, Math.random() * 2 + 0.5);
     }
     
     // Wave growth rings
-    ctx.strokeStyle = 'rgba(0,0,0,0.04)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.035)';
+    ctx.lineWidth = 2.5;
     for (let i = 0; i < 8; i++) {
       const yOffset = i * 75 - 50;
       ctx.beginPath();
       ctx.moveTo(0, yOffset);
-      ctx.bezierCurveTo(128, yOffset + 35, 384, yOffset - 25, 512, yOffset + 15);
+      ctx.bezierCurveTo(128, yOffset + 30, 384, yOffset - 20, 512, yOffset + 10);
       ctx.stroke();
     }
 
     // Wood knot
     const knotX = 220;
     const knotY = 180;
-    ctx.fillStyle = 'rgba(0,0,0,0.06)';
-    ctx.strokeStyle = 'rgba(0,0,0,0.03)';
+    ctx.fillStyle = 'rgba(0,0,0,0.05)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.02)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.ellipse(knotX, knotY, 15, 8, 0.08, 0, 2 * Math.PI);
@@ -95,6 +176,43 @@ export function getProceduralTexture(colorHex, type) {
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(4, 4);
   texture.colorSpace = THREE.SRGBColorSpace;
+  textureCache[cacheKey] = texture;
+  return texture;
+}
+
+export function getProceduralBumpTexture(type) {
+  const cacheKey = `bump-${type}`;
+  if (textureCache[cacheKey]) {
+    return textureCache[cacheKey];
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, 256, 256);
+
+  if (type === 'wood') {
+    for (let y = 0; y < 256; y += Math.random() * 4 + 2) {
+      const isHigh = Math.random() > 0.5;
+      ctx.fillStyle = isHigh ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      ctx.fillRect(0, y, 256, Math.random() * 2 + 1);
+    }
+  } else if (type === 'composite') {
+    for (let y = 0; y < 256; y += 4) {
+      ctx.fillStyle = 'rgba(0,0,0,0.04)';
+      ctx.fillRect(0, y, 256, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.02)';
+      ctx.fillRect(0, y + 2, 256, 1);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
   textureCache[cacheKey] = texture;
   return texture;
 }
@@ -180,7 +298,7 @@ export function getVerticalIntersections(x, vertices) {
   return segments;
 }
 
-function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, deckBoardSize, joistOrientation, deckingOrientation }) {
+function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, deckBoardSize, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth }) {
   const getBoardColor = () => {
     const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
     const opt = opts.find(o => o.value === deckColor);
@@ -191,7 +309,8 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
   const texture = getProceduralTexture(color, type);
   const boardW = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.depth || 5.5;
   const boardH = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.width || 1.0;
-  const gap = 0.125;
+  const gap = typeof deckBoardGap === 'number' ? deckBoardGap : 0.125;
+  const boardSpacing = boardW + gap;
 
   const boards = useMemo(() => {
     if (!vertices || vertices.length === 0) return [];
@@ -199,13 +318,163 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
     const localVertices = vertices.map(v => ({ x: v.x - secX, y: v.y - secY }));
     const joistOrient = joistOrientation || 'vertical';
     const deckingOpt = deckingOrientation || 'perpendicular';
+    const pfCount = pictureFrame || 0;
+    const isFlipped = deckingFlipped === true;
 
     const arr = [];
+    
+    // 1. Picture Frame Boards
+    if (pfCount > 0) {
+      for (let k = 0; k < pfCount; k++) {
+        const insetMin = k * boardSpacing;
+        const insetMax = (k + 1) * boardSpacing;
+        const offset = k * boardSpacing + boardW / 2;
+
+        // North
+        arr.push({
+          id: `frame-n-${k}`,
+          posX: width / 2,
+          posZ: offset,
+          sizeX: width - 2 * insetMin,
+          sizeZ: boardW,
+          rotY: 0
+        });
+        // South
+        arr.push({
+          id: `frame-s-${k}`,
+          posX: width / 2,
+          posZ: depth - offset,
+          sizeX: width - 2 * insetMin,
+          sizeZ: boardW,
+          rotY: 0
+        });
+        // West
+        arr.push({
+          id: `frame-w-${k}`,
+          posX: offset,
+          posZ: depth / 2,
+          sizeX: boardW,
+          sizeZ: depth - 2 * insetMax,
+          rotY: 0
+        });
+        // East
+        arr.push({
+          id: `frame-e-${k}`,
+          posX: width - offset,
+          posZ: depth / 2,
+          sizeX: boardW,
+          sizeZ: depth - 2 * insetMax,
+          rotY: 0
+        });
+      }
+    }
+
+    // 2. Inner Field Area
+    const frameWidth = pfCount * boardSpacing;
+    const insetVertices = [
+      { x: frameWidth, y: frameWidth },
+      { x: width - frameWidth, y: frameWidth },
+      { x: width - frameWidth, y: depth - frameWidth },
+      { x: frameWidth, y: depth - frameWidth }
+    ];
+
+    // Determine decking line direction
+    const joistsVertical = (joistOrient !== 'horizontal');
+    let runsVertical = joistsVertical ? (deckingOpt === 'parallel') : (deckingOpt !== 'parallel');
+    if (isFlipped) {
+      runsVertical = !runsVertical;
+    }
+
+    // Decide if divider is present
+    const fieldW = width - 2 * frameWidth;
+    const fieldD = depth - 2 * frameWidth;
+    const span = runsVertical ? fieldD : fieldW;
+    
+    let dividerType = dividerCount !== undefined ? dividerCount : 'auto';
+    let N = 0;
+    if (dividerType === 'auto') {
+      N = span > 240 ? 1 : 0;
+    } else {
+      N = Number(dividerType || 0);
+    }
+
+    const boardsPerDiv = boardsPerDivider || 1;
+    const divWidth = boardsPerDiv * boardW + (boardsPerDiv > 1 ? gap : 0);
+
+    // 3. Draw Divider Boards
+    if (N > 0) {
+      for (let k = 0; k < N; k++) {
+        const divCenter = frameWidth + (span / (N + 1)) * (k + 1);
+        if (runsVertical) {
+          // Divider runs horizontal (E-W) centered at divCenter
+          if (boardsPerDiv === 1) {
+            arr.push({
+              id: `div-${k}-0`,
+              posX: width / 2,
+              posZ: divCenter,
+              sizeX: fieldW,
+              sizeZ: boardW,
+              rotY: 0
+            });
+          } else {
+            // Double divider
+            arr.push({
+              id: `div-${k}-0`,
+              posX: width / 2,
+              posZ: divCenter - boardSpacing / 2,
+              sizeX: fieldW,
+              sizeZ: boardW,
+              rotY: 0
+            });
+            arr.push({
+              id: `div-${k}-1`,
+              posX: width / 2,
+              posZ: divCenter + boardSpacing / 2,
+              sizeX: fieldW,
+              sizeZ: boardW,
+              rotY: 0
+            });
+          }
+        } else {
+          // Divider runs vertical (N-S) centered at divCenter
+          if (boardsPerDiv === 1) {
+            arr.push({
+              id: `div-${k}-0`,
+              posX: divCenter,
+              posZ: depth / 2,
+              sizeX: boardW,
+              sizeZ: fieldD,
+              rotY: 0
+            });
+          } else {
+            // Double divider
+            arr.push({
+              id: `div-${k}-0`,
+              posX: divCenter - boardSpacing / 2,
+              posZ: depth / 2,
+              sizeX: boardW,
+              sizeZ: fieldD,
+              rotY: 0
+            });
+            arr.push({
+              id: `div-${k}-1`,
+              posX: divCenter + boardSpacing / 2,
+              posZ: depth / 2,
+              sizeX: boardW,
+              sizeZ: fieldD,
+              rotY: 0
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Generate Field Decking Boards
     if (deckingOpt === 'diagonal') {
-      const theta = Math.PI / 4;
+      const theta = isFlipped ? -Math.PI / 4 : Math.PI / 4;
       const cosNeg = Math.cos(-theta);
       const sinNeg = Math.sin(-theta);
-      const rotatedVertices = localVertices.map(v => ({
+      const rotatedVertices = insetVertices.map(v => ({
         x: v.x * cosNeg - v.y * sinNeg,
         y: v.x * sinNeg + v.y * cosNeg
       }));
@@ -229,7 +498,7 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
             const posX = rotatedCenterX * cosPos - rotatedCenterY * sinPos;
             const posZ = rotatedCenterX * sinPos + rotatedCenterY * cosPos;
             arr.push({
-              id: `${idx}-${sIdx}`,
+              id: `field-${idx}-${sIdx}`,
               posX,
               posZ,
               sizeX: boardLength,
@@ -238,74 +507,125 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
             });
           }
         });
-        y += boardW + gap;
+        y += boardSpacing;
         idx++;
       }
     } else {
-      const joistsVertical = (joistOrient !== 'horizontal');
-      const runsVertical = joistsVertical ? (deckingOpt === 'parallel') : (deckingOpt !== 'parallel');
-      
       if (runsVertical) {
-        const localXs = localVertices.map(v => v.x);
+        const localXs = insetVertices.map(v => v.x);
         const localMinX = Math.min(...localXs);
         const localMaxX = Math.max(...localXs);
         let x = localMinX, idx = 0;
         while (x < localMaxX) {
           const bw = Math.min(boardW, localMaxX - x);
           const boardCenterX = x + bw / 2;
-          const segments = getVerticalIntersections(boardCenterX, localVertices);
+          const segments = getVerticalIntersections(boardCenterX, insetVertices);
           segments.forEach((seg, sIdx) => {
-            const boardHeight = seg.endY - seg.startY;
-            if (boardHeight > 0.5) {
-              arr.push({
-                id: `${idx}-${sIdx}`,
-                posX: boardCenterX,
-                posZ: seg.startY + boardHeight / 2,
-                sizeX: bw,
-                sizeZ: boardHeight,
-                rotY: 0
+            // Apply divider splitting progressively
+            let currentSegments = [seg];
+            for (let k = 0; k < N; k++) {
+              const divCenter = frameWidth + (span / (N + 1)) * (k + 1);
+              const divMinY = divCenter - divWidth / 2;
+              const divMaxY = divCenter + divWidth / 2;
+
+              const nextSegments = [];
+              currentSegments.forEach((s) => {
+                if (s.endY <= divMinY) {
+                  nextSegments.push(s);
+                } else if (s.startY >= divMaxY) {
+                  nextSegments.push(s);
+                } else {
+                  if (divMinY - s.startY > 0.5) nextSegments.push({ startY: s.startY, endY: divMinY });
+                  if (s.endY - divMaxY > 0.5) nextSegments.push({ startY: divMaxY, endY: s.endY });
+                }
               });
+              currentSegments = nextSegments;
             }
+
+            currentSegments.forEach((sub, subIdx) => {
+              const boardHeight = sub.endY - sub.startY;
+              if (boardHeight > 0.5) {
+                arr.push({
+                  id: `field-${idx}-${sIdx}-${subIdx}`,
+                  posX: boardCenterX,
+                  posZ: sub.startY + boardHeight / 2,
+                  sizeX: bw,
+                  sizeZ: boardHeight,
+                  rotY: 0
+                });
+              }
+            });
           });
-          x += boardW + gap;
+          x += boardSpacing;
           idx++;
         }
       } else {
-        const localYs = localVertices.map(v => v.y);
+        const localYs = insetVertices.map(v => v.y);
         const localMinY = Math.min(...localYs);
         const localMaxY = Math.max(...localYs);
         let y = localMinY, idx = 0;
         while (y < localMaxY) {
           const bw = Math.min(boardW, localMaxY - y);
           const boardCenterY = y + bw / 2;
-          const segments = getHorizontalIntersections(boardCenterY, localVertices);
+          const segments = getHorizontalIntersections(boardCenterY, insetVertices);
           segments.forEach((seg, sIdx) => {
-            const boardWidth = seg.endX - seg.startX;
-            if (boardWidth > 0.5) {
-              arr.push({
-                id: `${idx}-${sIdx}`,
-                posX: seg.startX + boardWidth / 2,
-                posZ: boardCenterY,
-                sizeX: boardWidth,
-                sizeZ: bw,
-                rotY: 0
+            // Apply divider splitting progressively
+            let currentSegments = [seg];
+            for (let k = 0; k < N; k++) {
+              const divCenter = frameWidth + (span / (N + 1)) * (k + 1);
+              const divMinX = divCenter - divWidth / 2;
+              const divMaxX = divCenter + divWidth / 2;
+
+              const nextSegments = [];
+              currentSegments.forEach((s) => {
+                if (s.endX <= divMinX) {
+                  nextSegments.push(s);
+                } else if (s.startX >= divMaxX) {
+                  nextSegments.push(s);
+                } else {
+                  if (divMinX - s.startX > 0.5) nextSegments.push({ startX: s.startX, endX: divMinX });
+                  if (s.endX - divMaxX > 0.5) nextSegments.push({ startX: divMaxX, endX: s.endX });
+                }
               });
+              currentSegments = nextSegments;
             }
+
+            currentSegments.forEach((sub, subIdx) => {
+              const boardWidth = sub.endX - sub.startX;
+              if (boardWidth > 0.5) {
+                arr.push({
+                  id: `field-${idx}-${sIdx}-${subIdx}`,
+                  posX: sub.startX + boardWidth / 2,
+                  posZ: boardCenterY,
+                  sizeX: boardWidth,
+                  sizeZ: bw,
+                  rotY: 0
+                });
+              }
+            });
           });
-          y += boardW + gap;
+          y += boardSpacing;
           idx++;
         }
       }
     }
     return arr;
-  }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation]);
+  }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth]);
+
+  const bumpTexture = getProceduralBumpTexture(type);
 
   return (
     <group>
       {boards.map(({ id, posX, posZ, sizeX, sizeZ, rotY }) => (
         <mesh key={`board-${id}`} position={[posX * IN, boardH / 2 * IN, posZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
           <boxGeometry args={[sizeX * IN, boardH * IN, sizeZ * IN]} />
-          <meshStandardMaterial map={texture} roughness={type === 'composite' ? 0.8 : 0.65} metalness={0.03} />
+          <meshStandardMaterial 
+            map={texture} 
+            bumpMap={bumpTexture}
+            bumpScale={0.012}
+            roughness={type === 'composite' ? 0.85 : 0.6} 
+            metalness={0.02} 
+          />
         </mesh>
       ))}
     </group>
@@ -904,17 +1224,119 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
   );
 }
 
-function HouseWall({ width, height }) {
-  // height is the deck height (e.g. 36 inches)
-  // We want the wall to extend 96 inches (8 feet) above the deck, and go all the way down to the ground.
-  const wallHeightAboveDeck = 96;
+function House({ width, height }) {
+  const wallHeightAboveDeck = 96; // 8 feet
   const totalWallHeight = height + wallHeightAboveDeck;
   const wallThick = 6;
+  
+  const sidingTexture = getProceduralTexture('#cbd5e1', 'siding');
+  const shingleTexture = getProceduralTexture('#2f3640', 'shingles');
+  const concreteTexture = getProceduralTexture('#b2bec3', 'concrete');
+  
+  // Apply texture wrap settings
+  sidingTexture.repeat.set(1.5, totalWallHeight / 64);
+  shingleTexture.repeat.set(2, 1);
+  
   return (
-    <mesh position={[width / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -wallThick / 2 * IN]}>
-      <boxGeometry args={[(width + 24) * IN, totalWallHeight * IN, wallThick * IN]} />
-      <meshStandardMaterial color="#3a3a4a" roughness={0.9} metalness={0.05} />
-    </mesh>
+    <group position={[width / 2 * IN, 0, 0]}>
+      {/* 1. Main Siding Wall */}
+      <mesh position={[0, (wallHeightAboveDeck - height) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
+        <boxGeometry args={[(width + 36) * IN, totalWallHeight * IN, wallThick * IN]} />
+        <meshStandardMaterial map={sidingTexture} roughness={0.8} />
+      </mesh>
+
+      {/* 2. Concrete Foundation Base (below the deck floor level) */}
+      <mesh position={[0, -height / 2 * IN, -(wallThick - 0.5) / 2 * IN]} castShadow receiveShadow>
+        <boxGeometry args={[(width + 36) * IN, height * IN, (wallThick - 0.5) * IN]} />
+        <meshStandardMaterial map={concreteTexture} roughness={0.9} />
+      </mesh>
+
+      {/* 3. Vertical White Corner Trim */}
+      <mesh position={[-(width + 36.5) / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -2.5 * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} />
+      </mesh>
+      <mesh position={[(width + 36.5) / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -2.5 * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} />
+      </mesh>
+
+      {/* 4. Sliding Glass Patio Door (Centered at deck level) */}
+      <group position={[0, 42 * IN, 0.1 * IN]}>
+        <mesh castShadow>
+          <boxGeometry args={[74 * IN, 82 * IN, 3 * IN]} />
+          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+        </mesh>
+        <mesh position={[-16 * IN, 0, 0.5 * IN]}>
+          <boxGeometry args={[32 * IN, 76 * IN, 0.5 * IN]} />
+          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
+        </mesh>
+        <mesh position={[16 * IN, 0, 0.2 * IN]}>
+          <boxGeometry args={[32 * IN, 76 * IN, 0.5 * IN]} />
+          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
+        </mesh>
+        {/* White outline highlights */}
+        <mesh position={[-16 * IN, 0, 0.8 * IN]}>
+          <boxGeometry args={[32 * IN, 76 * IN, 0.1 * IN]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.5} wireframe={true} />
+        </mesh>
+        <mesh position={[16 * IN, 0, 0.5 * IN]}>
+          <boxGeometry args={[32 * IN, 76 * IN, 0.1 * IN]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.5} wireframe={true} />
+        </mesh>
+      </group>
+
+      {/* 5. Flanking Windows (Left and Right of the Door) */}
+      {width > 120 && (
+        <>
+          <group position={[-Math.max(48, width / 3.2) * IN, 48 * IN, 0.1 * IN]}>
+            <mesh castShadow>
+              <boxGeometry args={[38 * IN, 54 * IN, 2.5 * IN]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 0, 0.4 * IN]}>
+              <boxGeometry args={[32 * IN, 48 * IN, 0.5 * IN]} />
+              <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
+            </mesh>
+            <mesh position={[0, 0, 0.7 * IN]}>
+              <boxGeometry args={[32 * IN, 2 * IN, 0.2 * IN]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.4} />
+            </mesh>
+          </group>
+
+          <group position={[Math.max(48, width / 3.2) * IN, 48 * IN, 0.1 * IN]}>
+            <mesh castShadow>
+              <boxGeometry args={[38 * IN, 54 * IN, 2.5 * IN]} />
+              <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+            </mesh>
+            <mesh position={[0, 0, 0.4 * IN]}>
+              <boxGeometry args={[32 * IN, 48 * IN, 0.5 * IN]} />
+              <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
+            </mesh>
+            <mesh position={[0, 0, 0.7 * IN]}>
+              <boxGeometry args={[32 * IN, 2 * IN, 0.2 * IN]} />
+              <meshStandardMaterial color="#ffffff" roughness={0.4} />
+            </mesh>
+          </group>
+        </>
+      )}
+
+      {/* 6. Gabled Roof Overhang (above the wall, Y = wallHeightAboveDeck) */}
+      <group position={[0, wallHeightAboveDeck * IN, 0]}>
+        <mesh position={[0, 12 * IN, -30 * IN]} rotation={[-18 * Math.PI / 180, 0, 0]} castShadow>
+          <boxGeometry args={[(width + 42) * IN, 1 * IN, 84 * IN]} />
+          <meshStandardMaterial map={shingleTexture} roughness={0.95} />
+        </mesh>
+        <mesh position={[0, -0.5 * IN, 6 * IN]} castShadow>
+          <boxGeometry args={[(width + 40) * IN, 1 * IN, 12 * IN]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, -1.5 * IN, 12.2 * IN]} castShadow>
+          <boxGeometry args={[(width + 40.5) * IN, 4 * IN, 0.5 * IN]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.5} />
+        </mesh>
+      </group>
+    </group>
   );
 }
 
@@ -922,14 +1344,16 @@ function GroundPlane({ heightAxis }) {
   const theme = useDeckStore((s) => s.theme);
   const isLightTheme = theme === 'light';
 
-  const groundColor = isLightTheme ? '#2d5a27' : '#1a3a1a';
+  const groundColor = isLightTheme ? '#2d5a27' : '#173614';
+  const grassTexture = getProceduralTexture(groundColor, 'grass');
+  grassTexture.repeat.set(24, 24);
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
-      <planeGeometry args={[100, 100]} />
+      <planeGeometry args={[120, 120]} />
       <meshStandardMaterial 
-        color={groundColor} 
-        roughness={1} 
+        map={grassTexture}
+        roughness={1.0} 
         transparent={heightAxis < 0}
         opacity={heightAxis < 0 ? 0.3 : 1.0}
       />
@@ -1036,9 +1460,13 @@ export default function Scene3D() {
 
   const cameraTarget = useMemo(() => [bounds.cx * IN, 0, bounds.cz * IN], [bounds]);
 
+  const shadowCamSize = useMemo(() => {
+    return Math.max(20, Math.max(bounds.w, bounds.d) * IN * 1.2);
+  }, [bounds]);
+
   return (
     <div className="scene3d-container">
-      <Canvas shadows>
+      <Canvas shadows onCreated={({ gl }) => { gl.shadowMap.type = THREE.PCFSoftShadowMap; }}>
         <PerspectiveCamera
           makeDefault
           position={[
@@ -1077,6 +1505,13 @@ export default function Scene3D() {
           castShadow 
           shadow-mapSize-width={2048} 
           shadow-mapSize-height={2048} 
+          shadow-bias={-0.0004}
+          shadow-camera-left={-shadowCamSize}
+          shadow-camera-right={shadowCamSize}
+          shadow-camera-top={shadowCamSize}
+          shadow-camera-bottom={-shadowCamSize}
+          shadow-camera-near={0.1}
+          shadow-camera-far={150}
         />
         
         {fillIntensity > 0 && (
@@ -1112,6 +1547,14 @@ export default function Scene3D() {
                   deckBoardSize={materials.deckBoardSize} 
                   joistOrientation={sec.joistOrientation} 
                   deckingOrientation={sec.deckingOrientation} 
+                  pictureFrame={sec.pictureFrame}
+                  dividerCount={sec.dividerCount}
+                  boardsPerDivider={sec.boardsPerDivider}
+                  deckingFlipped={sec.deckingFlipped}
+                  deckingLayout={sec.deckingLayout}
+                  deckBoardGap={sec.deckBoardGap}
+                  width={sec.width}
+                  depth={sec.depth}
                 />
               )}
               {visibleLayers.framing && (
@@ -1168,7 +1611,7 @@ export default function Scene3D() {
                   />
                 </>
               )}
-              {sec.ledgerAttached && <HouseWall width={sec.width} height={sec.height} />}
+              {sec.ledgerAttached && <House width={sec.width} height={sec.height} />}
             </group>
           );
         })}

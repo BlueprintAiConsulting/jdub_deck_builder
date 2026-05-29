@@ -2405,6 +2405,45 @@ test('52. underground concrete footers and wood blocking calculations', () => {
   assert.strictEqual(state.sections[0].footerWidth, 18, 'footerWidth should update to 18');
 });
 
+test('53. decking layout, picture framing, and divider configurations', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // Add a section
+  store.getState().addSection({ x: 0, y: 0, width: 144, depth: 144 }, 'deck');
+  let state = store.getState();
+  const sec = state.sections[0];
+
+  // 1. Assert default layout options
+  assert.strictEqual(sec.pictureFrame, 0, 'Default pictureFrame should be 0');
+  assert.strictEqual(sec.dividerCount, 'auto', 'Default dividerCount should be auto');
+  assert.strictEqual(sec.boardsPerDivider, 1, 'Default boardsPerDivider should be 1');
+  assert.strictEqual(sec.deckingLayout, 'straight', 'Default deckingLayout should be straight');
+  assert.strictEqual(sec.deckBoardOverhang, 1, 'Default deckBoardOverhang should be 1');
+  assert.strictEqual(sec.deckBoardGap, 0.125, 'Default deckBoardGap should be 0.125');
+
+  // 2. Perform updates
+  store.getState().updateDeck({
+    pictureFrame: 2,
+    dividerCount: 2,
+    boardsPerDivider: 2,
+    deckingLayout: 'diagonal-up',
+    deckBoardOverhang: 1.5,
+    deckBoardGap: 0.25
+  });
+
+  state = store.getState();
+  const updatedSec = state.sections[0];
+
+  // 3. Assert updated values in the store
+  assert.strictEqual(updatedSec.pictureFrame, 2, 'pictureFrame should update to 2');
+  assert.strictEqual(updatedSec.dividerCount, 2, 'dividerCount should update to 2');
+  assert.strictEqual(updatedSec.boardsPerDivider, 2, 'boardsPerDivider should update to 2');
+  assert.strictEqual(updatedSec.deckingLayout, 'diagonal-up', 'deckingLayout should update to diagonal-up');
+  assert.strictEqual(updatedSec.deckBoardOverhang, 1.5, 'deckBoardOverhang should update to 1.5');
+  assert.strictEqual(updatedSec.deckBoardGap, 0.25, 'deckBoardGap should update to 0.25');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

@@ -987,6 +987,8 @@ export default function Canvas2D({ isMobile }) {
 
           const deckingOpt = sec.deckingOrientation || 'perpendicular';
           const joistsVertical = (sec.joistOrientation !== 'horizontal');
+          const pictureFrame = sec.pictureFrame || 0;
+          const isFlipped = sec.deckingFlipped === true;
           
           let drawMode = 'horizontal';
           if (deckingOpt === 'diagonal') {
@@ -998,23 +1000,179 @@ export default function Canvas2D({ isMobile }) {
               drawMode = (deckingOpt === 'parallel') ? 'horizontal' : 'vertical';
             }
           }
+          if (isFlipped) {
+            if (drawMode === 'horizontal') drawMode = 'vertical';
+            else if (drawMode === 'vertical') drawMode = 'horizontal';
+          }
 
+          // 1. Draw Picture Frame Borders
+          const frameWidth = pictureFrame * (bw + gap);
+          if (pictureFrame > 0) {
+            ctx.save();
+            ctx.lineWidth = 0.75;
+            for (let k = 0; k < pictureFrame; k++) {
+              const offset = k * (bw + gap);
+              ctx.beginPath();
+              ctx.rect(minX + offset, minY + offset, (maxX - minX) - 2 * offset, (maxY - minY) - 2 * offset);
+              ctx.stroke();
+            }
+            ctx.restore();
+          }
+
+          // Define inner field bounds
+          const fMinX = minX + frameWidth;
+          const fMaxX = maxX - frameWidth;
+          const fMinY = minY + frameWidth;
+          const fMaxY = maxY - frameWidth;
+          const fieldW = fMaxX - fMinX;
+          const fieldD = fMaxY - fMinY;
+
+          // Decide if divider is present
+          const span = drawMode === 'vertical' ? fieldD : fieldW;
+          const spanIn = span / S;
+          
+          let divCountVal = sec.dividerCount;
+          let hasDivider = false;
+          let dividerCountNum = 0;
+          if (divCountVal === 'auto' || divCountVal === undefined) {
+            if (spanIn > 240) {
+              hasDivider = true;
+              dividerCountNum = 1;
+            }
+          } else {
+            const num = Number(divCountVal);
+            if (num > 0) {
+              hasDivider = true;
+              dividerCountNum = num;
+            }
+          }
+
+          const boardsPerDiv = sec.boardsPerDivider || 1;
+          const divWidth = boardsPerDiv * bw + (boardsPerDiv > 1 ? gap : 0);
+
+          // 2. Draw Divider lines
+          if (hasDivider) {
+            ctx.save();
+            ctx.lineWidth = 0.75;
+            for (let k = 0; k < dividerCountNum; k++) {
+              const divCenter = (drawMode === 'horizontal')
+                ? fMinX + (fieldW / (dividerCountNum + 1)) * (k + 1)
+                : fMinY + (fieldD / (dividerCountNum + 1)) * (k + 1);
+
+              const divMin = divCenter - divWidth / 2;
+              const divMax = divCenter + divWidth / 2;
+
+              if (drawMode === 'horizontal') {
+                // Divider is vertical (runs N-S)
+                ctx.beginPath();
+                ctx.moveTo(divMin, fMinY); ctx.lineTo(divMin, fMaxY);
+                ctx.moveTo(divMax, fMinY); ctx.lineTo(divMax, fMaxY);
+                if (boardsPerDiv === 2) {
+                  ctx.moveTo(divCenter, fMinY); ctx.lineTo(divCenter, fMaxY);
+                }
+                ctx.stroke();
+              } else if (drawMode === 'vertical') {
+                // Divider is horizontal (runs E-W)
+                ctx.beginPath();
+                ctx.moveTo(fMinX, divMin); ctx.lineTo(fMaxX, divMin);
+                ctx.moveTo(fMinX, divMax); ctx.lineTo(fMaxX, divMax);
+                if (boardsPerDiv === 2) {
+                  ctx.moveTo(fMinX, divCenter); ctx.lineTo(fMaxX, divCenter);
+                }
+                ctx.stroke();
+              }
+            }
+            ctx.restore();
+          }
+
+          // 3. Draw Field Decking Lines
           if (drawMode === 'horizontal') {
-            for (let y = minY; y < maxY; y += bw + gap) {
-              ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
+            for (let y = fMinY + bw + gap; y < fMaxY - 1; y += bw + gap) {
+              ctx.beginPath();
+              if (hasDivider) {
+                // Split by multiple dividers
+                let segments = [{ start: fMinX, end: fMaxX }];
+                for (let k = 0; k < dividerCountNum; k++) {
+                  const divCenter = fMinX + (fieldW / (dividerCountNum + 1)) * (k + 1);
+                  const divMin = divCenter - divWidth / 2;
+                  const divMax = divCenter + divWidth / 2;
+
+                  const nextSegments = [];
+                  segments.forEach((seg) => {
+                    if (seg.end <= divMin) {
+                      nextSegments.push(seg);
+                    } else if (seg.start >= divMax) {
+                      nextSegments.push(seg);
+                    } else {
+                      if (divMin - seg.start > 0.5) nextSegments.push({ start: seg.start, end: divMin });
+                      if (seg.end - divMax > 0.5) nextSegments.push({ start: divMax, end: seg.end });
+                    }
+                  });
+                  segments = nextSegments;
+                }
+                segments.forEach((seg) => {
+                  ctx.moveTo(seg.start, y);
+                  ctx.lineTo(seg.end, y);
+                });
+              } else {
+                ctx.moveTo(fMinX, y);
+                ctx.lineTo(fMaxX, y);
+              }
+              ctx.stroke();
             }
           } else if (drawMode === 'vertical') {
-            for (let x = minX; x < maxX; x += bw + gap) {
-              ctx.beginPath(); ctx.moveTo(x, minY); ctx.lineTo(x, maxY); ctx.stroke();
+            for (let x = fMinX + bw + gap; x < fMaxX - 1; x += bw + gap) {
+              ctx.beginPath();
+              if (hasDivider) {
+                // Split by multiple dividers
+                let segments = [{ start: fMinY, end: fMaxY }];
+                for (let k = 0; k < dividerCountNum; k++) {
+                  const divCenter = fMinY + (fieldD / (dividerCountNum + 1)) * (k + 1);
+                  const divMin = divCenter - divWidth / 2;
+                  const divMax = divCenter + divWidth / 2;
+
+                  const nextSegments = [];
+                  segments.forEach((seg) => {
+                    if (seg.end <= divMin) {
+                      nextSegments.push(seg);
+                    } else if (seg.start >= divMax) {
+                      nextSegments.push(seg);
+                    } else {
+                      if (divMin - seg.start > 0.5) nextSegments.push({ start: seg.start, end: divMin });
+                      if (seg.end - divMax > 0.5) nextSegments.push({ start: divMax, end: seg.end });
+                    }
+                  });
+                  segments = nextSegments;
+                }
+                segments.forEach((seg) => {
+                  ctx.moveTo(x, seg.start);
+                  ctx.lineTo(x, seg.end);
+                });
+              } else {
+                ctx.moveTo(x, fMinY);
+                ctx.lineTo(x, fMaxY);
+              }
+              ctx.stroke();
             }
           } else if (drawMode === 'diagonal') {
             const step = (bw + gap) * Math.sqrt(2);
-            for (let offset = minX + minY - (maxX - minX); offset < maxX + maxY + (maxX - minX); offset += step) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(fMinX, fMinY, fMaxX - fMinX, fMaxY - fMinY);
+            ctx.clip();
+            
+            for (let offset = fMinX + fMinY - (fMaxX - fMinX); offset < fMaxX + fMaxY + (fMaxX - fMinX); offset += step) {
               ctx.beginPath();
-              ctx.moveTo(minX, offset - minX);
-              ctx.lineTo(maxX, offset - maxX);
+              if (isFlipped) {
+                ctx.moveTo(fMinX, offset - (fMaxX - fMinX));
+                ctx.lineTo(fMaxX, offset - (fMinX - fMinX)); 
+              } else {
+                ctx.moveTo(fMinX, offset - fMinX);
+                ctx.lineTo(fMaxX, offset - fMaxX);
+              }
               ctx.stroke();
             }
+            ctx.restore();
           }
           ctx.restore();
         }
@@ -1896,60 +2054,318 @@ export default function Canvas2D({ isMobile }) {
   };
 
   const renderLayoutTab = (selectedSec) => {
+    // Resolve Layout Mode
+    const layout = selectedSec.deckingLayout || 'straight';
+    
+    // Stepper help values
+    const pictureFrameValue = selectedSec.pictureFrame || 0;
+    
+    // Resolve divider auto details
+    const joistsVertical = (selectedSec.joistOrientation !== 'horizontal');
+    const deckingOpt = selectedSec.deckingOrientation || 'perpendicular';
+    const isFlipped = selectedSec.deckingFlipped === true;
+    let runsVertical = joistsVertical ? (deckingOpt === 'parallel') : (deckingOpt !== 'parallel');
+    if (isFlipped) runsVertical = !runsVertical;
+    const gap = selectedSec.deckBoardGap !== undefined ? selectedSec.deckBoardGap : 0.125;
+    const frameWidth = pictureFrameValue * (5.5 + gap);
+    const span = runsVertical ? (selectedSec.depth - 2 * frameWidth) : (selectedSec.width - 2 * frameWidth);
+    const spanIn = span;
+    
+    let isDivAuto = selectedSec.dividerCount === 'auto' || selectedSec.dividerCount === undefined;
+    let resolvedDivCount = 0;
+    if (isDivAuto) {
+      resolvedDivCount = spanIn > 240 ? 1 : 0;
+    } else {
+      resolvedDivCount = Number(selectedSec.dividerCount);
+    }
+    
+    const boardsPerDiv = selectedSec.boardsPerDivider || 1;
+    const showToast = useDeckStore.getState().showToast;
+    
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div className="settings-field">
-          <label className="settings-label">Width (inches)</label>
-          <input
-            className="settings-input"
-            type="number"
-            min="36"
-            max="480"
-            value={selectedSec.width}
-            onChange={(e) => {
-              const val = Math.max(36, Math.min(480, Number(e.target.value)));
-              updateDeck({ width: val });
-            }}
-          />
+      <div className="layout-tab-container" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* Section 1: Deck Board Layout */}
+        <div className="settings-section">
+          <div className="settings-section-title" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Deck Board Layout</div>
+          <div className="layout-cards" style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
+            {/* Straight Card */}
+            <div 
+              className={`layout-card ${layout === 'straight' ? 'layout-card--active' : ''}`}
+              onClick={() => updateDeck({ 
+                deckingLayout: 'straight', 
+                deckingOrientation: 'perpendicular', 
+                deckingFlipped: false 
+              })}
+            >
+              {layout === 'straight' && <div className="layout-card__check-badge">✓</div>}
+              <div className="layout-card__preview">
+                <svg width="50" height="50" viewBox="0 0 60 60">
+                  <rect width="60" height="60" rx="6" fill="#f5d793" stroke="#e0b863" strokeWidth="1" />
+                  <line x1="10" y1="0" x2="10" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="20" y1="0" x2="20" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="30" y1="0" x2="30" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="40" y1="0" x2="40" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="50" y1="0" x2="50" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <div className="layout-card__label">Straight</div>
+            </div>
+
+            {/* Diagonal Up Card */}
+            <div 
+              className={`layout-card ${layout === 'diagonal-up' ? 'layout-card--active' : ''}`}
+              onClick={() => updateDeck({ 
+                deckingLayout: 'diagonal-up', 
+                deckingOrientation: 'diagonal', 
+                deckingFlipped: false 
+              })}
+            >
+              {layout === 'diagonal-up' && <div className="layout-card__check-badge">✓</div>}
+              <div className="layout-card__preview">
+                <svg width="50" height="50" viewBox="0 0 60 60">
+                  <rect width="60" height="60" rx="6" fill="#f5d793" stroke="#e0b863" strokeWidth="1" />
+                  <line x1="-20" y1="40" x2="40" y2="-20" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="-10" y1="50" x2="50" y2="-10" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="0" y1="60" x2="60" y2="0" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="10" y1="70" x2="70" y2="10" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="20" y1="80" x2="80" y2="20" stroke="#8c6c39" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <div className="layout-card__label">Diagonal Up</div>
+            </div>
+
+            {/* Diagonal Down Card */}
+            <div 
+              className={`layout-card ${layout === 'diagonal-down' ? 'layout-card--active' : ''}`}
+              onClick={() => updateDeck({ 
+                deckingLayout: 'diagonal-down', 
+                deckingOrientation: 'diagonal', 
+                deckingFlipped: true 
+              })}
+            >
+              {layout === 'diagonal-down' && <div className="layout-card__check-badge">✓</div>}
+              <div className="layout-card__preview">
+                <svg width="50" height="50" viewBox="0 0 60 60">
+                  <rect width="60" height="60" rx="6" fill="#f5d793" stroke="#e0b863" strokeWidth="1" />
+                  <line x1="-20" y1="20" x2="40" y2="80" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="-10" y1="10" x2="50" y2="70" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="0" y1="0" x2="60" y2="60" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="10" y1="-10" x2="70" y2="50" stroke="#8c6c39" strokeWidth="1.5" />
+                  <line x1="20" y1="-20" x2="80" y2="40" stroke="#8c6c39" strokeWidth="1.5" />
+                </svg>
+              </div>
+              <div className="layout-card__label">Diagonal Down</div>
+            </div>
+          </div>
         </div>
-        <div className="settings-field">
-          <label className="settings-label">Depth (inches)</label>
-          <input
-            className="settings-input"
-            type="number"
-            min="36"
-            max="480"
-            value={selectedSec.depth}
-            onChange={(e) => {
-              const val = Math.max(36, Math.min(480, Number(e.target.value)));
-              updateDeck({ depth: val });
-            }}
-          />
+
+        {/* Section 2: Perimeter Boards */}
+        <div className="settings-section">
+          <div className="settings-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="help-icon" data-tooltip="Number of border boards running parallel to the deck perimeter.">?</div>
+              <span className="settings-label">Number Of Perimeter Boards</span>
+            </div>
+            <div className="stepper-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="stepper-buttons" style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', background: 'rgba(255, 255, 255, 0.08)' }}>
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ pictureFrame: Math.min(2, pictureFrameValue + 1) })}
+                  disabled={pictureFrameValue >= 2}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >+</button>
+                <div className="stepper-divider" style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ pictureFrame: Math.max(0, pictureFrameValue - 1) })}
+                  disabled={pictureFrameValue <= 0}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >−</button>
+              </div>
+              <span className="stepper-value" style={{ minWidth: '16px', textAlign: 'center', fontWeight: '600', color: '#3498db', fontSize: '14px' }}>{pictureFrameValue}</span>
+            </div>
+          </div>
         </div>
-        <div className="settings-field">
-          <label className="settings-label">Height (inches)</label>
-          <input
-            className="settings-input"
-            type="number"
-            min="12"
-            max="168"
-            value={selectedSec.height}
-            onChange={(e) => {
-              const val = Math.max(12, Math.min(168, Number(e.target.value)));
-              updateDeck({ height: val });
-            }}
-          />
+
+        {/* Section 3: Divider Boards */}
+        <div className="settings-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="settings-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="settings-label" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Divider Boards</span>
+            <div className="settings-section-actions" style={{ display: 'flex', gap: '6px' }}>
+              <button 
+                className="btn-sec-action btn-sec-action--edit" 
+                onClick={() => showToast("Divider placement mode enabled (mocked action).")}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '2px' }}>
+                  <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                edit
+              </button>
+              <button 
+                className="btn-sec-action btn-sec-action--reset" 
+                onClick={() => {
+                  updateDeck({ dividerCount: 'auto', boardsPerDivider: 1 });
+                  showToast("Divider board settings reset to Auto.");
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '2px' }}>
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+                reset
+              </button>
+            </div>
+          </div>
+
+          {/* Dividers Count Stepper */}
+          <div className="settings-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="help-icon" data-tooltip="Number of perpendicular boards crossing the deck span to divide boards.">?</div>
+              <span className="settings-label">Dividers Count</span>
+              {isDivAuto && <span className="auto-badge" style={{ fontSize: '9px', background: 'rgba(46, 204, 113, 0.15)', color: '#2ecc71', padding: '1px 4px', borderRadius: '3px', marginLeft: '4px' }}>Auto</span>}
+            </div>
+            <div className="stepper-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="stepper-buttons" style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', background: 'rgba(255, 255, 255, 0.08)' }}>
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ dividerCount: Math.min(5, resolvedDivCount + 1) })}
+                  disabled={resolvedDivCount >= 5}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >+</button>
+                <div className="stepper-divider" style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ dividerCount: Math.max(0, resolvedDivCount - 1) })}
+                  disabled={resolvedDivCount <= 0}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >−</button>
+              </div>
+              <span className="stepper-value" style={{ minWidth: '16px', textAlign: 'center', fontWeight: '600', color: '#3498db', fontSize: '14px' }}>{resolvedDivCount}</span>
+            </div>
+          </div>
+
+          {/* Boards Per Divider Stepper */}
+          <div className="settings-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="help-icon" data-tooltip="Number of boards comprising each perpendicular divider (single or double).">?</div>
+              <span className="settings-label">Boards Per Divider</span>
+            </div>
+            <div className="stepper-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="stepper-buttons" style={{ display: 'flex', borderRadius: '4px', overflow: 'hidden', background: 'rgba(255, 255, 255, 0.08)' }}>
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ boardsPerDivider: 2 })}
+                  disabled={boardsPerDiv >= 2}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >+</button>
+                <div className="stepper-divider" style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+                <button 
+                  className="stepper-btn" 
+                  onClick={() => updateDeck({ boardsPerDivider: 1 })}
+                  disabled={boardsPerDiv <= 1}
+                  style={{ width: '28px', height: '24px', background: '#ff9f43', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                >−</button>
+              </div>
+              <span className="stepper-value" style={{ minWidth: '16px', textAlign: 'center', fontWeight: '600', color: '#3498db', fontSize: '14px' }}>{boardsPerDiv}</span>
+            </div>
+          </div>
         </div>
-        <div className="settings-field">
-          <label className="settings-label">Section Type</label>
-          <select
-            value={selectedSec.type || 'deck'}
-            onChange={(e) => updateDeck({ type: e.target.value, ledgerAttached: e.target.value === 'landing' ? false : true })}
-            className="settings-select"
-          >
-            <option value="deck">Deck</option>
-            <option value="landing">Landing</option>
-          </select>
+
+        {/* Section 4: Other Settings */}
+        <div className="settings-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div className="settings-section-title" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Other Settings</div>
+
+          {/* Deck Board Overhang Select */}
+          <div className="settings-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="help-icon" data-tooltip="The distance deck boards extend past the outer rim joist framing.">?</div>
+              <span className="settings-label">Deck Board Overhang</span>
+            </div>
+            <select 
+              value={selectedSec.deckBoardOverhang !== undefined ? selectedSec.deckBoardOverhang : 1}
+              onChange={(e) => updateDeck({ deckBoardOverhang: Number(e.target.value) })}
+              className="blue-text-select"
+            >
+              <option value={0}>0" in</option>
+              <option value={0.5}>0 1/2" in</option>
+              <option value={1}>1" in</option>
+              <option value={1.5}>1 1/2" in</option>
+              <option value={2}>2" in</option>
+            </select>
+          </div>
+
+          {/* Space Between Boards Select */}
+          <div className="settings-row-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="settings-row-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div className="help-icon" data-tooltip="The physical spacing/gap left between adjacent field deck boards.">?</div>
+              <span className="settings-label">Space Between Boards</span>
+            </div>
+            <select 
+              value={selectedSec.deckBoardGap !== undefined ? selectedSec.deckBoardGap : 0.125}
+              onChange={(e) => updateDeck({ deckBoardGap: Number(e.target.value) })}
+              className="blue-text-select"
+            >
+              <option value={0}>0" in</option>
+              <option value={0.125}>0 1/8" in</option>
+              <option value={0.25}>0 1/4" in</option>
+              <option value={0.375}>0 3/8" in</option>
+              <option value={0.5}>0 1/2" in</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Section 5: Section Dimensions */}
+        <div className="settings-section" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px', marginTop: '4px' }}>
+          <div className="settings-section-title" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)' }}>Section Dimensions</div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
+            <div className="settings-field">
+              <label className="settings-label">Width (in)</label>
+              <input
+                className="settings-input"
+                type="number"
+                min="36"
+                max="480"
+                value={selectedSec.width}
+                onChange={(e) => updateDeck({ width: Math.max(36, Math.min(480, Number(e.target.value))) })}
+              />
+            </div>
+            <div className="settings-field">
+              <label className="settings-label">Depth (in)</label>
+              <input
+                className="settings-input"
+                type="number"
+                min="36"
+                max="480"
+                value={selectedSec.depth}
+                onChange={(e) => updateDeck({ depth: Math.max(36, Math.min(480, Number(e.target.value))) })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
+            <div className="settings-field">
+              <label className="settings-label">Height (in)</label>
+              <input
+                className="settings-input"
+                type="number"
+                min="12"
+                max="168"
+                value={selectedSec.height}
+                onChange={(e) => updateDeck({ height: Math.max(12, Math.min(168, Number(e.target.value))) })}
+              />
+            </div>
+            <div className="settings-field">
+              <label className="settings-label">Type</label>
+              <select
+                value={selectedSec.type || 'deck'}
+                onChange={(e) => updateDeck({ type: e.target.value, ledgerAttached: e.target.value === 'landing' ? false : true })}
+                className="settings-select"
+              >
+                <option value="deck">Deck</option>
+                <option value="landing">Landing</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     );

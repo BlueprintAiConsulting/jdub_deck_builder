@@ -666,6 +666,41 @@ export default function PropertiesPanel({ isMobile }) {
               swatch={DECK_MATERIAL_COLORS[deck.deckMaterial]}
             />
             <SelectField id="sel-decking-orient" label="Decking Direction" value={deck.deckingOrientation || 'perpendicular'} options={[{ value: 'perpendicular', label: 'Perpendicular to Joists' }, { value: 'parallel', label: 'Parallel to Joists' }, { value: 'diagonal', label: '45° Diagonal' }]} onChange={(v) => updateDeck({ deckingOrientation: v })} />
+            <SelectField 
+              id="sel-picture-frame" 
+              label="Picture Frame" 
+              value={deck.pictureFrame !== undefined ? deck.pictureFrame : 0} 
+              options={[
+                { value: 0, label: 'None' },
+                { value: 1, label: 'Single Board' },
+                { value: 2, label: 'Double Board' }
+              ]} 
+              onChange={(v) => updateDeck({ pictureFrame: Number(v) })} 
+            />
+            <SelectField 
+              id="sel-divider" 
+              label="Divider Board" 
+              value={deck.divider || 'auto'} 
+              options={[
+                { value: 'auto', label: 'Auto (Over 20ft)' },
+                { value: 'none', label: 'None' },
+                { value: 'single', label: 'Single Divider' },
+                { value: 'double', label: 'Double Divider' }
+              ]} 
+              onChange={(v) => updateDeck({ divider: v })} 
+            />
+            <div className="prop-field">
+              <label className="label">Flip Decking Direction</label>
+              <button
+                type="button"
+                className={`btn btn--ghost prop-toggle ${deck.deckingFlipped === true ? 'prop-toggle--on' : ''}`}
+                onClick={() => updateDeck({ deckingFlipped: !deck.deckingFlipped })}
+                aria-pressed={deck.deckingFlipped === true}
+                style={{ width: '100%' }}
+              >
+                {deck.deckingFlipped === true ? '✓ Flipped (90°/Opposite)' : '✗ Standard'}
+              </button>
+            </div>
             {DECK_COLOR_OPTIONS[deck.deckMaterial] && DECK_COLOR_OPTIONS[deck.deckMaterial].length > 1 && (
               <div className="prop-field">
                 <label className="label">Decking Color / Line</label>

@@ -128,6 +128,13 @@ function createSection(overrides = {}) {
     footerWidth: 12,
     blocking: true,
     blockingSpacing: 72,
+    pictureFrame: 0,
+    dividerCount: 'auto',
+    boardsPerDivider: 1,
+    deckingFlipped: false,
+    deckingLayout: 'straight',
+    deckBoardOverhang: 1,
+    deckBoardGap: 0.125,
   };
   const merged = { ...base, ...overrides };
   if (!merged.vertices) {
@@ -830,7 +837,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing', 'pictureFrame', 'divider', 'deckingFlipped', 'deckingLayout', 'dividerCount', 'boardsPerDivider', 'deckBoardOverhang', 'deckBoardGap'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -1006,6 +1013,13 @@ export const useDeckStore = create((set, get) => ({
         footerWidth: 12,
         blocking: true,
         blockingSpacing: 72,
+        pictureFrame: 0,
+        dividerCount: 'auto',
+        boardsPerDivider: 1,
+        deckingFlipped: false,
+        deckingLayout: 'straight',
+        deckBoardOverhang: 1,
+        deckBoardGap: 0.125,
         ...s,
         type,
         stairs: stairObj,
