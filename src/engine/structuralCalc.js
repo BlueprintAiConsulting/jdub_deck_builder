@@ -15,7 +15,7 @@ function getJoistSpanBucket(joistSpanFt) {
 }
 
 /** Calculate joist layout for a given deck */
-export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, joistOrientation = 'vertical', vertices = null, secX = 0, secY = 0) {
+export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, joistOrientation = 'vertical', vertices = null, secX = 0, secY = 0, blockingEnabled = true, blockingSpacing = 72) {
   const isHorizontal = joistOrientation === 'horizontal';
   const width = isHorizontal ? deckDepthIn : deckWidthIn;
   const depth = isHorizontal ? deckWidthIn : deckDepthIn;
@@ -61,6 +61,46 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
     }
   }
 
+  // Calculate blocking segments if enabled
+  const blockingSegments = [];
+  if (blockingEnabled && positions.length > 1) {
+    const spanLength = isHorizontal ? deckWidthIn : deckDepthIn;
+    const blockCoords = [];
+    for (let coord = blockingSpacing; coord < spanLength - 6; coord += blockingSpacing) {
+      blockCoords.push(coord);
+    }
+
+    blockCoords.forEach((bCoord) => {
+      for (let i = 0; i < positions.length - 1; i++) {
+        const p1 = positions[i];
+        const p2 = positions[i + 1];
+
+        let x1, y1, x2, y2;
+        if (isHorizontal) {
+          x1 = bCoord;
+          y1 = p1;
+          x2 = bCoord;
+          y2 = p2;
+        } else {
+          x1 = p1;
+          y1 = bCoord;
+          x2 = p2;
+          y2 = bCoord;
+        }
+
+        if (vertices && vertices.length >= 3) {
+          const midX = secX + (x1 + x2) / 2;
+          const midY = secY + (y1 + y2) / 2;
+          if (isPointInPolygon(midX, midY, vertices) || isPointOnPolygonBoundary({ x: midX, y: midY }, vertices)) {
+            blockingSegments.push({ x1, y1, x2, y2 });
+          }
+        } else {
+          blockingSegments.push({ x1, y1, x2, y2 });
+        }
+      }
+    });
+  }
+
   return {
     count: positions.length,
     length: joistLength,
@@ -69,6 +109,11 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
     needsInteriorBeam,
     actualDimensions: actual,
     positions,
+    blocking: {
+      enabled: blockingEnabled,
+      spacing: blockingSpacing,
+      segments: blockingSegments,
+    },
   };
 }
 
@@ -250,9 +295,11 @@ export function calculateRamp(totalRiseIn, rampOpt) {
 
 /** Run all structural calculations for a deck config */
 export function calculateAll(config) {
-  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback, postOffset, beamSpecies } = config;
+  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback, postOffset, beamSpecies, blocking, blockingSpacing } = config;
   const joistOrient = joistOrientation || 'vertical';
-  const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient, vertices, x, y);
+  const blockingEnabled = blocking !== false;
+  const blockingSp = blockingSpacing || 72;
+  const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient, vertices, x, y, blockingEnabled, blockingSp);
   
   const actualBeamSpecies = beamSpecies || species;
   const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback);

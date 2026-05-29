@@ -2350,6 +2350,61 @@ test('51. customizable support beam plies, sizes, species, and post offsets', ()
   );
 });
 
+test('52. underground concrete footers and wood blocking calculations', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // 1. Add a deck section
+  store.getState().addSection({ x: 0, y: 0, width: 192, depth: 144, beamSetback: 12 }, 'deck');
+  const secId = store.getState().sections[0].id;
+
+  let state = store.getState();
+  let calcs = state.sectionCalcs[secId];
+
+  // Verify default footer width and blocking settings
+  assert.strictEqual(state.sections[0].footerWidth, 12, 'Default footerWidth should be 12 inches');
+  assert.strictEqual(state.sections[0].blocking, true, 'Default blocking should be true');
+  assert.strictEqual(state.sections[0].blockingSpacing, 72, 'Default blockingSpacing should be 72 inches (6 ft)');
+
+  // Verify calculated blocking segments exist and are correctly placed
+  // For width 192, depth 144, joists run vertical (N-S).
+  // spanLength is 144. blockingSpacing is 72.
+  // blockCoords: [72] (since 72 < 144 - 6 = 138).
+  // Joist positions are typically spaced at 16" o.c.
+  // number of joists: 192 / 16 + 1 = 13.
+  // segments length should be 12.
+  assert.ok(calcs.joists.blocking, 'calcs.joists.blocking should be calculated');
+  assert.strictEqual(calcs.joists.blocking.enabled, true, 'blocking should be enabled in calcs');
+  assert.strictEqual(calcs.joists.blocking.segments.length, 12, 'should calculate 12 blocking segments');
+
+  // Verify each segment has correct coordinates running horizontally (y=72)
+  calcs.joists.blocking.segments.forEach((seg) => {
+    assert.strictEqual(seg.y1, 72, 'blocking piece start y should be 72');
+    assert.strictEqual(seg.y2, 72, 'blocking piece end y should be 72');
+    assert.strictEqual(seg.x2 - seg.x1, 16, 'blocking piece width should be equal to joist spacing');
+  });
+
+  // 2. Change blockingSpacing to 48 (4 ft)
+  store.getState().updateDeck({ blockingSpacing: 48 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  // blockCoords: [48, 96] (since 96 < 138).
+  // segments length should be 12 * 2 = 24.
+  assert.strictEqual(calcs.joists.blocking.segments.length, 24, 'should calculate 24 blocking segments for 4ft spacing');
+
+  // 3. Disable blocking
+  store.getState().updateDeck({ blocking: false });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.joists.blocking.enabled, false, 'blocking should be disabled in calcs');
+  assert.strictEqual(calcs.joists.blocking.segments.length, 0, 'should have 0 blocking segments when disabled');
+
+  // 4. Update footerWidth to 18
+  store.getState().updateDeck({ footerWidth: 18 });
+  state = store.getState();
+  assert.strictEqual(state.sections[0].footerWidth, 18, 'footerWidth should update to 18');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

@@ -142,6 +142,31 @@ export function generateBOM(config, calcs) {
   rimItem.totalPrice = rimItem.unitPrice * rimItem.quantity;
   items.push(rimItem);
 
+  // --- Blocking ---
+  if (joists.blocking && joists.blocking.enabled && joists.blocking.segments && joists.blocking.segments.length > 0) {
+    const segmentLengthIn = joists.spacing || 16;
+    const totalSegments = joists.blocking.segments.length;
+    const blockingBoardLen = 12; // 12' boards as standard for blocking
+    const piecesPerBoard = Math.floor((blockingBoardLen * 12) / segmentLengthIn);
+    const boardsNeeded = piecesPerBoard > 0 ? Math.ceil(totalSegments / piecesPerBoard) : 0;
+    
+    if (boardsNeeded > 0) {
+      const blockingItem = {
+        id: 'blocking',
+        category: 'Framing',
+        description: `${config.joistSize} × ${blockingBoardLen}' Blocking Lumber`,
+        size: config.joistSize,
+        length: blockingBoardLen,
+        quantity: Math.ceil(boardsNeeded * wasteMultiplier),
+        unit: 'ea',
+        material: config.species,
+      };
+      blockingItem.unitPrice = estimateUnitPrice(blockingItem, config.species, config.deckMaterial);
+      blockingItem.totalPrice = blockingItem.unitPrice * blockingItem.quantity;
+      items.push(blockingItem);
+    }
+  }
+
   // --- Beams ---
   // approximate for non-rectangular — bounding box layout
   const beamSpan = joistOrientation === 'horizontal' ? depth : width;

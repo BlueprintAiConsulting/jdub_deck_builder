@@ -376,6 +376,72 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
   );
 }
 
+function Blocking({ blocking, joistSize }) {
+  const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
+  const woodTexture = getProceduralTexture('#5a4d3b', 'wood');
+
+  if (!blocking || !blocking.enabled || !blocking.segments) return null;
+
+  return (
+    <group>
+      {blocking.segments.map((seg, i) => {
+        const dx = seg.x2 - seg.x1;
+        const dz = seg.y2 - seg.y1;
+        const len = Math.sqrt(dx * dx + dz * dz);
+        const posX = (seg.x1 + seg.x2) / 2;
+        const posZ = (seg.y1 + seg.y2) / 2;
+
+        const isHorizontal = Math.abs(dz) > Math.abs(dx);
+        const sizeX = isHorizontal ? actual.width : len;
+        const sizeZ = isHorizontal ? len : actual.width;
+
+        return (
+          <mesh 
+            key={`block-${i}`} 
+            position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} 
+            castShadow 
+            receiveShadow
+          >
+            <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
+            <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function Footers({ beamPositions, width, depth, joistOrientation, footerWidth, height }) {
+  const isHorizontal = joistOrientation === 'horizontal';
+  const fWidth = footerWidth || 12;
+  const fDepth = 12; // 12 inches deep concrete grade beam
+  const fColor = '#8a8a8a';
+  const yPos = -(height + 60 + fDepth / 2);
+  
+  return (
+    <group>
+      {beamPositions.map((coordIn, i) => {
+        const posX = isHorizontal ? coordIn * IN : (width / 2) * IN;
+        const posZ = isHorizontal ? (depth / 2) * IN : coordIn * IN;
+        const sizeX = isHorizontal ? fWidth * IN : width * IN;
+        const sizeZ = isHorizontal ? depth * IN : fWidth * IN;
+        
+        return (
+          <mesh 
+            key={`footer-${i}`} 
+            position={[posX, yPos * IN, posZ]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={[sizeX, fDepth * IN, sizeZ]} />
+            <meshStandardMaterial color={fColor} roughness={0.9} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
 function Posts({ posts, postSize, joistSize, beamConfig }) {
   const nominalWidth = postSize === '6x6' ? 5.5 : 3.5;
   const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
@@ -852,7 +918,7 @@ function HouseWall({ width, height }) {
   );
 }
 
-function GroundPlane() {
+function GroundPlane({ heightAxis }) {
   const theme = useDeckStore((s) => s.theme);
   const isLightTheme = theme === 'light';
 
@@ -861,7 +927,12 @@ function GroundPlane() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
       <planeGeometry args={[100, 100]} />
-      <meshStandardMaterial color={groundColor} roughness={1} />
+      <meshStandardMaterial 
+        color={groundColor} 
+        roughness={1} 
+        transparent={heightAxis < 0}
+        opacity={heightAxis < 0 ? 0.3 : 1.0}
+      />
     </mesh>
   );
 }
@@ -945,6 +1016,7 @@ export default function Scene3D() {
   
   const [viewType, setViewType] = useState(null);
   const [viewTrigger, setViewTrigger] = useState(0);
+  const [heightAxis, setHeightAxis] = useState(0);
   const controlsRef = useRef();
 
   const triggerView = (type) => {
@@ -1045,11 +1117,24 @@ export default function Scene3D() {
               {visibleLayers.framing && (
                 <>
                   <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+                  <Blocking blocking={calcs.joists.blocking} joistSize={materials.joistSize} />
                   <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
                 </>
               )}
               {visibleLayers.foundation && (
-                <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+                <>
+                  <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+                  {heightAxis < 0 && (
+                    <Footers 
+                      beamPositions={calcs.beams.positions} 
+                      width={sec.width} 
+                      depth={sec.depth} 
+                      joistOrientation={sec.joistOrientation} 
+                      footerWidth={sec.footerWidth}
+                      height={sec.height}
+                    />
+                  )}
+                </>
               )}
               {visibleLayers.accessories && (
                 <>
@@ -1088,7 +1173,7 @@ export default function Scene3D() {
           );
         })}
 
-        <GroundPlane />
+        <GroundPlane heightAxis={heightAxis} />
         
         <gridHelper 
           args={[
@@ -1115,6 +1200,23 @@ export default function Scene3D() {
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
           </svg>
         </button>
+        <div style={{ width: '1px', height: '14px', background: 'var(--border-default)', margin: '0 4px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)', padding: '0 4px' }}>
+          <span style={{ fontWeight: 600 }}>Height Axis:</span>
+          <input
+            id="height-axis-slider"
+            type="range"
+            min="-60"
+            max="0"
+            step="1"
+            value={heightAxis}
+            onChange={(e) => setHeightAxis(Number(e.target.value))}
+            style={{ width: '80px', accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
+          />
+          <span style={{ fontFamily: 'var(--font-mono)', minWidth: '36px', textAlign: 'right' }}>
+            {heightAxis === 0 ? 'Above' : `${heightAxis}"`}
+          </span>
+        </div>
       </div>
     </div>
   );

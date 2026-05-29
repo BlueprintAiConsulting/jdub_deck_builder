@@ -609,6 +609,43 @@ export default function PropertiesPanel({ isMobile }) {
               </div>
             </div>
             <SelectField id="sel-post-size" label="Post Size" value={deck.postSize} options={POST_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ postSize: v })} />
+            <SelectField 
+              id="sel-footer-width" 
+              label="Footer Width (in)" 
+              value={deck.footerWidth !== undefined ? deck.footerWidth : 12} 
+              options={[
+                { value: 12, label: '12"' },
+                { value: 15, label: '15"' },
+                { value: 18, label: '18"' },
+                { value: 24, label: '24"' }
+              ]} 
+              onChange={(v) => updateDeck({ footerWidth: Number(v) })} 
+            />
+            <div className="prop-field">
+              <label className="label">Add Blocking</label>
+              <button
+                type="button"
+                className={`btn btn--ghost prop-toggle ${deck.blocking !== false ? 'prop-toggle--on' : ''}`}
+                onClick={() => updateDeck({ blocking: deck.blocking === false ? true : false })}
+                aria-pressed={deck.blocking !== false}
+                style={{ width: '100%' }}
+              >
+                {deck.blocking !== false ? '✓ Enabled' : '✗ Disabled'}
+              </button>
+            </div>
+            {deck.blocking !== false && (
+              <SelectField
+                id="sel-blocking-spacing"
+                label="Blocking Spacing"
+                value={deck.blockingSpacing !== undefined ? deck.blockingSpacing : 72}
+                options={[
+                  { value: 48, label: '4 ft' },
+                  { value: 72, label: '6 ft (Default)' },
+                  { value: 96, label: '8 ft' },
+                ]}
+                onChange={(v) => updateDeck({ blockingSpacing: Number(v) })}
+              />
+            )}
           </CollapsibleSection>
 
           <div className="divider" />

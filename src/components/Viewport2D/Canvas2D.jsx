@@ -1055,6 +1055,18 @@ export default function Canvas2D({ isMobile }) {
           });
         }
 
+        // Blocking
+        if (calcs.joists.blocking && calcs.joists.blocking.enabled && calcs.joists.blocking.segments) {
+          ctx.strokeStyle = legendColors.joists;
+          ctx.lineWidth = 1.5;
+          calcs.joists.blocking.segments.forEach((seg) => {
+            ctx.beginPath();
+            ctx.moveTo(sx + seg.x1 * S, sy + seg.y1 * S);
+            ctx.lineTo(sx + seg.x2 * S, sy + seg.y2 * S);
+            ctx.stroke();
+          });
+        }
+
         // Beams
         ctx.strokeStyle = legendColors.beams;
         ctx.lineWidth = 3;
@@ -1702,6 +1714,31 @@ export default function Canvas2D({ isMobile }) {
             <option value="horizontal">Horizontal (E-W)</option>
           </select>
         </div>
+        <div className="settings-field">
+          <label className="settings-label">Blocking</label>
+          <select 
+            value={selectedSec.blocking !== false ? 'enabled' : 'disabled'} 
+            onChange={(e) => updateDeck({ blocking: e.target.value === 'enabled' })}
+            className="settings-select"
+          >
+            <option value="enabled">Enabled</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </div>
+        {selectedSec.blocking !== false && (
+          <div className="settings-field">
+            <label className="settings-label">Blocking Spacing</label>
+            <select 
+              value={selectedSec.blockingSpacing !== undefined ? selectedSec.blockingSpacing : 72} 
+              onChange={(e) => updateDeck({ blockingSpacing: Number(e.target.value) })}
+              className="settings-select"
+            >
+              <option value={48}>4 ft</option>
+              <option value={72}>6 ft (Default)</option>
+              <option value={96}>8 ft</option>
+            </select>
+          </div>
+        )}
       </div>
     );
   };
@@ -1823,6 +1860,21 @@ export default function Canvas2D({ isMobile }) {
             />
             <span className="unit-label">" in</span>
           </div>
+        </div>
+
+        <div className="settings-field-row">
+          <label className="settings-label">Footer Width</label>
+          <select 
+            value={selectedSec.footerWidth || 12} 
+            onChange={(e) => updateDeck({ footerWidth: Number(e.target.value) })}
+            className="settings-select"
+            style={{ width: '160px' }}
+          >
+            <option value={12}>12"</option>
+            <option value={15}>15"</option>
+            <option value={18}>18"</option>
+            <option value={24}>24"</option>
+          </select>
         </div>
 
         <button 

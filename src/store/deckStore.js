@@ -125,6 +125,9 @@ function createSection(overrides = {}) {
     beamSpecies: 'SYP',
     beamGrade: 'Grade #2',
     postOffset: 6,
+    footerWidth: 12,
+    blocking: true,
+    blockingSpacing: 72,
   };
   const merged = { ...base, ...overrides };
   if (!merged.vertices) {
@@ -226,6 +229,8 @@ function recalculateSection(section, materials, allSections = []) {
     beamSetback: section.beamSetback !== undefined ? section.beamSetback : 12,
     postOffset: section.postOffset !== undefined ? section.postOffset : 6,
     beamSpecies: section.beamSpecies || materials.species || 'SYP',
+    blocking: section.blocking !== false,
+    blockingSpacing: section.blockingSpacing || 72,
   });
   if (calcs.ramp && rampObj) {
     calcs.ramp.doesNotFit = doesRampOverlap(section, calcs.ramp, allSections);
@@ -825,7 +830,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -998,6 +1003,9 @@ export const useDeckStore = create((set, get) => ({
         beamSpecies: 'SYP',
         beamGrade: 'Grade #2',
         postOffset: 6,
+        footerWidth: 12,
+        blocking: true,
+        blockingSpacing: 72,
         ...s,
         type,
         stairs: stairObj,
