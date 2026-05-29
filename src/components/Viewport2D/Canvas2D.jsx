@@ -602,7 +602,6 @@ export default function Canvas2D({ isMobile }) {
           });
         }
       }
-      }
 
       // Posts
       if (visibleLayers.foundation) {
