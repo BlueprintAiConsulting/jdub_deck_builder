@@ -75,6 +75,124 @@ export function hitTestVertices(mx, my, vertices, S, panX, panY, cw, ch) {
   return -1;
 }
 
+function getStairHandlePositions(sec, S, ox, oy, sectionCalcs) {
+  const calcs = sectionCalcs[sec.id];
+  if (!sec.stairs || !calcs || !calcs.stairs) return null;
+  const st = calcs.stairs;
+  const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
+  const stairW = st.width * S;
+  const stairD = st.totalRun * S;
+  const sx = sec.x * S + ox, sy = sec.y * S + oy;
+  const sw = sec.width * S, sd = sec.depth * S;
+  const offset = getSubObjectOffset(sec, 'stairs');
+
+  let stX, stY;
+  if (stairDir === 's') {
+    stX = sx + offset * S;
+    stY = sy + sd;
+  } else if (stairDir === 'n') {
+    stX = sx + offset * S;
+    stY = sy - stairD;
+  } else if (stairDir === 'e') {
+    stX = sx + sw;
+    stY = sy + offset * S;
+  } else { // 'w'
+    stX = sx - stairD;
+    stY = sy + offset * S;
+  }
+
+  if (stairDir === 's') {
+    return {
+      depth: { x: stX + stairW / 2, y: stY + stairD },
+      side1: { x: stX, y: stY + stairD / 2 },
+      side2: { x: stX + stairW, y: stY + stairD / 2 }
+    };
+  } else if (stairDir === 'n') {
+    return {
+      depth: { x: stX + stairW / 2, y: stY },
+      side1: { x: stX, y: stY + stairD / 2 },
+      side2: { x: stX + stairW, y: stY + stairD / 2 }
+    };
+  } else if (stairDir === 'e') {
+    return {
+      depth: { x: stX + stairD, y: stY + stairW / 2 },
+      side1: { x: stX + stairD / 2, y: stY },
+      side2: { x: stX + stairD / 2, y: stY + stairW }
+    };
+  } else { // 'w'
+    return {
+      depth: { x: stX, y: stY + stairW / 2 },
+      side1: { x: stX + stairD / 2, y: stY },
+      side2: { x: stX + stairD / 2, y: stY + stairW }
+    };
+  }
+}
+
+function getRampHandlePositions(sec, S, ox, oy, sectionCalcs) {
+  const calcs = sectionCalcs[sec.id];
+  if (!sec.ramp || !calcs || !calcs.ramp) return null;
+  const rm = calcs.ramp;
+  const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
+  const rampW = rm.width * S;
+  const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
+  const rampD = footprintRun * S;
+  const sx = sec.x * S + ox, sy = sec.y * S + oy;
+  const sw = sec.width * S, sd = sec.depth * S;
+  const offset = getSubObjectOffset(sec, 'ramp');
+
+  let rmX, rmY;
+  if (rampDir === 's') {
+    rmX = sx + offset * S;
+    rmY = sy + sd;
+  } else if (rampDir === 'n') {
+    rmX = sx + offset * S;
+    rmY = sy - rampD;
+  } else if (rampDir === 'e') {
+    rmX = sx + sw;
+    rmY = sy + offset * S;
+  } else { // 'w'
+    rmX = sx - rampD;
+    rmY = sy + offset * S;
+  }
+
+  if (rampDir === 's') {
+    return {
+      depth: { x: rmX + rampW / 2, y: rmY + rampD },
+      side1: { x: rmX, y: rmY + rampD / 2 },
+      side2: { x: rmX + rampW, y: rmY + rampD / 2 }
+    };
+  } else if (rampDir === 'n') {
+    return {
+      depth: { x: rmX + rampW / 2, y: rmY },
+      side1: { x: rmX, y: rmY + rampD / 2 },
+      side2: { x: rmX + rampW, y: rmY + rampD / 2 }
+    };
+  } else if (rampDir === 'e') {
+    return {
+      depth: { x: rmX + rampD, y: rmY + rampW / 2 },
+      side1: { x: rmX + rampD / 2, y: rmY },
+      side2: { x: rmX + rampD / 2, y: rmY + rampW }
+    };
+  } else { // 'w'
+    return {
+      depth: { x: rmX, y: rmY + rampW / 2 },
+      side1: { x: rmX + rampD / 2, y: rmY },
+      side2: { x: rmX + rampD / 2, y: rmY + rampW }
+    };
+  }
+}
+
+function hitTestSubObjectHandles(mx, my, sec, S, ox, oy, sectionCalcs, type) {
+  const handles = type === 'stairs' 
+    ? getStairHandlePositions(sec, S, ox, oy, sectionCalcs)
+    : getRampHandlePositions(sec, S, ox, oy, sectionCalcs);
+  if (!handles) return null;
+  for (const [key, pos] of Object.entries(handles)) {
+    if (Math.abs(mx - pos.x) < HANDLE_SIZE + 2 && Math.abs(my - pos.y) < HANDLE_SIZE + 2) return key;
+  }
+  return null;
+}
+
 
 function getNearestEdge(mx, my, sec, S, panX, panY, cw, ch) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
@@ -125,6 +243,8 @@ export default function Canvas2D({ isMobile }) {
   const dragVertex = useDeckStore((s) => s.dragVertex);
   const finishVertexDrag = useDeckStore((s) => s.finishVertexDrag);
   const addVertex = useDeckStore((s) => s.addVertex);
+  const removeSection = useDeckStore((s) => s.removeSection);
+  const setSelectedTool = useDeckStore((s) => s.setSelectedTool);
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -141,6 +261,34 @@ export default function Canvas2D({ isMobile }) {
     const rect = containerRef.current.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 
+    if (e.detail === 3) {
+      // Triple click - delete the clicked object (stairs, ramp, or section)
+      const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
+      if (hit) {
+        const sec = sections.find((s) => s.id === hit.id);
+        if (sec) {
+          if (hit.type === 'stairs' && sec.stairs) {
+            attachStairs(hit.id, sec.stairs.direction || sec.stairs);
+            if (selectedSectionId === hit.id && selectedSubObjectType === 'stairs') {
+              selectSection(selectedSectionId, null);
+            }
+          } else if (hit.type === 'ramp' && sec.ramp) {
+            attachRamp(hit.id, sec.ramp.direction || sec.ramp);
+            if (selectedSectionId === hit.id && selectedSubObjectType === 'ramp') {
+              selectSection(selectedSectionId, null);
+            }
+          } else {
+            // Entire deck section
+            if (window.confirm("Are you sure you want to delete this deck section?")) {
+              removeSection(hit.id);
+            }
+          }
+        }
+      }
+      e.preventDefault();
+      return;
+    }
+
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       lastMouseRef.current = { x: e.clientX, y: e.clientY };
@@ -155,6 +303,28 @@ export default function Canvas2D({ isMobile }) {
 
     if (selectedTool === 'select') {
       const sel = sections.find((s) => s.id === selectedSectionId);
+      
+      // Check stairs/ramp handles first if selected
+      if (sel && (selectedSubObjectType === 'stairs' || selectedSubObjectType === 'ramp')) {
+        const handleKey = hitTestSubObjectHandles(mx, my, sel, S, panOffset.x, panOffset.y, sectionCalcs, selectedSubObjectType);
+        if (handleKey) {
+          const obj = selectedSubObjectType === 'stairs' ? sel.stairs : sel.ramp;
+          setInteraction({
+            mode: 'resizing_subobject',
+            subType: selectedSubObjectType,
+            sectionId: sel.id,
+            handle: handleKey,
+            dragStart: { x: mx, y: my },
+            initialWidth: obj.width || 36,
+            initialNumberOfSteps: selectedSubObjectType === 'stairs' ? (obj.numberOfSteps !== undefined ? obj.numberOfSteps : 5) : null,
+            initialRampRun: selectedSubObjectType === 'ramp' ? (obj.run || 120) : null,
+            initialOffset: obj.offset || 0,
+            initialTotalRun: selectedSubObjectType === 'stairs' ? (sectionCalcs[sel.id]?.stairs?.totalRun || 50) : null
+          });
+          return;
+        }
+      }
+
       if (sel && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
         // Check vertex handles first
         const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
@@ -209,7 +379,7 @@ export default function Canvas2D({ isMobile }) {
         else attachRamp(hitId, edge);
       }
     }
-  }, [selectedTool, sections, selectedSectionId, selectedSubObjectType, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp, updateStairs, updateRamp, sectionCalcs]);
+  }, [selectedTool, sections, selectedSectionId, selectedSubObjectType, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp, updateStairs, updateRamp, sectionCalcs, removeSection]);
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning) {
@@ -251,6 +421,73 @@ export default function Canvas2D({ isMobile }) {
       if (h.includes('s')) u.depth = sec.depth + dy;
       if (h.includes('n')) { u.y = sec.y + dy; u.depth = sec.depth - dy; }
       resizeSection(selectedSectionId, u);
+    }
+    if (interaction.mode === 'resizing_subobject' && selectedSectionId) {
+      const sec = sections.find((s) => s.id === selectedSectionId);
+      if (sec) {
+        const type = interaction.subType;
+        const h = interaction.handle;
+        const dx = (mx - interaction.dragStart.x) / S;
+        const dy = (my - interaction.dragStart.y) / S;
+        const obj = type === 'stairs' ? sec.stairs : sec.ramp;
+        if (obj) {
+          const dir = typeof obj === 'string' ? obj : (obj.direction || 's');
+          const isVert = dir === 'n' || dir === 's';
+          
+          if (h === 'depth') {
+            if (type === 'stairs') {
+              const treadDepth = obj.run || 10;
+              let deltaRun = 0;
+              if (dir === 's') deltaRun = dy;
+              else if (dir === 'n') deltaRun = -dy;
+              else if (dir === 'e') deltaRun = dx;
+              else if (dir === 'w') deltaRun = -dx;
+              
+              const newTotalRun = Math.max(10, interaction.initialTotalRun + deltaRun);
+              const newSteps = Math.round(newTotalRun / treadDepth);
+              updateStairs(selectedSectionId, { numberOfSteps: Math.max(1, newSteps) });
+            } else if (type === 'ramp') {
+              let deltaRun = 0;
+              if (dir === 's') deltaRun = dy;
+              else if (dir === 'n') deltaRun = -dy;
+              else if (dir === 'e') deltaRun = dx;
+              else if (dir === 'w') deltaRun = -dx;
+              
+              const newRun = Math.max(12, interaction.initialRampRun + deltaRun);
+              updateRamp(selectedSectionId, { run: newRun });
+            }
+          } else {
+            const edgeLength = isVert ? sec.width : sec.depth;
+            let newWidth = interaction.initialWidth;
+            let newOffset = interaction.initialOffset;
+            
+            if (isVert) {
+              if (h === 'side1') {
+                newOffset = interaction.initialOffset + dx;
+                newWidth = interaction.initialWidth - dx;
+              } else if (h === 'side2') {
+                newWidth = interaction.initialWidth + dx;
+              }
+            } else {
+              if (h === 'side1') {
+                newOffset = interaction.initialOffset + dy;
+                newWidth = interaction.initialWidth - dy;
+              } else if (h === 'side2') {
+                newWidth = interaction.initialWidth + dy;
+              }
+            }
+            
+            newWidth = Math.max(24, Math.min(edgeLength, newWidth));
+            newOffset = Math.max(0, Math.min(edgeLength - newWidth, newOffset));
+            
+            if (type === 'stairs') {
+              updateStairs(selectedSectionId, { width: newWidth, offset: newOffset, align: 'custom' });
+            } else if (type === 'ramp') {
+              updateRamp(selectedSectionId, { width: newWidth, offset: newOffset, align: 'custom' });
+            }
+          }
+        }
+      }
     }
     if (interaction.mode === 'dragging_subval' && selectedSectionId) {
       const sec = sections.find((s) => s.id === selectedSectionId);
@@ -300,7 +537,7 @@ export default function Canvas2D({ isMobile }) {
     if (interaction.mode === 'dragging_vertex') finishVertexDrag();
     if (interaction.mode === 'moving') finishMove();
     if (interaction.mode === 'resizing') setInteraction({ mode: 'idle', dragStart: null, resizeHandle: null });
-    if (interaction.mode === 'dragging_subval') setInteraction({ mode: 'idle', dragStart: null });
+    if (interaction.mode === 'dragging_subval' || interaction.mode === 'resizing_subobject') setInteraction({ mode: 'idle', dragStart: null });
   }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction, finishVertexDrag]);
 
   // Touch handlers
@@ -363,6 +600,74 @@ export default function Canvas2D({ isMobile }) {
           moveSection(selectedSectionId, sec.x + dx, sec.y + dy);
           setInteraction({ dragStart: { x: mx, y: my } });
         }
+      } else if (interaction.mode === 'resizing_subobject' && selectedSectionId) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
+        const sec = sections.find((s) => s.id === selectedSectionId);
+        if (sec) {
+          const type = interaction.subType;
+          const h = interaction.handle;
+          const dx = (mx - interaction.dragStart.x) / S;
+          const dy = (my - interaction.dragStart.y) / S;
+          const obj = type === 'stairs' ? sec.stairs : sec.ramp;
+          if (obj) {
+            const dir = typeof obj === 'string' ? obj : (obj.direction || 's');
+            const isVert = dir === 'n' || dir === 's';
+            
+            if (h === 'depth') {
+              if (type === 'stairs') {
+                const treadDepth = obj.run || 10;
+                let deltaRun = 0;
+                if (dir === 's') deltaRun = dy;
+                else if (dir === 'n') deltaRun = -dy;
+                else if (dir === 'e') deltaRun = dx;
+                else if (dir === 'w') deltaRun = -dx;
+                
+                const newTotalRun = Math.max(10, interaction.initialTotalRun + deltaRun);
+                const newSteps = Math.round(newTotalRun / treadDepth);
+                updateStairs(selectedSectionId, { numberOfSteps: Math.max(1, newSteps) });
+              } else if (type === 'ramp') {
+                let deltaRun = 0;
+                if (dir === 's') deltaRun = dy;
+                else if (dir === 'n') deltaRun = -dy;
+                else if (dir === 'e') deltaRun = dx;
+                else if (dir === 'w') deltaRun = -dx;
+                
+                const newRun = Math.max(12, interaction.initialRampRun + deltaRun);
+                updateRamp(selectedSectionId, { run: newRun });
+              }
+            } else {
+              const edgeLength = isVert ? sec.width : sec.depth;
+              let newWidth = interaction.initialWidth;
+              let newOffset = interaction.initialOffset;
+              
+              if (isVert) {
+                if (h === 'side1') {
+                  newOffset = interaction.initialOffset + dx;
+                  newWidth = interaction.initialWidth - dx;
+                } else if (h === 'side2') {
+                  newWidth = interaction.initialWidth + dx;
+                }
+              } else {
+                if (h === 'side1') {
+                  newOffset = interaction.initialOffset + dy;
+                  newWidth = interaction.initialWidth - dy;
+                } else if (h === 'side2') {
+                  newWidth = interaction.initialWidth + dy;
+                }
+              }
+              
+              newWidth = Math.max(24, Math.min(edgeLength, newWidth));
+              newOffset = Math.max(0, Math.min(edgeLength - newWidth, newOffset));
+              
+              if (type === 'stairs') {
+                updateStairs(selectedSectionId, { width: newWidth, offset: newOffset, align: 'custom' });
+              } else if (type === 'ramp') {
+                updateRamp(selectedSectionId, { width: newWidth, offset: newOffset, align: 'custom' });
+              }
+            }
+          }
+        }
       } else if (interaction.mode === 'dragging_subval' && selectedSectionId) {
         const rect = containerRef.current.getBoundingClientRect();
         const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
@@ -405,15 +710,30 @@ export default function Canvas2D({ isMobile }) {
     setIsPanning(false);
     lastTouchDistRef.current = null;
     if (interaction.mode === 'moving') finishMove();
-    if (interaction.mode === 'dragging_subval') setInteraction({ mode: 'idle', dragStart: null });
+    if (interaction.mode === 'dragging_subval' || interaction.mode === 'resizing_subobject') setInteraction({ mode: 'idle', dragStart: null });
   }, [interaction, finishMove, setInteraction]);
 
-  // Global keyboard listener to delete active vertex via Backspace/Delete keys
+  // Global keyboard listener to delete active vertex/sub-object/section via Backspace/Delete keys, or confirm tool selection via Enter key
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.closest('input, select') && selectedSectionId) {
+      if (e.target.closest('input, select, textarea')) return;
+
+      // 1. Enter key: save/confirm placing or active tool by switching back to select tool
+      if (e.key === 'Enter') {
+        if (selectedTool !== 'select') {
+          setSelectedTool('select');
+          e.preventDefault();
+        }
+        return;
+      }
+
+      // 2. Backspace/Delete key: remove active vertex, sub-object (stairs/ramp), or entire section
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSectionId) {
         const sec = sections.find((s) => s.id === selectedSectionId);
-        if (sec && interaction.selectedVertexIndex !== null && interaction.selectedVertexIndex !== undefined) {
+        if (!sec) return;
+
+        // A. Vertex is selected
+        if (interaction.selectedVertexIndex !== null && interaction.selectedVertexIndex !== undefined) {
           if (sec.vertices.length <= 3) {
             alert("A deck section must have at least 3 vertices to remain a valid polygon.");
             return;
@@ -421,11 +741,42 @@ export default function Canvas2D({ isMobile }) {
           removeVertex(selectedSectionId, interaction.selectedVertexIndex);
           e.preventDefault();
         }
+        // B. Stairs are selected
+        else if (selectedSubObjectType === 'stairs' && sec.stairs) {
+          attachStairs(selectedSectionId, sec.stairs.direction || sec.stairs);
+          selectSection(selectedSectionId, null);
+          e.preventDefault();
+        }
+        // C. Ramp is selected
+        else if (selectedSubObjectType === 'ramp' && sec.ramp) {
+          attachRamp(selectedSectionId, sec.ramp.direction || sec.ramp);
+          selectSection(selectedSectionId, null);
+          e.preventDefault();
+        }
+        // D. Deck section is selected
+        else if (!selectedSubObjectType || selectedSubObjectType === 'deck') {
+          if (window.confirm("Are you sure you want to delete this deck section?")) {
+            removeSection(selectedSectionId);
+            e.preventDefault();
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [selectedSectionId, sections, interaction.selectedVertexIndex, removeVertex]);
+  }, [
+    selectedSectionId,
+    sections,
+    interaction.selectedVertexIndex,
+    selectedSubObjectType,
+    selectedTool,
+    removeVertex,
+    attachStairs,
+    attachRamp,
+    selectSection,
+    removeSection,
+    setSelectedTool
+  ]);
 
   // Double-click to split polygon edge
   const handleDoubleClick = useCallback((e) => {
@@ -994,8 +1345,8 @@ export default function Canvas2D({ isMobile }) {
       }
       ctx.textBaseline = 'alphabetic';
 
-      // Resize handles (selected only)
-      if (isSelected && selectedTool === 'select') {
+      // Resize handles (selected only, when no sub-object is selected)
+      if (isSelected && selectedTool === 'select' && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
         const handles = getHandlePositions(sec, S);
         Object.values(handles).forEach((pos) => {
           ctx.fillStyle = '#3b82f6';
@@ -1006,8 +1357,8 @@ export default function Canvas2D({ isMobile }) {
         });
       }
 
-      // Vertex handles (selected only)
-      if (isSelected && selectedTool === 'select' && sec.vertices) {
+      // Vertex handles (selected only, when no sub-object is selected)
+      if (isSelected && selectedTool === 'select' && sec.vertices && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
         sec.vertices.forEach((v, idx) => {
           const vx = v.x * S + ox;
           const vy = v.y * S + oy;
@@ -1024,6 +1375,22 @@ export default function Canvas2D({ isMobile }) {
           ctx.arc(vx, vy, 6, 0, Math.PI * 2);
           ctx.stroke();
         });
+      }
+
+      // Sub-object handles (stairs / ramp selected)
+      if (isSelected && selectedTool === 'select' && (selectedSubObjectType === 'stairs' || selectedSubObjectType === 'ramp')) {
+        const handles = selectedSubObjectType === 'stairs'
+          ? getStairHandlePositions(sec, S, ox, oy, sectionCalcs)
+          : getRampHandlePositions(sec, S, ox, oy, sectionCalcs);
+        if (handles) {
+          Object.values(handles).forEach((pos) => {
+            ctx.fillStyle = '#db2777'; // magenta/pink for accessories
+            ctx.fillRect(pos.x - HANDLE_SIZE/2, pos.y - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(pos.x - HANDLE_SIZE/2, pos.y - HANDLE_SIZE/2, HANDLE_SIZE, HANDLE_SIZE);
+          });
+        }
       }
     });
 

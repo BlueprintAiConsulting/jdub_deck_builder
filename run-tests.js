@@ -2124,6 +2124,36 @@ test('46. setLegendColor updates state and persists through serialization and lo
   assert.strictEqual(store.getState().legendColors.joists, '#ff00ff', 'Store should update with loaded legend colors');
 });
 
+test('47. updateStairs and updateRamp actions update width, steps, and run', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+  
+  // Add a section first
+  store.getState().addSection({ x: 0, y: 0, width: 120, depth: 120 }, 'deck');
+  const secId = store.getState().sections[0].id;
+  
+  // Attach stairs
+  store.getState().attachStairs(secId, 's');
+  assert.ok(store.getState().sections[0].stairs, 'Stairs should be attached');
+  assert.strictEqual(store.getState().sections[0].stairs.width, 36, 'Default stair width should be 36');
+  assert.strictEqual(store.getState().sections[0].stairs.numberOfSteps, 5, 'Default stairs steps should be 5');
+  
+  // Update stairs width and steps
+  store.getState().updateStairs(secId, { width: 48, numberOfSteps: 8 });
+  assert.strictEqual(store.getState().sections[0].stairs.width, 48, 'Stair width should update to 48');
+  assert.strictEqual(store.getState().sections[0].stairs.numberOfSteps, 8, 'Stairs steps should update to 8');
+  
+  // Attach ramp
+  store.getState().attachRamp(secId, 'e');
+  assert.ok(store.getState().sections[0].ramp, 'Ramp should be attached');
+  assert.strictEqual(store.getState().sections[0].ramp.width, 36, 'Default ramp width should be 36');
+  
+  // Update ramp width and run
+  store.getState().updateRamp(secId, { width: 42, run: 150 });
+  assert.strictEqual(store.getState().sections[0].ramp.width, 42, 'Ramp width should update to 42');
+  assert.strictEqual(store.getState().sections[0].ramp.run, 150, 'Ramp run should update to 150');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
