@@ -301,6 +301,14 @@ export const useDeckStore = create((set, get) => ({
   showDimensions: true,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
+  legendColors: {
+    joists: '#0284c7',
+    beams: '#d97706',
+    posts: '#ef4444',
+    railings: '#16a34a',
+    stairs: '#db2777',
+    ramps: '#7c3aed',
+  },
   visibleLayers2d: {
     decking: true,
     framing: true,
@@ -376,6 +384,13 @@ export const useDeckStore = create((set, get) => ({
   }),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
+  setLegendColor: (itemKey, color) => set((s) => ({
+    legendColors: {
+      ...s.legendColors,
+      [itemKey]: color
+    },
+    isDirty: true
+  })),
   toggleTheme: () => {
     const nextTheme = get().theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
@@ -847,6 +862,14 @@ export const useDeckStore = create((set, get) => ({
       selectedSubObjectType: null,
       materials: mat,
       currentProjectName: '',
+      legendColors: {
+        joists: '#0284c7',
+        beams: '#d97706',
+        posts: '#ef4444',
+        railings: '#16a34a',
+        stairs: '#db2777',
+        ramps: '#7c3aed',
+      },
       ...results,
       history: [{ sections: [{ ...sec }], materials: { ...mat } }],
       historyIndex: 0,
@@ -864,6 +887,14 @@ export const useDeckStore = create((set, get) => ({
       selectedSubObjectType: null,
       materials: mat,
       currentProjectName: '',
+      legendColors: {
+        joists: '#0284c7',
+        beams: '#d97706',
+        posts: '#ef4444',
+        railings: '#16a34a',
+        stairs: '#db2777',
+        ramps: '#7c3aed',
+      },
       ...results,
       history: [{ sections: [], materials: { ...mat } }],
       historyIndex: 0,
@@ -871,7 +902,7 @@ export const useDeckStore = create((set, get) => ({
     });
   },
 
-  loadProject: (sections = [], materials = {}) => {
+  loadProject: (sections = [], materials = {}, legendColors = null) => {
     const normalizedSections = (sections || []).map(s => {
       const type = s.type || 'deck';
       let stairObj = s.stairs;
@@ -955,6 +986,14 @@ export const useDeckStore = create((set, get) => ({
       sections: normalizedSections.map((s) => ({ ...s })),
       selectedSectionId: normalizedSections[0]?.id || null,
       materials: normalizedMaterials,
+      legendColors: legendColors || {
+        joists: '#0284c7',
+        beams: '#d97706',
+        posts: '#ef4444',
+        railings: '#16a34a',
+        stairs: '#db2777',
+        ramps: '#7c3aed',
+      },
       ...results,
       history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: normalizedMaterials }],
       historyIndex: 0,

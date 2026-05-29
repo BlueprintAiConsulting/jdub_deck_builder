@@ -8,12 +8,13 @@ export const SCHEMA_VERSION = 2;
 /**
  * Serialize a project state to a standard JS object.
  */
-export function serializeProject(projectName, sections, materials) {
+export function serializeProject(projectName, sections, materials, legendColors = null) {
   return {
     schemaVersion: SCHEMA_VERSION,
     projectName,
     sections,
     materials,
+    legendColors,
     timestamp: new Date().toISOString()
   };
 }
@@ -21,8 +22,8 @@ export function serializeProject(projectName, sections, materials) {
 /**
  * Downloads a project state as a .deck JSON file.
  */
-export function downloadProjectFile(projectName, sections, materials) {
-  const data = serializeProject(projectName, sections, materials);
+export function downloadProjectFile(projectName, sections, materials, legendColors = null) {
+  const data = serializeProject(projectName, sections, materials, legendColors);
   const jsonString = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -41,9 +42,9 @@ export function downloadProjectFile(projectName, sections, materials) {
 /**
  * Saves a project state to browser localStorage and updates the Recent Projects list.
  */
-export function saveProjectToLocalStorage(projectName, sections, materials) {
+export function saveProjectToLocalStorage(projectName, sections, materials, legendColors = null) {
   try {
-    const data = serializeProject(projectName, sections, materials);
+    const data = serializeProject(projectName, sections, materials, legendColors);
     const key = `deckforge_project_${projectName}`;
     localStorage.setItem(key, JSON.stringify(data));
 

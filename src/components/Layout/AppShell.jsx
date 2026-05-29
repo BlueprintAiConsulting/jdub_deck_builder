@@ -38,6 +38,7 @@ export default function AppShell() {
   const sections = useDeckStore((s) => s.sections);
   const materials = useDeckStore((s) => s.materials);
   const currentProjectName = useDeckStore((s) => s.currentProjectName);
+  const legendColors = useDeckStore((s) => s.legendColors);
 
   const [showDraftBanner, setShowDraftBanner] = useState(false);
   const [draftData, setDraftData] = useState(null);
@@ -51,7 +52,7 @@ export default function AppShell() {
         const mostRecent = recents[0];
         const data = loadProjectFromLocalStorage(mostRecent);
         if (data && data.sections && data.materials) {
-          loadProject(data.sections, data.materials);
+          loadProject(data.sections, data.materials, data.legendColors);
           setCurrentProjectName(mostRecent);
         }
       }
@@ -111,6 +112,7 @@ export default function AppShell() {
           projectName: currentProjectName,
           sections,
           materials,
+          legendColors,
           timestamp: new Date().toISOString()
         };
         localStorage.setItem('deckforge_autosave_draft', JSON.stringify(draft));
@@ -120,11 +122,11 @@ export default function AppShell() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [isDirty, sections, materials, currentProjectName]);
+  }, [isDirty, sections, materials, legendColors, currentProjectName]);
 
   const handleRestoreDraft = useCallback(() => {
     if (draftData && draftData.sections && draftData.materials) {
-      loadProject(draftData.sections, draftData.materials);
+      loadProject(draftData.sections, draftData.materials, draftData.legendColors);
       if (draftData.projectName) {
         setCurrentProjectName(draftData.projectName);
       }

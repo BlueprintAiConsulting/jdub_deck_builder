@@ -118,6 +118,8 @@ export default function Canvas2D({ isMobile }) {
   const moveSection = useDeckStore((s) => s.moveSection);
   const finishMove = useDeckStore((s) => s.finishMove);
   const resizeSection = useDeckStore((s) => s.resizeSection);
+  const legendColors = useDeckStore((s) => s.legendColors);
+  const setLegendColor = useDeckStore((s) => s.setLegendColor);
   const setInteraction = useDeckStore((s) => s.setInteraction);
   const toggleRailing = useDeckStore((s) => s.toggleRailing);
   const dragVertex = useDeckStore((s) => s.dragVertex);
@@ -561,16 +563,16 @@ export default function Canvas2D({ isMobile }) {
       if (visibleLayers.decking) {
         if (sec.type === 'landing') {
           // Landing surface
-          ctx.fillStyle = isLightTheme ? 'rgba(2, 132, 199, 0.08)' : 'rgba(14, 165, 233, 0.12)';
+          ctx.fillStyle = legendColors.joists + '1f'; // ~12% alpha
           drawVerticesPath(ctx, sec.vertices, S, ox, oy);
           ctx.fill();
-          ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? '#0284c7' : '#0ea5e9');
+          ctx.strokeStyle = isSelected ? '#1d4ed8' : legendColors.joists;
           ctx.lineWidth = isSelected ? 2.5 : 2;
           drawVerticesPath(ctx, sec.vertices, S, ox, oy);
           ctx.stroke();
 
           // Landing double border / pattern
-          ctx.strokeStyle = isSelected ? '#3b82f6' : (isLightTheme ? '#0369a1' : '#38bdf8');
+          ctx.strokeStyle = isSelected ? '#3b82f6' : legendColors.joists;
           ctx.lineWidth = 1;
           drawVerticesPath(ctx, sec.vertices, S, ox, oy, 4);
           ctx.stroke();
@@ -660,7 +662,7 @@ export default function Canvas2D({ isMobile }) {
 
       // Joists
       if (visibleLayers.framing) {
-        ctx.strokeStyle = '#3b82f6';
+        ctx.strokeStyle = legendColors.joists;
         ctx.lineWidth = 1.5;
         if (joistsVertical) {
           calcs.joists.positions.forEach((xIn) => {
@@ -677,7 +679,7 @@ export default function Canvas2D({ isMobile }) {
         }
 
         // Beams
-        ctx.strokeStyle = isLightTheme ? '#d97706' : '#f59e0b';
+        ctx.strokeStyle = legendColors.beams;
         ctx.lineWidth = 3;
         if (joistsVertical) {
           calcs.beams.positions.forEach((yIn) => {
@@ -696,9 +698,9 @@ export default function Canvas2D({ isMobile }) {
       if (visibleLayers.foundation) {
         calcs.posts.posts.forEach((post) => {
           const px = sx + post.x * S, py = sy + post.y * S;
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+          ctx.fillStyle = legendColors.posts + '33'; // ~20% alpha
           ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ef4444';
+          ctx.fillStyle = legendColors.posts;
           ctx.fillRect(px - 3.5, py - 3.5, 7, 7);
         });
       }
@@ -707,7 +709,7 @@ export default function Canvas2D({ isMobile }) {
       if (visibleLayers.accessories) {
         Object.entries(sec.railings).forEach(([edge, on]) => {
           if (!on) return;
-          ctx.strokeStyle = isLightTheme ? '#16a34a' : '#22c55e';
+          ctx.strokeStyle = legendColors.railings;
           ctx.lineWidth = 3;
           ctx.beginPath();
           if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
@@ -728,10 +730,10 @@ export default function Canvas2D({ isMobile }) {
         const isStairsSelected = isSelected && selectedSubObjectType === 'stairs';
         ctx.fillStyle = isStairsSelected 
           ? (isLightTheme ? 'rgba(29, 78, 216, 0.1)' : 'rgba(59, 130, 246, 0.15)')
-          : (isLightTheme ? 'rgba(219, 39, 119, 0.1)' : 'rgba(236, 72, 153, 0.15)');
+          : legendColors.stairs + '26'; // ~15% alpha
         ctx.strokeStyle = isStairsSelected 
           ? '#1d4ed8' 
-          : (isLightTheme ? '#db2777' : '#ec4899');
+          : legendColors.stairs;
         ctx.lineWidth = isStairsSelected ? 3.0 : 1.5;
         
         let stX, stY;
@@ -848,11 +850,11 @@ export default function Canvas2D({ isMobile }) {
             ? (isLightTheme ? 'rgba(29, 78, 216, 0.1)' : 'rgba(59, 130, 246, 0.15)')
             : (isLanding 
               ? (isLightTheme ? 'rgba(16, 185, 129, 0.15)' : 'rgba(52, 211, 153, 0.2)')
-              : (isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)'));
+              : legendColors.ramps + '26');
               
           ctx.strokeStyle = rampStrokeStyle || (isLanding
             ? (isLightTheme ? '#10b981' : '#34d399')
-            : (isLightTheme ? '#7c3aed' : '#a78bfa'));
+            : legendColors.ramps);
             
           ctx.lineWidth = rampLineWidth;
           ctx.fillRect(segX, segY, segW, segH);
@@ -874,7 +876,7 @@ export default function Canvas2D({ isMobile }) {
         // Draw directional arrows or sloped lines inside the ramp
         ctx.strokeStyle = isRampSelected 
           ? '#1d4ed8' 
-          : (isLightTheme ? '#7c3aed' : '#a78bfa');
+          : legendColors.ramps;
         ctx.lineWidth = rampLineWidth;
         ctx.beginPath();
         if (isVert) {
@@ -1093,26 +1095,7 @@ export default function Canvas2D({ isMobile }) {
       }
     }
 
-    // Legend (with roundRect polyfill)
-    const lx = 16, ly = size.h - 123;
-    ctx.font = '500 10px Inter';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = isLightTheme ? 'rgba(255, 255, 255, 0.9)' : 'rgba(8, 14, 28, 0.85)';
-    const legendBorder = isLightTheme ? 'rgba(15, 23, 42, 0.08)' : 'rgba(78, 142, 247, 0.12)';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(lx - 8, ly - 8, 114, 115, 8); ctx.fill(); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.stroke(); }
-    else { ctx.fillRect(lx - 8, ly - 8, 114, 115); ctx.strokeStyle = legendBorder; ctx.lineWidth = 1; ctx.strokeRect(lx - 8, ly - 8, 114, 115); }
-    const legendItems = [
-      { color: isLightTheme ? '#0284c7' : '#4e8ef7', label: 'Joists' },
-      { color: isLightTheme ? '#d97706' : '#f5a623', label: 'Beams' },
-      { color: '#f87171', label: 'Posts' },
-      { color: isLightTheme ? '#16a34a' : '#34d399', label: 'Railings' },
-      { color: isLightTheme ? '#db2777' : '#f472b6', label: 'Stairs' },
-      { color: isLightTheme ? '#7c3aed' : '#a78bfa', label: 'Ramps' },
-    ];
-    legendItems.forEach((item, i) => {
-      ctx.fillStyle = item.color; ctx.fillRect(lx, ly + i * 17, 14, 3);
-      ctx.fillStyle = isLightTheme ? '#334155' : '#8b9dc3'; ctx.fillText(item.label, lx + 20, ly + i * 17 + 5);
-    });
+    // Native canvas Legend removed - replaced by HTML interactive overlay below
 
     // Tool hint
     if (selectedTool === 'rectangle') {
@@ -1132,7 +1115,7 @@ export default function Canvas2D({ isMobile }) {
       ctx.fillText(isMobile ? 'Tap to place a landing' : 'Click & drag or click to place a landing', size.w / 2, 24);
     }
 
-  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, showDimensions, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S]);
+  }, [sections, sectionCalcs, materials, selectedSectionId, showGrid, showDimensions, selectedTool, interaction, size, panOffset, zoomScale, isMobile, S, legendColors]);
 
   const cursor = interaction.mode === 'placing' ? 'crosshair' :
     interaction.mode === 'moving' || interaction.mode === 'dragging_vertex' ? 'grabbing' :
@@ -1157,6 +1140,26 @@ export default function Canvas2D({ isMobile }) {
       onWheel={handleWheel}
       style={{ cursor, touchAction: 'none' }}>
       <canvas ref={canvasRef} className="canvas-2d__canvas" />
+      
+      {/* Interactive Legend Overlay */}
+      <div className="canvas-2d__legend" id="canvas-2d-legend">
+        {Object.entries(legendColors).map(([key, color]) => (
+          <div key={key} className="canvas-2d__legend-item">
+            <label className="canvas-2d__legend-swatch" style={{ backgroundColor: color }} title={`Change ${key} color`}>
+              <input 
+                type="color" 
+                value={color} 
+                onChange={(e) => setLegendColor(key, e.target.value)} 
+                className="canvas-2d__legend-color-input"
+              />
+            </label>
+            <span className="canvas-2d__legend-label">
+              {key.charAt(0).toUpperCase() + key.slice(1)}
+            </span>
+          </div>
+        ))}
+      </div>
+
       {/* Zoom Controls */}
       {!isMobile && (
         <div className="zoom-controls" id="zoom-controls">

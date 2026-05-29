@@ -269,6 +269,7 @@ export default function Toolbar({ isMobile }) {
   const toggleTheme = useDeckStore((s) => s.toggleTheme);
   const showDimensions = useDeckStore((s) => s.showDimensions);
   const toggleDimensions = useDeckStore((s) => s.toggleDimensions);
+  const legendColors = useDeckStore((s) => s.legendColors);
 
   const confirmSaveAs = () => {
     const trimmed = tempProjectName.trim();
@@ -278,7 +279,7 @@ export default function Toolbar({ isMobile }) {
     setShowSaveModal(false);
     
     try {
-      saveProjectToLocalStorage(trimmed, sections, materials);
+      saveProjectToLocalStorage(trimmed, sections, materials, legendColors);
       showToast('Project saved successfully!', 'success');
       setDirty(false);
     } catch (err) {
@@ -296,7 +297,7 @@ export default function Toolbar({ isMobile }) {
       handleSaveAsClick();
     } else {
       try {
-        saveProjectToLocalStorage(currentProjectName, sections, materials);
+        saveProjectToLocalStorage(currentProjectName, sections, materials, legendColors);
         showToast('Project saved successfully!', 'success');
         setDirty(false);
       } catch (err) {
@@ -307,8 +308,8 @@ export default function Toolbar({ isMobile }) {
 
   const handleExportClick = useCallback(() => {
     const name = currentProjectName || 'My Deck Project';
-    downloadProjectFile(name, sections, materials);
-  }, [currentProjectName, sections, materials]);
+    downloadProjectFile(name, sections, materials, legendColors);
+  }, [currentProjectName, sections, materials, legendColors]);
 
   const handleNewClick = useCallback(() => {
     if (isDirty) {
@@ -329,7 +330,7 @@ export default function Toolbar({ isMobile }) {
     if (!file) return;
     try {
       const data = await parseDeckFile(file);
-      loadProject(data.sections, data.materials);
+      loadProject(data.sections, data.materials, data.legendColors);
       setCurrentProjectName(data.projectName || file.name.replace(/\.deck$/, ''));
       setShowOpenModal(false);
     } catch (err) {
@@ -341,7 +342,7 @@ export default function Toolbar({ isMobile }) {
   const handleLoadRecent = (name) => {
     try {
       const data = loadProjectFromLocalStorage(name);
-      loadProject(data.sections, data.materials);
+      loadProject(data.sections, data.materials, data.legendColors);
       setCurrentProjectName(name);
       setShowOpenModal(false);
     } catch (err) {

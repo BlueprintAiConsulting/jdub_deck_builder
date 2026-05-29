@@ -2097,6 +2097,33 @@ test('45. validateProjectData, saveProjectToLocalStorage, and loadProject suppor
   assert.strictEqual(store.getState().sections.length, 0, 'Store should successfully update to 0 sections');
 });
 
+test('46. setLegendColor updates state and persists through serialization and local storage save/load', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+  
+  // 1. Initial color check
+  const initialColors = store.getState().legendColors;
+  assert.strictEqual(initialColors.joists, '#0284c7', 'Should start with default joists color');
+  
+  // 2. Mutate color
+  store.getState().setLegendColor('joists', '#ff00ff');
+  assert.strictEqual(store.getState().legendColors.joists, '#ff00ff', 'State should update to custom joists color');
+  assert.strictEqual(store.getState().isDirty, true, 'Updating legend color should mark store as dirty');
+  
+  // 3. Serialize and save
+  const customColors = store.getState().legendColors;
+  saveProjectToLocalStorage('Legend Color Test', store.getState().sections, store.getState().materials, customColors);
+  
+  // 4. Load it back from localStorage
+  const loaded = loadProjectFromLocalStorage('Legend Color Test');
+  assert.ok(loaded.legendColors, 'Loaded project should contain legendColors');
+  assert.strictEqual(loaded.legendColors.joists, '#ff00ff', 'Loaded legendColors should preserve custom color');
+  
+  // 5. Load project into store
+  store.getState().loadProject(loaded.sections, loaded.materials, loaded.legendColors);
+  assert.strictEqual(store.getState().legendColors.joists, '#ff00ff', 'Store should update with loaded legend colors');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
