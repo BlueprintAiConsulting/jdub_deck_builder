@@ -175,15 +175,15 @@ try {
   // ─── STEP 5: Save, Reload, and Load ───
   console.log('Step 5: Saving and round-tripping project file...');
   
-  // Click open Save As modal
-  await page.click('#btn-save');
-  await page.waitForSelector('#modalProjectName');
-  await page.fill('#modalProjectName', 'VerifyProject');
+  // Set the project name first in store
+  await page.evaluate(() => {
+    window.useDeckStore.setState({ currentProjectName: 'VerifyProject' });
+  });
   
   // Setup file download interception
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.click('.toolbar-modal__card .btn--primary')
+    page.click('#btn-export-deck')
   ]);
   
   const downloadPath = path.join(process.cwd(), 'VerifyProject.deck');
