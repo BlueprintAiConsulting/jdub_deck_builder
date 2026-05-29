@@ -839,16 +839,11 @@ function HouseWall({ width, height }) {
   );
 }
 
-function GroundPlane({ lightingPreset }) {
+function GroundPlane() {
   const theme = useDeckStore((s) => s.theme);
   const isLightTheme = theme === 'light';
 
-  let groundColor = isLightTheme ? '#2d5a27' : '#1a3a1a';
-  if (lightingPreset === 'night') {
-    groundColor = '#061305';
-  } else if (lightingPreset === 'goldenHour') {
-    groundColor = isLightTheme ? '#4a6b2c' : '#1b2612';
-  }
+  const groundColor = isLightTheme ? '#2d5a27' : '#1a3a1a';
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]} receiveShadow>
@@ -910,78 +905,32 @@ export default function Scene3D() {
   const sections = useDeckStore((s) => s.sections);
   const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
   const materials = useDeckStore((s) => s.materials);
-  const lightingPreset = useDeckStore((s) => s.lightingPreset) || 'daylight';
-  const setLightingPreset = useDeckStore((s) => s.setLightingPreset);
   const visibleLayers = useDeckStore((s) => s.visibleLayers3d || { decking: true, framing: true, foundation: true, accessories: true });
 
-  const isNight = lightingPreset === 'night';
-  const isGoldenHour = lightingPreset === 'goldenHour';
-  const isDaylight = lightingPreset === 'daylight';
+  const isNight = false;
+  const isGoldenHour = false;
+  const isDaylight = true;
 
   // Preset lighting values
-  let ambientColor = '#ffffff';
-  let ambientIntensity = 0.45;
+  const ambientColor = '#ffffff';
+  const ambientIntensity = 0.45;
   
-  let sunPosition = [20, 35, 20];
-  let sunColor = '#ffffff';
-  let sunIntensity = 1.2;
+  const sunPosition = [20, 35, 20];
+  const sunColor = '#ffffff';
+  const sunIntensity = 1.2;
   
-  let fillPosition = [-10, 15, -10];
-  let fillColor = '#a9c1e6';
-  let fillIntensity = 0.3;
+  const fillPosition = [-10, 15, -10];
+  const fillColor = '#a9c1e6';
+  const fillIntensity = 0.3;
   
-  let hemiColor = '#aaddff';
-  let hemiGroundColor = '#332200';
-  let hemiIntensity = 0.2;
+  const hemiColor = '#aaddff';
+  const hemiGroundColor = '#332200';
+  const hemiIntensity = 0.2;
   
   const isLightTheme = theme === 'light';
-  let bgColor = isLightTheme ? '#f1f5f9' : '#0a1628';
-  let fogNear = 40;
-  let fogFar = 120;
-
-  if (isNight) {
-    ambientColor = '#0a0f1d';
-    ambientIntensity = 0.04;
-    
-    sunPosition = [-10, 20, -10];
-    sunColor = '#9bb6e0';
-    sunIntensity = 0.15;
-    
-    fillIntensity = 0;
-    
-    hemiColor = '#3b82f6';
-    hemiGroundColor = '#000000';
-    hemiIntensity = 0.02;
-    
-    bgColor = '#030712';
-    fogNear = 25;
-    fogFar = 75;
-  } else if (isGoldenHour) {
-    ambientColor = '#ffd2a1';
-    ambientIntensity = 0.35;
-    
-    sunPosition = [35, 12, 15];
-    sunColor = '#ff8833';
-    sunIntensity = 1.4;
-    
-    fillPosition = [-20, 10, -20];
-    fillColor = '#443355';
-    fillIntensity = 0.2;
-    
-    hemiColor = '#ffaa66';
-    hemiGroundColor = '#221100';
-    hemiIntensity = 0.15;
-    
-    bgColor = isLightTheme ? '#fcd34d' : '#1a0f0d';
-    fogNear = 30;
-    fogFar = 90;
-  } else {
-    if (isLightTheme) {
-      bgColor = '#f1f5f9';
-    } else {
-      bgColor = '#0a1628';
-    }
-  }
+  const bgColor = isLightTheme ? '#f1f5f9' : '#0a1628';
+  const fogNear = 40;
+  const fogFar = 120;
   
   const [viewType, setViewType] = useState(null);
   const [viewTrigger, setViewTrigger] = useState(0);
@@ -1130,45 +1079,6 @@ export default function Scene3D() {
         />
       </Canvas>
 
-      {/* Floating Preset Selector Controls */}
-      <div className="viewport-overlay-controls" role="group" aria-label="Environment lighting presets">
-        <button 
-          className={`lighting-preset-btn lighting-preset-btn--daylight ${isDaylight ? 'lighting-preset-btn--active' : ''}`}
-          onClick={() => setLightingPreset('daylight')}
-          aria-label="Toggle Daylight Mode"
-          title="Daylight Mode"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-          </svg>
-          <span>Daylight</span>
-        </button>
-        
-        <button 
-          className={`lighting-preset-btn lighting-preset-btn--goldenHour ${isGoldenHour ? 'lighting-preset-btn--active' : ''}`}
-          onClick={() => setLightingPreset('goldenHour')}
-          aria-label="Toggle Golden Hour Mode"
-          title="Golden Hour Mode"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2v2M4.93 4.93l1.41 1.41M19.07 4.93l-1.41 1.41M2 12h2M20 12h2M12 18H2M22 18h-4M16 12a4 4 0 0 0-8 0"/>
-          </svg>
-          <span>Golden Hour</span>
-        </button>
-        
-        <button 
-          className={`lighting-preset-btn lighting-preset-btn--night ${isNight ? 'lighting-preset-btn--active' : ''}`}
-          onClick={() => setLightingPreset('night')}
-          aria-label="Toggle Night Mode"
-          title="Night Mode"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
-          </svg>
-          <span>Night</span>
-        </button>
-      </div>
 
       {/* Floating 3D Viewport Controls HUD */}
       <div className="viewport-3d-hud" id="viewport-3d-hud">
