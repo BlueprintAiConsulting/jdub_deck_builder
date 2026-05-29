@@ -2690,6 +2690,7 @@ export default function Canvas2D({ isMobile }) {
         <div className="settings-overlay-modal glass-panel animate-slide-right" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: 80, left: 20, zIndex: 9998 }}>
           {(() => {
             const selectedSec = sections.find((x) => x.id === selectedSectionId) || sections[0];
+            if (!selectedSec) return null;
             const isStairs = selectedSubObjectType === 'stairs';
             const isRamp = selectedSubObjectType === 'ramp';
             const isLanding = selectedSec.type === 'landing';

@@ -224,11 +224,11 @@ export default function PropertiesPanel({ isMobile }) {
   const placementRamp = useDeckStore((s) => s.placementRamp);
   const updatePlacementRamp = useDeckStore((s) => s.updatePlacementRamp);
 
-  if (!calcs) return null;
-  const joistSpanOk = calcs.joists.maxSpan >= deck.depth;
   const sectionIndex = sections.findIndex((s) => s.id === selectedSectionId);
   const currentSection = sections[sectionIndex] || sections[0];
-  const isLanding = currentSection?.type === 'landing';
+  if (!calcs || !currentSection) return null;
+  const joistSpanOk = calcs.joists.maxSpan >= deck.depth;
+  const isLanding = currentSection.type === 'landing';
   const healthStatus = joistSpanOk ? 'ok' : 'warn';
 
   const stairObj = typeof currentSection.stairs === 'object' && currentSection.stairs !== null
