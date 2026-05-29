@@ -3,12 +3,13 @@
  * Multi-section deck design with interactive placement.
  */
 import { create } from 'zustand';
-import { calculateAll } from '../engine/structuralCalc';
-import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator';
+import { calculateAll } from '../engine/structuralCalc.js';
+import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator.js';
+import { DECK_COLOR_OPTIONS } from '../components/Materials/materialData.js';
 
 // Initialize theme on load to prevent flash of wrong theme
 if (typeof window !== 'undefined') {
-  const savedTheme = localStorage.getItem('deckforge_theme') || 'dark';
+  const savedTheme = localStorage.getItem('deckforge_theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
@@ -27,7 +28,9 @@ const DEFAULT_MATERIALS = {
   postSize: '6x6',
   deckBoardSize: '5/4x6',
   deckMaterial: 'PT-SYP',
+  deckColor: 'pine-natural',
   soilCapacity: 2000,
+  wasteFactor: 10,
 };
 
 function createSection(overrides = {}) {
@@ -147,12 +150,30 @@ const initialResults = recalculateAll([initialSection], DEFAULT_MATERIALS);
 
 export const useDeckStore = create((set, get) => ({
   // --- View State ---
-  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'dark') : 'dark',
+  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'light') : 'light',
   viewMode: '2d',
   selectedTool: 'select',
   showGrid: true,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
+  visibleLayers2d: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
+  visibleLayers3d: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
+  visibleLayers: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
 
   // --- Sections ---
   sections: [initialSection],
@@ -181,6 +202,28 @@ export const useDeckStore = create((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setSelectedTool: (tool) => set({ selectedTool: tool }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  toggleLayer: (layer, mode) => set((s) => {
+    const targetMode = mode || (s.viewMode === 'split' ? '2d' : s.viewMode);
+    if (targetMode === '3d') {
+      const next3d = {
+        ...s.visibleLayers3d,
+        [layer]: !s.visibleLayers3d[layer],
+      };
+      return {
+        visibleLayers3d: next3d,
+        visibleLayers: next3d,
+      };
+    } else {
+      const next2d = {
+        ...s.visibleLayers2d,
+        [layer]: !s.visibleLayers2d[layer],
+      };
+      return {
+        visibleLayers2d: next2d,
+        visibleLayers: next2d,
+      };
+    }
+  }),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
   toggleTheme: () => {
@@ -417,6 +460,13 @@ export const useDeckStore = create((set, get) => ({
       else materialUpdates[key] = val;
     });
 
+    if (updates.deckMaterial && updates.deckMaterial !== state.materials.deckMaterial) {
+      const colors = DECK_COLOR_OPTIONS[updates.deckMaterial];
+      if (colors && colors.length > 0) {
+        materialUpdates.deckColor = colors[0].value;
+      }
+    }
+
     const newMaterials = { ...state.materials, ...materialUpdates };
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
@@ -533,12 +583,23 @@ export const useDeckStore = create((set, get) => ({
     });
     nextId = maxId + 1;
 
+    const updatedMaterials = { ...materials };
+    if (!updatedMaterials.wasteFactor) {
+      updatedMaterials.wasteFactor = 10;
+    }
+    if (updatedMaterials.deckMaterial && !updatedMaterials.deckColor) {
+      const colors = DECK_COLOR_OPTIONS[updatedMaterials.deckMaterial];
+      if (colors && colors.length > 0) {
+        updatedMaterials.deckColor = colors[0].value;
+      }
+    }
+
     set({
       sections: normalizedSections.map((s) => ({ ...s })),
       selectedSectionId: normalizedSections[0]?.id || null,
-      materials: { ...materials },
+      materials: updatedMaterials,
       ...results,
-      history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: { ...materials } }],
+      history: [{ sections: normalizedSections.map((s) => ({ ...s })), materials: updatedMaterials }],
       historyIndex: 0,
     });
   },

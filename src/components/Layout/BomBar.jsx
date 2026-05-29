@@ -5,9 +5,12 @@ import './BomBar.css';
 export default function BomBar({ isMobile, expanded: forceExpanded }) {
   const bom = useDeckStore((s) => s.bom);
   const sqft = useDeckStore((s) => s.sqft);
+  const materials = useDeckStore((s) => s.materials || { wasteFactor: 10 });
+  const updateDeck = useDeckStore((s) => s.updateDeck);
   const [expanded, setExpanded] = useState(false);
 
   const isExpanded = forceExpanded || expanded;
+  const wasteFactor = materials.wasteFactor ?? 10;
 
   const categories = {};
   bom.forEach((item) => {
@@ -17,6 +20,7 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
 
   const lineItems = bom.length;
   const totalParts = bom.reduce((sum, item) => sum + item.quantity, 0);
+  const totalCost = bom.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
 
   // Mobile BOM renders directly as a list of cards
   if (isMobile) {
@@ -25,6 +29,7 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
         <div className="bom-mobile__summary">
           <span className="badge">{lineItems} items</span>
           <span className="bom-bar__parts-count">{totalParts.toLocaleString()} pcs total</span>
+          <span className="badge badge--green font-mono">${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} est.</span>
           <span className="bom-bar__sqft font-mono">{sqft} sq ft</span>
         </div>
 
@@ -50,6 +55,7 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
                 <span className="font-mono">{item.size}</span>
                 {item.length && <span className="font-mono">{item.length}'</span>}
                 <span>{item.unit}</span>
+                <span className="font-mono text-secondary">${(item.totalPrice || 0).toFixed(2)}</span>
                 <span className="text-tertiary">{item.material}</span>
               </div>
             </div>
@@ -57,8 +63,10 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
         </div>
 
         <div className="bom-mobile__total">
-          <span>Total Parts</span>
-          <span className="font-mono bom-bar__qty">{totalParts.toLocaleString()}</span>
+          <span>Total Cost Estimate</span>
+          <span className="font-mono bom-bar__qty text-green" style={{ color: 'var(--accent-green)', fontWeight: 'bold' }}>
+            ${totalCost.toFixed(2)}
+          </span>
         </div>
       </div>
     );
@@ -86,6 +94,9 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
           <span className="bom-bar__title">Bill of Materials</span>
           <span className="badge">{lineItems} items</span>
           <span className="bom-bar__parts-count">{totalParts.toLocaleString()} pcs total</span>
+          <span className="badge badge--green font-mono" style={{ marginLeft: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+            ${totalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} est.
+          </span>
         </div>
 
         <div className="bom-bar__chips">
@@ -105,7 +116,7 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
             tabIndex={-1}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+               style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
               <polyline points="18 15 12 9 6 15"/>
             </svg>
           </button>
@@ -114,6 +125,29 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
 
       {isExpanded && (
         <div className="bom-bar__table-wrap animate-slide-up">
+          <div className="bom-bar__config-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-default)' }}>
+            <div className="bom-bar__waste-ctrl" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="label" style={{ margin: 0, textTransform: 'none', fontSize: 'var(--text-sm)' }}>Wastage Factor:</span>
+              <div className="btn-group" style={{ display: 'flex', gap: '2px', background: 'var(--bg-primary)', padding: '2px', borderRadius: 'var(--border-radius-sm)', border: '1px solid var(--border-default)' }}>
+                {[0, 5, 10, 15, 20].map((pct) => (
+                  <button
+                    key={pct}
+                    className={`btn btn--xs ${wasteFactor === pct ? 'btn--active' : 'btn--ghost'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateDeck({ wasteFactor: pct });
+                    }}
+                    style={{ minWidth: '36px', height: '22px', padding: 0 }}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="bom-bar__cost-summary" style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>
+              Estimated project material cost: <strong style={{ color: 'var(--accent-green)', fontSize: 'var(--text-md)' }}>${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+            </div>
+          </div>
           <table className="bom-bar__table" role="table">
             <thead>
               <tr>
@@ -123,6 +157,8 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
                 <th>Length</th>
                 <th className="text-right">Qty</th>
                 <th>Unit</th>
+                <th className="text-right">Unit Price</th>
+                <th className="text-right">Est. Cost</th>
                 <th>Material</th>
               </tr>
             </thead>
@@ -135,6 +171,8 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
                   <td className="font-mono">{item.length ? `${item.length}'` : '—'}</td>
                   <td className="font-mono bom-bar__qty">{item.quantity.toLocaleString()}</td>
                   <td>{item.unit}</td>
+                  <td className="font-mono text-right">${(item.unitPrice || 0).toFixed(2)}</td>
+                  <td className="font-mono text-right bom-bar__qty">${(item.totalPrice || 0).toFixed(2)}</td>
                   <td className="text-tertiary">{item.material}</td>
                 </tr>
               ))}
@@ -143,7 +181,12 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
               <tr className="bom-bar__total-row">
                 <td colSpan="4" className="text-right"><strong>Total Parts</strong></td>
                 <td className="font-mono bom-bar__qty"><strong>{totalParts.toLocaleString()}</strong></td>
-                <td colSpan="2"></td>
+                <td></td>
+                <td className="text-right"><strong>Total Cost:</strong></td>
+                <td className="font-mono text-right" style={{ color: 'var(--accent-green)', fontWeight: 'bold' }}>
+                  <strong>${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                </td>
+                <td></td>
               </tr>
             </tfoot>
           </table>

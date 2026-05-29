@@ -576,3 +576,29 @@ body {
   height: 20px;
   background: var(--border-default);
 }
+
+/* ===== 3D VIEWPORT HUD ===== */
+.viewport-3d-hud {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--glass-bg-solid);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius-md);
+  padding: var(--space-1);
+  box-shadow: var(--shadow-md);
+  z-index: 40;
+}
+.viewport-3d-hud button {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  min-height: 26px;
+  padding: 2px var(--space-2);
+}
+

@@ -263,6 +263,7 @@ export default function Toolbar({ isMobile }) {
     if (isMeta && e.key === 's') { e.preventDefault(); handleSaveClick(); }
     if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('2d');
     if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('3d');
+    if (e.key === '4' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('split');
   }, [undo, redo, setViewMode, handleSaveClick]);
 
   useEffect(() => {
@@ -486,6 +487,10 @@ export default function Toolbar({ isMobile }) {
           <button className={`btn btn--ghost toolbar__view-btn ${viewMode === '3d' ? 'btn--active' : ''}`} onClick={() => setViewMode('3d')} id="btn-view-3d" role="radio" aria-checked={viewMode === '3d'} data-tooltip="3D Preview [3]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             3D
+          </button>
+          <button className={`btn btn--ghost toolbar__view-btn ${viewMode === 'split' ? 'btn--active' : ''}`} onClick={() => setViewMode('split')} id="btn-view-split" role="radio" aria-checked={viewMode === 'split'} data-tooltip="Split View [4]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+            Split
           </button>
         </div>
       </div>

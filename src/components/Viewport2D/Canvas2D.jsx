@@ -1,7 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useDeckStore } from '../../store/deckStore';
 import { formatDimension } from '../../utils/units';
-import { WOOD_COLORS } from '../Materials/materialData';
+import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData';
+import {
+  isPointInPolygon,
+  hitTestSection,
+  getDistanceToSegment,
+  findEdgeSplitIndex
+} from '../../utils/polygonUtils.js';
 import './Canvas2D.css';
 
 const SCALE = 3;
@@ -51,30 +57,6 @@ function hitTestHandles(mx, my, sec, S, panX, panY, cw, ch) {
   return null;
 }
 
-export function isPointInPolygon(px, py, vertices) {
-  if (!vertices || vertices.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-    const xi = vertices[i].x, yi = vertices[i].y;
-    const xj = vertices[j].x, yj = vertices[j].y;
-
-    const intersect = ((yi > py) !== (yj > py))
-        && (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch) {
-  const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
-  const lx = (mx - ox) / S;
-  const ly = (my - oy) / S;
-  for (let i = sections.length - 1; i >= 0; i--) {
-    const sec = sections[i];
-    if (isPointInPolygon(lx, ly, sec.vertices)) return sec.id;
-  }
-  return null;
-}
 
 export function hitTestVertices(mx, my, vertices, S, panX, panY, cw, ch) {
   if (!vertices) return -1;
@@ -90,36 +72,6 @@ export function hitTestVertices(mx, my, vertices, S, panX, panY, cw, ch) {
   return -1;
 }
 
-export function getDistanceToSegment(px, py, ax, ay, bx, by) {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-  
-  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  
-  const cx = ax + t * dx;
-  const cy = ay + t * dy;
-  return Math.hypot(px - cx, py - cy);
-}
-
-export function findEdgeSplitIndex(lx, ly, vertices, thresholdInches) {
-  if (!vertices || vertices.length < 3) return -1;
-  let bestIndex = -1;
-  let minDistance = thresholdInches;
-  
-  for (let i = 0; i < vertices.length; i++) {
-    const v1 = vertices[i];
-    const v2 = vertices[(i + 1) % vertices.length];
-    const dist = getDistanceToSegment(lx, ly, v1.x, v1.y, v2.x, v2.y);
-    if (dist < minDistance) {
-      minDistance = dist;
-      bestIndex = i;
-    }
-  }
-  return bestIndex;
-}
 
 function getNearestEdge(mx, my, sec, S, panX, panY, cw, ch) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
@@ -148,6 +100,7 @@ export default function Canvas2D({ isMobile }) {
   const sectionCalcs = useDeckStore((s) => s.sectionCalcs);
   const materials = useDeckStore((s) => s.materials);
   const showGrid = useDeckStore((s) => s.showGrid);
+  const visibleLayers = useDeckStore((s) => s.visibleLayers2d || { decking: true, framing: true, foundation: true, accessories: true });
   const selectedTool = useDeckStore((s) => s.selectedTool);
   const interaction = useDeckStore((s) => s.interaction);
   const selectSection = useDeckStore((s) => s.selectSection);
@@ -479,10 +432,17 @@ export default function Canvas2D({ isMobile }) {
       const sx = sec.x * S + ox, sy = sec.y * S + oy;
       const sw = sec.width * S, sd = sec.depth * S;
       const isSelected = sec.id === selectedSectionId;
-      const woodColor = WOOD_COLORS[materials.species] || '#c4a35a';
+      const getBoardColor = () => {
+        const mat = materials.deckMaterial;
+        const col = materials.deckColor;
+        const opts = DECK_COLOR_OPTIONS[mat] || [];
+        const opt = opts.find(o => o.value === col);
+        return opt ? opt.color : (DECK_MATERIAL_COLORS[mat] || WOOD_COLORS[materials.species] || '#c4a35a');
+      };
+      const woodColor = getBoardColor();
 
       // House wall
-      if (sec.ledgerAttached) {
+      if (sec.ledgerAttached && (visibleLayers.decking || visibleLayers.framing || visibleLayers.foundation || visibleLayers.accessories)) {
         const hh = 30 * zoomScale;
         ctx.fillStyle = isLightTheme ? '#e2e8f0' : '#2a2a3a';
         ctx.fillRect(sx - 20, sy - hh, sw + 40, hh);
@@ -495,99 +455,117 @@ export default function Canvas2D({ isMobile }) {
         ctx.fillText('HOUSE', sx + sw / 2, sy - hh / 2 + 3);
       }
 
-      if (sec.type === 'landing') {
-        // Landing surface
-        ctx.fillStyle = isLightTheme ? 'rgba(2, 132, 199, 0.08)' : 'rgba(14, 165, 233, 0.12)';
-        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
-        ctx.fill();
-        ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? '#0284c7' : '#0ea5e9');
-        ctx.lineWidth = isSelected ? 2.5 : 2;
+      // Selection outline fallback if decking is toggled off
+      if (!visibleLayers.decking) {
+        ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? 'rgba(15, 23, 42, 0.2)' : 'rgba(232, 237, 245, 0.2)');
+        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.setLineDash([4, 4]);
         drawVerticesPath(ctx, sec.vertices, S, ox, oy);
         ctx.stroke();
+        ctx.setLineDash([]);
+      }
 
-        // Landing double border / pattern
-        ctx.strokeStyle = isSelected ? '#3b82f6' : (isLightTheme ? '#0369a1' : '#38bdf8');
-        ctx.lineWidth = 1;
-        drawVerticesPath(ctx, sec.vertices, S, ox, oy, 4);
-        ctx.stroke();
+      if (visibleLayers.decking) {
+        if (sec.type === 'landing') {
+          // Landing surface
+          ctx.fillStyle = isLightTheme ? 'rgba(2, 132, 199, 0.08)' : 'rgba(14, 165, 233, 0.12)';
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? '#0284c7' : '#0ea5e9');
+          ctx.lineWidth = isSelected ? 2.5 : 2;
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+          ctx.stroke();
 
-        // Label in the center
-        ctx.fillStyle = isLightTheme ? '#0369a1' : '#38bdf8';
-        ctx.font = '600 10px Inter';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('LANDING', sx + sw / 2, sy + sd / 2);
-        ctx.textBaseline = 'alphabetic';
-      } else {
-        // Deck surface
-        ctx.fillStyle = woodColor + '25';
-        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
-        ctx.fill();
-        ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? woodColor : woodColor + '80');
-        ctx.lineWidth = isSelected ? 2.5 : 2;
-        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
-        ctx.stroke();
+          // Landing double border / pattern
+          ctx.strokeStyle = isSelected ? '#3b82f6' : (isLightTheme ? '#0369a1' : '#38bdf8');
+          ctx.lineWidth = 1;
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy, 4);
+          ctx.stroke();
 
-        // Deck boards
-        ctx.save();
-        drawVerticesPath(ctx, sec.vertices, S, ox, oy);
-        ctx.clip();
+          // Label in the center
+          ctx.fillStyle = isLightTheme ? '#0369a1' : '#38bdf8';
+          ctx.font = '600 10px Inter';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('LANDING', sx + sw / 2, sy + sd / 2);
+          ctx.textBaseline = 'alphabetic';
+        } else {
+          // Deck surface
+          ctx.fillStyle = woodColor + '25';
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+          ctx.fill();
+          ctx.strokeStyle = isSelected ? '#1d4ed8' : (isLightTheme ? woodColor : woodColor + '80');
+          ctx.lineWidth = isSelected ? 2.5 : 2;
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+          ctx.stroke();
 
-        const ys = sec.vertices.map(v => v.y * S + oy);
-        const xs = sec.vertices.map(v => v.x * S + ox);
-        const minY = Math.min(...ys), maxY = Math.max(...ys);
-        const minX = Math.min(...xs), maxX = Math.max(...xs);
+          // Deck boards
+          ctx.save();
+          drawVerticesPath(ctx, sec.vertices, S, ox, oy);
+          ctx.clip();
 
-        const bw = 5.5 * S, gap = 0.125 * S;
-        ctx.strokeStyle = isLightTheme ? woodColor + '60' : woodColor + '40';
-        ctx.lineWidth = 0.5;
-        for (let y = minY; y < maxY; y += bw + gap) {
-          ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
+          const ys = sec.vertices.map(v => v.y * S + oy);
+          const xs = sec.vertices.map(v => v.x * S + ox);
+          const minY = Math.min(...ys), maxY = Math.max(...ys);
+          const minX = Math.min(...xs), maxX = Math.max(...xs);
+
+          const bw = 5.5 * S, gap = 0.125 * S;
+          ctx.strokeStyle = isLightTheme ? woodColor + '60' : woodColor + '40';
+          ctx.lineWidth = 0.5;
+          for (let y = minY; y < maxY; y += bw + gap) {
+            ctx.beginPath(); ctx.moveTo(minX, y); ctx.lineTo(maxX, y); ctx.stroke();
+          }
+          ctx.restore();
         }
-        ctx.restore();
       }
 
       // Joists
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 1.5;
-      calcs.joists.positions.forEach((xIn) => {
-        const x = sx + xIn * S;
-        if (x > sx + sw + 1) return;
-        ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
-      });
+      if (visibleLayers.framing) {
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 1.5;
+        calcs.joists.positions.forEach((xIn) => {
+          const x = sx + xIn * S;
+          if (x > sx + sw + 1) return;
+          ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
+        });
 
-      // Beams
-      ctx.strokeStyle = isLightTheme ? '#d97706' : '#f59e0b';
-      ctx.lineWidth = 3;
-      calcs.beams.positions.forEach((yIn) => {
-        const y = sy + yIn * S;
-        ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
-      });
+        // Beams
+        ctx.strokeStyle = isLightTheme ? '#d97706' : '#f59e0b';
+        ctx.lineWidth = 3;
+        calcs.beams.positions.forEach((yIn) => {
+          const y = sy + yIn * S;
+          ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
+        });
+      }
 
       // Posts
-      calcs.posts.posts.forEach((post) => {
-        const px = sx + post.x * S, py = sy + post.y * S;
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
-        ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(px - 3.5, py - 3.5, 7, 7);
-      });
+      if (visibleLayers.foundation) {
+        calcs.posts.posts.forEach((post) => {
+          const px = sx + post.x * S, py = sy + post.y * S;
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+          ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(px - 3.5, py - 3.5, 7, 7);
+        });
+      }
 
       // Railings
-      Object.entries(sec.railings).forEach(([edge, on]) => {
-        if (!on) return;
-        ctx.strokeStyle = isLightTheme ? '#16a34a' : '#22c55e';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
-        if (edge === 's') { ctx.moveTo(sx, sy + sd); ctx.lineTo(sx + sw, sy + sd); }
-        if (edge === 'w') { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + sd); }
-        if (edge === 'e') { ctx.moveTo(sx + sw, sy); ctx.lineTo(sx + sw, sy + sd); }
-        ctx.stroke();
-      });
+      if (visibleLayers.accessories) {
+        Object.entries(sec.railings).forEach(([edge, on]) => {
+          if (!on) return;
+          ctx.strokeStyle = isLightTheme ? '#16a34a' : '#22c55e';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
+          if (edge === 's') { ctx.moveTo(sx, sy + sd); ctx.lineTo(sx + sw, sy + sd); }
+          if (edge === 'w') { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + sd); }
+          if (edge === 'e') { ctx.moveTo(sx + sw, sy); ctx.lineTo(sx + sw, sy + sd); }
+          ctx.stroke();
+        });
+      }
 
       // Stairs
-      if (sec.stairs && calcs.stairs) {
+      if (sec.stairs && calcs.stairs && visibleLayers.accessories) {
         const st = calcs.stairs;
         const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
         const stairW = st.width * S;

@@ -1,7 +1,7 @@
 import {
   JOIST_SPANS, BEAM_SPANS, LUMBER_ACTUAL,
   POST_SIZES, STAIR_RULES, RAILING_RULES, FOOTING_SIZES,
-} from './spanTables';
+} from './spanTables.js';
 
 /** Get the joist span bucket label for beam lookup */
 function getJoistSpanBucket(joistSpanFt) {

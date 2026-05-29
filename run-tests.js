@@ -55,7 +55,8 @@ global.document = {
 const { serializeProject, validateProjectData } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
-const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/components/Viewport2D/Canvas2D.jsx');
+const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/utils/polygonUtils.js');
+const { DECK_MATERIAL_OPTIONS, DECK_MATERIAL_COLORS } = await import('./src/components/Materials/materialData.js');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -226,32 +227,32 @@ test('4. Landing survival check: landing dimensions survive alongside stairs in 
   assert.strictEqual(restoredLanding.height, 36, 'Landing height should survive');
 });
 
-test('5. Theme state toggle: defaults to dark, persists to localStorage and restores on reload', () => {
+test('5. Theme state toggle: defaults to light, persists to localStorage and restores on reload', () => {
   // Clear any existing localStorage
   mockLocalStorage.clear();
 
   // Test default theme on load
   const store = useDeckStore.getState();
-  assert.strictEqual(store.theme, 'dark', 'New users should default to dark theme');
+  assert.strictEqual(store.theme, 'light', 'New users should default to light theme');
 
   // Verify document.documentElement and meta setup
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should be initialized to dark');
-  assert.strictEqual(mockMeta.attributes['content'], '#060a14', 'Meta theme-color should match dark mode color');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should be initialized to light');
+  assert.strictEqual(mockMeta.attributes['content'], '#f8fafc', 'Meta theme-color should match light mode color');
 
-  // Toggle theme to light
+  // Toggle theme to dark
   store.toggleTheme();
   const stateAfterToggle = useDeckStore.getState();
-  assert.strictEqual(stateAfterToggle.theme, 'light', 'Theme should switch to light after toggleTheme()');
-  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'light', 'Theme selection must be written to localStorage');
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should update to light');
-  assert.strictEqual(mockMeta.attributes['content'], '#f8fafc', 'Meta theme-color should update to light mode color');
+  assert.strictEqual(stateAfterToggle.theme, 'dark', 'Theme should switch to dark after toggleTheme()');
+  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'dark', 'Theme selection must be written to localStorage');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
+  assert.strictEqual(mockMeta.attributes['content'], '#060a14', 'Meta theme-color should update to dark mode color');
 
-  // Toggle theme back to dark
+  // Toggle theme back to light
   stateAfterToggle.toggleTheme();
   const stateAfterToggle2 = useDeckStore.getState();
-  assert.strictEqual(stateAfterToggle2.theme, 'dark', 'Theme should switch back to dark after second toggleTheme()');
-  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'dark', 'Theme selection must be updated in localStorage');
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
+  assert.strictEqual(stateAfterToggle2.theme, 'light', 'Theme should switch back to light after second toggleTheme()');
+  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'light', 'Theme selection must be updated in localStorage');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should update to light');
 });
 
 test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip with schemaVersion 2', () => {
@@ -804,6 +805,54 @@ test('23. Round-trip: a reshaped non-rectangular section (6-vertex L-shape) surv
   assert.deepStrictEqual(loadedSec.vertices, lShapeSec.vertices, 'Restored vertices must match L-shape vertices in exact order');
   assert.strictEqual(loadedSec.width, 192, 'Restored width must be 192');
   assert.strictEqual(loadedSec.depth, 144, 'Restored depth must be 144');
+});
+
+test('24. Decking material options and color mapping: Timbertech Composite and Azek PVC options exist and resolve to correct rendering colors', () => {
+  // Verify Azek PVC and Timbertech Composite exist in options
+  const ttOption = DECK_MATERIAL_OPTIONS.find(opt => opt.value === 'TIMBERTECH');
+  const azekOption = DECK_MATERIAL_OPTIONS.find(opt => opt.value === 'AZEK');
+  
+  assert.ok(ttOption, 'Timbertech option must exist');
+  assert.ok(azekOption, 'Azek option must exist');
+  assert.strictEqual(ttOption.label, 'Timbertech Composite', 'Timbertech label must match');
+  assert.strictEqual(azekOption.label, 'Azek PVC', 'Azek label must match');
+  
+  // Verify they resolve to the correct hex color codes
+  assert.strictEqual(DECK_MATERIAL_COLORS['TIMBERTECH'], '#7e7568', 'Timbertech color must resolve to warm gray/brown');
+  assert.strictEqual(DECK_MATERIAL_COLORS['AZEK'], '#4b4e52', 'Azek color must resolve to dark gray');
+});
+
+test('25. Deck color state updates and backward compatibility migration: changing material updates color and loading project populates missing color', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+  
+  // Verify default color is set on reset
+  assert.strictEqual(store.materials.deckMaterial, 'PT-SYP');
+  assert.strictEqual(store.materials.deckColor, 'pine-natural');
+  
+  // Change deck material to AZEK
+  store.updateDeck({ deckMaterial: 'AZEK' });
+  const azekState = useDeckStore.getState();
+  assert.strictEqual(azekState.materials.deckMaterial, 'AZEK');
+  assert.strictEqual(azekState.materials.deckColor, 'azek-coastline', 'Changing to Azek PVC must snap to first color option (Coastline)');
+  
+  // Load a project with missing deckColor but set deckMaterial
+  const legacyProj = {
+    schemaVersion: 2,
+    projectName: 'Legacy Color Test',
+    sections: [
+      { id: 'sec-1', x: 0, y: 0, width: 144, depth: 120, height: 36, type: 'deck', vertices: [] }
+    ],
+    materials: {
+      deckMaterial: 'TIMBERTECH',
+      species: 'SYP'
+    }
+  };
+  
+  store.loadProject(legacyProj.sections, legacyProj.materials);
+  const loadedState = useDeckStore.getState();
+  assert.strictEqual(loadedState.materials.deckMaterial, 'TIMBERTECH');
+  assert.strictEqual(loadedState.materials.deckColor, 'tt-pecan', 'Loading legacy project with missing color must populate default Timbertech color');
 });
 
 // ─── EXECUTE ALL TESTS ───
