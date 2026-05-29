@@ -13,6 +13,51 @@ import {
 } from '../../utils/polygonUtils.js';
 import './Canvas2D.css';
 
+function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly }) {
+  const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? value.toString() : "");
+
+  useEffect(() => {
+    if (value !== undefined && value !== null) {
+      setLocalVal(value.toString());
+    }
+  }, [value]);
+
+  const commitValue = () => {
+    let num = Number(localVal);
+    if (isNaN(num) || localVal.trim() === "") {
+      setLocalVal(value !== undefined && value !== null ? value.toString() : "");
+      return;
+    }
+    if (min !== undefined && num < min) num = min;
+    if (max !== undefined && num > max) num = max;
+    onChange(num);
+    setLocalVal(num.toString());
+  };
+
+  return (
+    <input
+      id={id}
+      className={className}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onBlur={commitValue}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          commitValue();
+          e.currentTarget.blur();
+        }
+      }}
+      style={style}
+      disabled={disabled}
+      readOnly={readOnly}
+    />
+  );
+}
+
 const SCALE = 3;
 const HANDLE_SIZE = 8;
 const HANDLES = ['nw','n','ne','e','se','s','sw','w'];
@@ -1808,52 +1853,48 @@ export default function Canvas2D({ isMobile }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-stair-width">Stair Width (in)</label>
-          <input
+          <HardenedNumberInput
             id="popup-stair-width"
             className="settings-input"
-            type="number"
-            min="36"
-            max="96"
+            min={36}
+            max={96}
             value={stairObj.width || 36}
-            onChange={(e) => updateStairs(selectedSec.id, { width: Number(e.target.value) })}
+            onChange={(val) => updateStairs(selectedSec.id, { width: val })}
           />
         </div>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-stair-steps">Number of Steps</label>
-          <input
+          <HardenedNumberInput
             id="popup-stair-steps"
             className="settings-input"
-            type="number"
-            min="1"
-            max="20"
+            min={1}
+            max={20}
             value={stairObj.numberOfSteps || 5}
-            onChange={(e) => updateStairs(selectedSec.id, { numberOfSteps: Number(e.target.value) })}
+            onChange={(val) => updateStairs(selectedSec.id, { numberOfSteps: val })}
           />
         </div>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-stair-rise">Rise per Step (in)</label>
-          <input
+          <HardenedNumberInput
             id="popup-stair-rise"
             className="settings-input"
-            type="number"
-            step="0.25"
-            min="4"
-            max="9"
+            step={0.25}
+            min={4}
+            max={9}
             value={stairObj.rise || 7.25}
-            onChange={(e) => updateStairs(selectedSec.id, { rise: Number(e.target.value) })}
+            onChange={(val) => updateStairs(selectedSec.id, { rise: val })}
           />
         </div>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-stair-run">Run per Step (in)</label>
-          <input
+          <HardenedNumberInput
             id="popup-stair-run"
             className="settings-input"
-            type="number"
-            step="0.25"
-            min="8"
-            max="14"
+            step={0.25}
+            min={8}
+            max={14}
             value={stairObj.run || 10}
-            onChange={(e) => updateStairs(selectedSec.id, { run: Number(e.target.value) })}
+            onChange={(val) => updateStairs(selectedSec.id, { run: val })}
           />
         </div>
       </div>
@@ -1883,29 +1924,27 @@ export default function Canvas2D({ isMobile }) {
         </div>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-ramp-width">Ramp Width (in)</label>
-          <input
+          <HardenedNumberInput
             id="popup-ramp-width"
             className="settings-input"
-            type="number"
-            min="36"
-            max="96"
+            min={36}
+            max={96}
             value={rampObj.width || 36}
-            onChange={(e) => updateRamp(selectedSec.id, { width: Number(e.target.value) })}
+            onChange={(val) => updateRamp(selectedSec.id, { width: val })}
           />
         </div>
         <div className="settings-field">
           <label className="settings-label" htmlFor="popup-ramp-run">Ramp Run (in)</label>
-          <input
+          <HardenedNumberInput
             id="popup-ramp-run"
             className="settings-input"
-            type="number"
-            min="12"
-            max="1000"
+            min={12}
+            max={1000}
             value={rampObj.mode === 'ada' ? (selectedSec.height * 12) : (rampObj.run || selectedSec.height * 8)}
             readOnly={rampObj.mode === 'ada'}
             disabled={rampObj.mode === 'ada'}
             style={rampObj.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-            onChange={(e) => updateRamp(selectedSec.id, { run: Number(e.target.value) })}
+            onChange={(val) => updateRamp(selectedSec.id, { run: val })}
           />
         </div>
       </div>
@@ -2410,24 +2449,22 @@ export default function Canvas2D({ isMobile }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
             <div className="settings-field">
               <label className="settings-label">Width (in)</label>
-              <input
+              <HardenedNumberInput
                 className="settings-input"
-                type="number"
-                min="36"
-                max="480"
+                min={36}
+                max={480}
                 value={selectedSec.width}
-                onChange={(e) => updateDeck({ width: Math.max(36, Math.min(480, Number(e.target.value))) })}
+                onChange={(val) => updateDeck({ width: val })}
               />
             </div>
             <div className="settings-field">
               <label className="settings-label">Depth (in)</label>
-              <input
+              <HardenedNumberInput
                 className="settings-input"
-                type="number"
-                min="36"
-                max="480"
+                min={36}
+                max={480}
                 value={selectedSec.depth}
-                onChange={(e) => updateDeck({ depth: Math.max(36, Math.min(480, Number(e.target.value))) })}
+                onChange={(val) => updateDeck({ depth: val })}
               />
             </div>
           </div>
@@ -2435,13 +2472,12 @@ export default function Canvas2D({ isMobile }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
             <div className="settings-field">
               <label className="settings-label">Height (in)</label>
-              <input
+              <HardenedNumberInput
                 className="settings-input"
-                type="number"
-                min="12"
-                max="168"
+                min={12}
+                max={168}
                 value={selectedSec.height}
-                onChange={(e) => updateDeck({ height: Math.max(12, Math.min(168, Number(e.target.value))) })}
+                onChange={(val) => updateDeck({ height: val })}
               />
             </div>
             <div className="settings-field">

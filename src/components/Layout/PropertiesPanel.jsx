@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDeckStore } from '../../store/deckStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatDimension } from '../../utils/units';
@@ -48,16 +48,33 @@ function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 
   const feet = Math.floor(valueInches / 12);
   const inches = Math.round(valueInches % 12);
   
-  const handleFeetChange = (e) => {
-    const newFeet = Math.max(0, parseInt(e.target.value) || 0);
-    const newVal = newFeet * 12 + inches;
-    onChange(Math.max(min, Math.min(max, newVal)));
-  };
+  const [localFeet, setLocalFeet] = useState(feet.toString());
+  const [localInches, setLocalInches] = useState(inches.toString());
 
-  const handleInchesChange = (e) => {
-    const newInches = Math.max(0, Math.min(11, parseInt(e.target.value) || 0));
-    const newVal = feet * 12 + newInches;
-    onChange(Math.max(min, Math.min(max, newVal)));
+  useEffect(() => {
+    setLocalFeet(feet.toString());
+    setLocalInches(inches.toString());
+  }, [feet, inches]);
+
+  const commitValue = (fStr, iStr) => {
+    let f = parseInt(fStr);
+    let i = parseInt(iStr);
+    
+    if (isNaN(f)) f = feet;
+    if (isNaN(i)) i = inches;
+    
+    f = Math.max(0, f);
+    i = Math.max(0, Math.min(11, i));
+    
+    let newVal = f * 12 + i;
+    newVal = Math.max(min, Math.min(max, newVal));
+    
+    onChange(newVal);
+    
+    const finalFeet = Math.floor(newVal / 12);
+    const finalInches = Math.round(newVal % 12);
+    setLocalFeet(finalFeet.toString());
+    setLocalInches(finalInches.toString());
   };
 
   return (
@@ -71,8 +88,15 @@ function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 
             type="number"
             min={Math.floor(min / 12)}
             max={Math.floor(max / 12)}
-            value={feet}
-            onChange={handleFeetChange}
+            value={localFeet}
+            onChange={(e) => setLocalFeet(e.target.value)}
+            onBlur={() => commitValue(localFeet, localInches)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitValue(localFeet, localInches);
+                e.currentTarget.blur();
+              }
+            }}
             style={{ width: '100%', minWidth: '45px', textAlign: 'right' }}
           />
           <span className="prop-field__unit" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ft</span>
@@ -84,8 +108,15 @@ function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 
             type="number"
             min={0}
             max={11}
-            value={inches}
-            onChange={handleInchesChange}
+            value={localInches}
+            onChange={(e) => setLocalInches(e.target.value)}
+            onBlur={() => commitValue(localFeet, localInches)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                commitValue(localFeet, localInches);
+                e.currentTarget.blur();
+              }
+            }}
             style={{ width: '100%', minWidth: '45px', textAlign: 'right' }}
           />
           <span className="prop-field__unit" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>in</span>
@@ -95,6 +126,51 @@ function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 
         </span>
       </div>
     </div>
+  );
+}
+
+function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly }) {
+  const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? value.toString() : "");
+
+  useEffect(() => {
+    if (value !== undefined && value !== null) {
+      setLocalVal(value.toString());
+    }
+  }, [value]);
+
+  const commitValue = () => {
+    let num = Number(localVal);
+    if (isNaN(num) || localVal.trim() === "") {
+      setLocalVal(value !== undefined && value !== null ? value.toString() : "");
+      return;
+    }
+    if (min !== undefined && num < min) num = min;
+    if (max !== undefined && num > max) num = max;
+    onChange(num);
+    setLocalVal(num.toString());
+  };
+
+  return (
+    <input
+      id={id}
+      className={className}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={localVal}
+      onChange={(e) => setLocalVal(e.target.value)}
+      onBlur={commitValue}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          commitValue();
+          e.currentTarget.blur();
+        }
+      }}
+      style={style}
+      disabled={disabled}
+      readOnly={readOnly}
+    />
   );
 }
 
@@ -434,52 +510,48 @@ export default function PropertiesPanel({ isMobile }) {
         >
           <div className="prop-field">
             <label className="label" htmlFor="stair-width">Stair Width (in)</label>
-            <input
+            <HardenedNumberInput
               id="stair-width"
               className="input input--sm"
-              type="number"
-              min="36"
-              max="96"
+              min={36}
+              max={96}
               value={stairObj?.width || 36}
-              onChange={(e) => updateStairs(selectedSectionId, { width: Number(e.target.value) })}
+              onChange={(val) => updateStairs(selectedSectionId, { width: val })}
             />
           </div>
           <div className="prop-field">
             <label className="label" htmlFor="stair-steps">Number of Steps</label>
-            <input
+            <HardenedNumberInput
               id="stair-steps"
               className="input input--sm"
-              type="number"
-              min="1"
-              max="20"
+              min={1}
+              max={20}
               value={stairObj?.numberOfSteps || 5}
-              onChange={(e) => updateStairs(selectedSectionId, { numberOfSteps: Number(e.target.value) })}
+              onChange={(val) => updateStairs(selectedSectionId, { numberOfSteps: val })}
             />
           </div>
           <div className="prop-field">
             <label className="label" htmlFor="stair-rise">Rise per Step (in)</label>
-            <input
+            <HardenedNumberInput
               id="stair-rise"
               className="input input--sm"
-              type="number"
-              step="0.25"
-              min="4"
-              max="9"
+              step={0.25}
+              min={4}
+              max={9}
               value={stairObj?.rise || 7.25}
-              onChange={(e) => updateStairs(selectedSectionId, { rise: Number(e.target.value) })}
+              onChange={(val) => updateStairs(selectedSectionId, { rise: val })}
             />
           </div>
           <div className="prop-field">
             <label className="label" htmlFor="stair-run">Run per Step (in)</label>
-            <input
+            <HardenedNumberInput
               id="stair-run"
               className="input input--sm"
-              type="number"
-              step="0.25"
-              min="8"
-              max="14"
+              step={0.25}
+              min={8}
+              max={14}
               value={stairObj?.run || 10}
-              onChange={(e) => updateStairs(selectedSectionId, { run: Number(e.target.value) })}
+              onChange={(val) => updateStairs(selectedSectionId, { run: val })}
             />
           </div>
         </CollapsibleSection>
@@ -504,29 +576,27 @@ export default function PropertiesPanel({ isMobile }) {
           />
           <div className="prop-field">
             <label className="label" htmlFor="ramp-width">Ramp Width (in)</label>
-            <input
+            <HardenedNumberInput
               id="ramp-width"
               className="input input--sm"
-              type="number"
-              min="36"
-              max="96"
+              min={36}
+              max={96}
               value={rampObj?.width || 36}
-              onChange={(e) => updateRamp(selectedSectionId, { width: Number(e.target.value) })}
+              onChange={(val) => updateRamp(selectedSectionId, { width: val })}
             />
           </div>
           <div className="prop-field">
             <label className="label" htmlFor="ramp-run">Ramp Run (in)</label>
-            <input
+            <HardenedNumberInput
               id="ramp-run"
               className="input input--sm"
-              type="number"
-              min="12"
-              max="1000"
+              min={12}
+              max={1000}
               value={rampObj?.mode === 'ada' ? (currentSection.height * 12) : (rampObj?.run || currentSection.height * 8)}
               readOnly={rampObj?.mode === 'ada'}
               disabled={rampObj?.mode === 'ada'}
               style={rampObj?.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-              onChange={(e) => updateRamp(selectedSectionId, { run: Number(e.target.value) })}
+              onChange={(val) => updateRamp(selectedSectionId, { run: val })}
             />
           </div>
         </CollapsibleSection>
@@ -977,18 +1047,17 @@ export default function PropertiesPanel({ isMobile }) {
                   onChange={(e) => updateRamp(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
                   style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
                 />
-                <input
+                <HardenedNumberInput
                   id="ramp-offset"
                   className="input input--sm"
-                  type="number"
-                  min="0"
+                  min={0}
                   max={(() => {
                     const isVert = rampObj.direction === 'n' || rampObj.direction === 's';
                     const edgeLen = isVert ? currentSection.width : currentSection.depth;
                     return Math.max(0, edgeLen - rampObj.width);
                   })()}
                   value={Math.round(getSubObjectOffset(currentSection, 'ramp'))}
-                  onChange={(e) => updateRamp(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  onChange={(val) => updateRamp(selectedSectionId, { offset: val, align: 'custom' })}
                   style={{ width: '60px' }}
                 />
               </div>
@@ -1008,29 +1077,27 @@ export default function PropertiesPanel({ isMobile }) {
             />
             <div className="prop-field">
               <label className="label" htmlFor="ramp-width">Ramp Width (in)</label>
-              <input
+              <HardenedNumberInput
                 id="ramp-width"
                 className="input input--sm"
-                type="number"
-                min="36"
-                max="96"
+                min={36}
+                max={96}
                 value={rampObj.width || 36}
-                onChange={(e) => updateRamp(selectedSectionId, { width: Number(e.target.value) })}
+                onChange={(val) => updateRamp(selectedSectionId, { width: val })}
               />
             </div>
             <div className="prop-field">
               <label className="label" htmlFor="ramp-run">Ramp Run (in)</label>
-              <input
+              <HardenedNumberInput
                 id="ramp-run"
                 className="input input--sm"
-                type="number"
-                min="12"
-                max="1000"
+                min={12}
+                max={1000}
                 value={rampObj.mode === 'ada' ? (currentSection.height * 12) : (rampObj.run || currentSection.height * 8)}
                 readOnly={rampObj.mode === 'ada'}
                 disabled={rampObj.mode === 'ada'}
                 style={rampObj.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-                onChange={(e) => updateRamp(selectedSectionId, { run: Number(e.target.value) })}
+                onChange={(val) => updateRamp(selectedSectionId, { run: val })}
               />
             </div>
             <button
