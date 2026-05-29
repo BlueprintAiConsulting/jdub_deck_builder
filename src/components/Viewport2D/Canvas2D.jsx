@@ -2,7 +2,16 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeckStore } from '../../store/deckStore';
 import { formatDimension } from '../../utils/units';
-import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData.js';
+import { 
+  WOOD_COLORS, 
+  DECK_MATERIAL_COLORS, 
+  DECK_COLOR_OPTIONS, 
+  SPECIES_OPTIONS, 
+  JOIST_SIZES, 
+  JOIST_SPACINGS, 
+  POST_SIZE_OPTIONS, 
+  SOIL_CAPACITIES 
+} from '../Materials/materialData.js';
 import { drawDimensionLine } from '../../utils/blueprintRenderer.js';
 import {
   isPointInPolygon,
