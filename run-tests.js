@@ -1586,24 +1586,7 @@ test('35. Pricing cost estimation and BOM bar summary cost updates', () => {
   assert.ok(joistsItem, 'Joists item must be generated in BOM');
 });
 
-test('36. Environmental lighting preset state mutations', () => {
-  const store = useDeckStore.getState();
-  store.resetDeck();
 
-  let state = useDeckStore.getState();
-  // 1. Verify default lightingPreset is 'daylight'
-  assert.strictEqual(state.lightingPreset, 'daylight', 'lightingPreset should default to daylight');
-
-  // 2. Set to goldenHour and assert
-  store.setLightingPreset('goldenHour');
-  state = useDeckStore.getState();
-  assert.strictEqual(state.lightingPreset, 'goldenHour', 'lightingPreset should be goldenHour');
-
-  // 3. Set to night and assert
-  store.setLightingPreset('night');
-  state = useDeckStore.getState();
-  assert.strictEqual(state.lightingPreset, 'night', 'lightingPreset should be night');
-});
 
 test('37. Polygon area calculations and rectangle square footage equivalence', async () => {
   const { calculateSquareFootage } = await import('./src/engine/bomGenerator.js');

@@ -407,8 +407,7 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   );
 }
 
-function Railings({ railings, width, depth, height, species, deckMaterial, lightingPreset }) {
-  const isNight = lightingPreset === 'night';
+function Railings({ railings, width, depth, height, species, deckMaterial }) {
   const guardHeight = RAILING_RULES.guardMinHeight; // 36"
   const postWidth = 3.5;
   const railWidth = 1.5;
@@ -473,24 +472,13 @@ function Railings({ railings, width, depth, height, species, deckMaterial, light
                   <mesh position={[p.x * IN, capY + 0.5 * IN, p.z * IN]} castShadow>
                     <boxGeometry args={[4.2 * IN, 1 * IN, 4.2 * IN]} />
                     <meshStandardMaterial 
-                      color={isNight ? '#ffeaa7' : '#2d3436'} 
-                      emissive={isNight ? '#ffeaa7' : '#000000'}
-                      emissiveIntensity={isNight ? 1.5 : 0}
+                      color="#2d3436" 
+                      emissive="#000000"
+                      emissiveIntensity={0}
                       roughness={0.2} 
                       metalness={0.8}
                     />
                   </mesh>
-
-                  {/* Glowing post cap point light */}
-                  {isNight && (
-                    <pointLight 
-                      position={[p.x * IN, capY + 1 * IN, p.z * IN]}
-                      intensity={1.5} 
-                      distance={8} 
-                      decay={2} 
-                      color="#ffeaa7" 
-                    />
-                  )}
                 </group>
               );
             })}
@@ -907,9 +895,7 @@ export default function Scene3D() {
   const materials = useDeckStore((s) => s.materials);
   const visibleLayers = useDeckStore((s) => s.visibleLayers3d || { decking: true, framing: true, foundation: true, accessories: true });
 
-  const isNight = false;
-  const isGoldenHour = false;
-  const isDaylight = true;
+
 
   // Preset lighting values
   const ambientColor = '#ffffff';
@@ -1039,7 +1025,6 @@ export default function Scene3D() {
                     height={sec.height} 
                     species={materials.species}
                     deckMaterial={materials.deckMaterial}
-                    lightingPreset={lightingPreset}
                   />
                   <Stairs 
                     stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} 
@@ -1066,14 +1051,14 @@ export default function Scene3D() {
           );
         })}
 
-        <GroundPlane lightingPreset={lightingPreset} />
+        <GroundPlane />
         
         <gridHelper 
           args={[
             100, 
             100, 
-            isNight ? '#111827' : (isLightTheme ? '#cbd5e1' : '#1a2a4a'), 
-            isNight ? '#030712' : (isLightTheme ? '#e2e8f0' : '#111828')
+            isLightTheme ? '#cbd5e1' : '#1a2a4a', 
+            isLightTheme ? '#e2e8f0' : '#111828'
           ]} 
           position={[0, -4.99, 0]} 
         />
