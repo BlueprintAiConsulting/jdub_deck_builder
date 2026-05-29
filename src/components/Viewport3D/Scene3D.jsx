@@ -1199,7 +1199,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
         return (
           <mesh 
             position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-            rotation={[-theta, 0, 0]} 
+            rotation={[theta, 0, 0]} 
             castShadow 
             receiveShadow
           >
@@ -1217,7 +1217,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
         return (
           <mesh 
             position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-            rotation={[-theta, 0, 0]} 
+            rotation={[theta, 0, 0]} 
             castShadow 
             receiveShadow
           >
@@ -1309,7 +1309,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const deckBump = getProceduralBumpTexture(deckVar);
 
       elements.push(
-        <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[-theta, 0, 0]}>
+        <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[theta, 0, 0]}>
           <mesh castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
             <boxGeometry args={[rampWidth * IN, treadThickness * IN, segSurfaceLength * IN]} />
             <meshStandardMaterial 
