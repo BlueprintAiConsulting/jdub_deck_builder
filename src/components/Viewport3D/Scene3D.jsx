@@ -32,7 +32,7 @@ export function getProceduralTexture(colorHex, type) {
     for (let i = 0; i < numSlats; i++) {
       const y = i * slatH;
       // Draw linear gradient shadow for lap siding
-      const grad = ctx.getContext('2d').createLinearGradient(0, y, 0, y + slatH);
+      const grad = ctx.createLinearGradient(0, y, 0, y + slatH);
       const colStart = baseColor.clone().multiplyScalar(1.05).getStyle();
       const colMid = baseColor.getStyle();
       const colEnd = baseColor.clone().multiplyScalar(0.85).getStyle();

@@ -219,13 +219,6 @@ export default function Canvas2D({ isMobile }) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [activeTab, setActiveTab] = useState('beams');
 
-  useEffect(() => {
-    if (!selectedSectionId) {
-      setActionPopup(null);
-      setShowSettingsModal(false);
-    }
-  }, [selectedSectionId]);
-
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
@@ -238,6 +231,13 @@ export default function Canvas2D({ isMobile }) {
   const showGrid = useDeckStore((s) => s.showGrid);
   const showDimensions = useDeckStore((s) => s.showDimensions);
   const visibleLayers = useDeckStore((s) => s.visibleLayers2d || { decking: true, framing: true, foundation: true, accessories: true });
+
+  useEffect(() => {
+    if (!selectedSectionId) {
+      setActionPopup(null);
+      setShowSettingsModal(false);
+    }
+  }, [selectedSectionId]);
   const selectedTool = useDeckStore((s) => s.selectedTool);
   const interaction = useDeckStore((s) => s.interaction);
   const selectSection = useDeckStore((s) => s.selectSection);
@@ -1688,6 +1688,11 @@ export default function Canvas2D({ isMobile }) {
   const zoomIn = useCallback(() => setZoomScale((z) => Math.min(4, z * 1.25)), []);
   const zoomOut = useCallback(() => setZoomScale((z) => Math.max(0.2, z / 1.25)), []);
   const zoomReset = useCallback(() => { setZoomScale(1); setPanOffset({ x: 0, y: 0 }); }, []);
+
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    setZoomScale((z) => Math.min(4, Math.max(0.2, z * (e.deltaY > 0 ? 0.92 : 1.08))));
+  }, []);
 
   const handleDeletePopupObject = useCallback(() => {
     if (!actionPopup) return;

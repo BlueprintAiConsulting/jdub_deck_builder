@@ -90,6 +90,14 @@ try {
   await page.goto(serverUrl);
   await page.waitForSelector('.canvas-2d__canvas');
 
+  // Dismiss onboarding modal to ensure views are unobstructed
+  console.log('Dismissing onboarding modal...');
+  const skipBtn = await page.$('.onboarding__skip');
+  if (skipBtn) {
+    await skipBtn.click();
+    await page.waitForTimeout(300);
+  }
+
   // Load the rectangular project via window.useDeckStore
   console.log('Loading rectangular project into store...');
   await page.evaluate((proj) => {
