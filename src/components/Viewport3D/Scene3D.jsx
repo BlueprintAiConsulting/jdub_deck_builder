@@ -951,7 +951,17 @@ export default function Scene3D() {
           ]}
           fov={50}
         />
-        <OrbitControls ref={controlsRef} target={cameraTarget} enableDamping dampingFactor={0.1} />
+        <OrbitControls 
+          ref={controlsRef} 
+          target={cameraTarget} 
+          enableDamping 
+          dampingFactor={0.1} 
+          mouseButtons={{
+            LEFT: THREE.MOUSE.PAN,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.ROTATE
+          }}
+        />
         
         <CameraController
           viewTrigger={viewTrigger}
