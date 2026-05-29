@@ -13,6 +13,170 @@ const IN = 1 / 12; // inches to scene units (feet)
 
 const textureCache = {};
 
+function drawWoodPatternOnCanvas(canvas, colorHex, type, isBump = false) {
+  const ctx = canvas.getContext('2d');
+  
+  if (isBump) {
+    ctx.fillStyle = '#808080';
+  } else {
+    ctx.fillStyle = colorHex;
+  }
+  ctx.fillRect(0, 0, 512, 512);
+
+  // broad color variations
+  if (!isBump) {
+    for (let i = 0; i < 15; i++) {
+      const gradY = Math.random() * 512;
+      const gradH = Math.random() * 100 + 50;
+      const grad = ctx.createLinearGradient(0, gradY, 0, gradY + gradH);
+      grad.addColorStop(0, 'rgba(0,0,0,0.03)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.02)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.03)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, gradY, 512, gradH);
+    }
+  } else {
+    // broad bump shading
+    for (let i = 0; i < 8; i++) {
+      const gradY = Math.random() * 512;
+      const gradH = Math.random() * 120 + 60;
+      const grad = ctx.createLinearGradient(0, gradY, 0, gradY + gradH);
+      grad.addColorStop(0, 'rgba(120,120,120,0.04)');
+      grad.addColorStop(0.5, 'rgba(140,140,140,0.04)');
+      grad.addColorStop(1, 'rgba(120,120,120,0.04)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, gradY, 512, gradH);
+    }
+  }
+
+  // Preset knot coordinates for this variation
+  const variation = type.split('-')[1] || '0';
+  let hasKnot = true;
+  let knotX = 260;
+  let knotY = 230;
+  if (variation === '0') { knotX = 140; knotY = 150; }
+  else if (variation === '1') { knotX = 390; knotY = 320; }
+  else if (variation === '2') { hasKnot = false; } // No knot for variance
+  else if (variation === '3') { knotX = 420; knotY = 100; }
+  else if (variation === '4') { knotX = 180; knotY = 420; }
+
+  const getKnotDistortion = (x, y) => {
+    if (!hasKnot) return 0;
+    const dx = x - knotX;
+    const dy = y - knotY;
+    const r = Math.sqrt(dx * dx + dy * dy * 6); // Stretch vertically for ovals
+    if (r < 120) {
+      const force = Math.sin((r / 120) * Math.PI / 2) * 22;
+      return (dy > 0 ? 1 : -1) * (22 - force);
+    }
+    return 0;
+  };
+
+  // Draw fine wood grain lines
+  ctx.lineWidth = 1.0;
+  const numLines = isBump ? 120 : 180;
+  for (let g = 0; g < numLines; g++) {
+    const baseOffsetY = Math.random() * 512;
+    const isDark = Math.random() > 0.4;
+    
+    if (isBump) {
+      ctx.strokeStyle = isDark 
+        ? `rgba(110,110,110,${Math.random() * 0.15 + 0.05})` 
+        : `rgba(145,145,145,${Math.random() * 0.1 + 0.02})`;
+    } else {
+      ctx.strokeStyle = isDark 
+        ? `rgba(0,0,0,${Math.random() * 0.12 + 0.04})` 
+        : `rgba(255,255,255,${Math.random() * 0.05 + 0.02})`;
+    }
+    
+    ctx.beginPath();
+    for (let x = 0; x <= 512; x += 8) {
+      const sine = Math.sin(x * 0.012 + baseOffsetY) * 4;
+      const knotD = getKnotDistortion(x, baseOffsetY);
+      const y = baseOffsetY + sine + knotD;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  // Draw the wood knot details
+  if (hasKnot) {
+    if (isBump) {
+      ctx.fillStyle = 'rgba(100,100,100,0.18)';
+      ctx.strokeStyle = 'rgba(110,110,110,0.1)';
+      ctx.lineWidth = 2.0;
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.lineWidth = 2;
+    }
+    
+    ctx.beginPath();
+    ctx.ellipse(knotX, knotY, 14, 6, 0.06, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+
+    for (let r = 20; r < 70; r += 12) {
+      ctx.beginPath();
+      ctx.ellipse(knotX, knotY, r, r * 0.42, 0.06, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawCompositePatternOnCanvas(canvas, colorHex, type, isBump = false) {
+  const ctx = canvas.getContext('2d');
+  
+  if (isBump) {
+    ctx.fillStyle = '#808080';
+  } else {
+    ctx.fillStyle = colorHex;
+  }
+  ctx.fillRect(0, 0, 512, 512);
+
+  // broad shading variations
+  if (!isBump) {
+    for (let i = 0; i < 10; i++) {
+      const gradY = Math.random() * 512;
+      const gradH = Math.random() * 80 + 40;
+      const grad = ctx.createLinearGradient(0, gradY, 0, gradY + gradH);
+      grad.addColorStop(0, 'rgba(0,0,0,0.02)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.02)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, gradY, 512, gradH);
+    }
+  }
+
+  // Fine linear grooves
+  if (isBump) {
+    ctx.strokeStyle = 'rgba(110,110,110,0.12)';
+  } else {
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+  }
+  ctx.lineWidth = 1.0;
+  for (let y = 0; y < 512; y += 6) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(512, y);
+    ctx.stroke();
+  }
+
+  // Add fine speckles/wood fibers
+  const numSpeckles = isBump ? 4000 : 8000;
+  for (let i = 0; i < numSpeckles; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const alpha = Math.random() * 0.05;
+    if (isBump) {
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(140,140,140,${alpha})` : `rgba(115,115,115,${alpha})`;
+    } else {
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+    }
+    ctx.fillRect(x, y, 1.5, 1.5);
+  }
+}
+
 export function getProceduralTexture(colorHex, type) {
   const cacheKey = `${colorHex}-${type}`;
   if (textureCache[cacheKey]) {
@@ -22,16 +186,15 @@ export function getProceduralTexture(colorHex, type) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
-  const ctx = canvas.getContext('2d');
 
   if (type === 'siding') {
+    const ctx = canvas.getContext('2d');
     const numSlats = 16;
     const slatH = 512 / numSlats;
     const baseColor = new THREE.Color(colorHex);
     
     for (let i = 0; i < numSlats; i++) {
       const y = i * slatH;
-      // Draw linear gradient shadow for lap siding
       const grad = ctx.createLinearGradient(0, y, 0, y + slatH);
       const colStart = baseColor.clone().multiplyScalar(1.05).getStyle();
       const colMid = baseColor.getStyle();
@@ -45,13 +208,13 @@ export function getProceduralTexture(colorHex, type) {
       ctx.fillStyle = grad;
       ctx.fillRect(0, y, 512, slatH);
       
-      // Bottom overlap shadow highlight line
       ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
       ctx.fillRect(0, y + slatH - 1.5, 512, 1.5);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.fillRect(0, y, 512, 0.5);
     }
   } else if (type === 'shingles') {
+    const ctx = canvas.getContext('2d');
     ctx.fillStyle = colorHex;
     ctx.fillRect(0, 0, 512, 512);
     
@@ -68,17 +231,16 @@ export function getProceduralTexture(colorHex, type) {
         ctx.fillStyle = shColor.getStyle();
         ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
         
-        // Shadow lines
         ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.fillRect(x, y + rowH - 1, colW, 1);
         ctx.fillRect(x + colW - 1, y, 1, rowH);
       }
     }
   } else if (type === 'grass') {
+    const ctx = canvas.getContext('2d');
     ctx.fillStyle = colorHex;
     ctx.fillRect(0, 0, 512, 512);
     
-    // Draw fine grass blades
     for (let i = 0; i < 18000; i++) {
       const x = Math.random() * 512;
       const y = Math.random() * 512;
@@ -96,6 +258,7 @@ export function getProceduralTexture(colorHex, type) {
       ctx.stroke();
     }
   } else if (type === 'concrete') {
+    const ctx = canvas.getContext('2d');
     ctx.fillStyle = colorHex;
     ctx.fillRect(0, 0, 512, 512);
     
@@ -106,69 +269,10 @@ export function getProceduralTexture(colorHex, type) {
       ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
       ctx.fillRect(x, y, Math.random() * 2 + 1, Math.random() * 2 + 1);
     }
-  } else if (type === 'composite') {
-    // Base fill
-    ctx.fillStyle = colorHex;
-    ctx.fillRect(0, 0, 512, 512);
-    
-    for (let i = 0; i < 4000; i++) {
-      const x = Math.random() * 512;
-      const y = Math.random() * 512;
-      const alpha = Math.random() * 0.04;
-      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
-    
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 1;
-    for (let y = 0; y < 512; y += 8) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
-    }
-    
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    for (let y = 4; y < 512; y += 8) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
-    }
+  } else if (type.startsWith('composite')) {
+    drawCompositePatternOnCanvas(canvas, colorHex, type, false);
   } else {
-    // Base fill
-    ctx.fillStyle = colorHex;
-    ctx.fillRect(0, 0, 512, 512);
-
-    // Wood grain lines (including light/dark contrast lines)
-    for (let y = 0; y < 512; y += Math.random() * 4 + 2) {
-      const alpha = Math.random() * 0.05;
-      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${alpha * 0.4})` : `rgba(0,0,0,${alpha})`;
-      ctx.fillRect(0, y, 512, Math.random() * 2 + 0.5);
-    }
-    
-    // Wave growth rings
-    ctx.strokeStyle = 'rgba(0,0,0,0.035)';
-    ctx.lineWidth = 2.5;
-    for (let i = 0; i < 8; i++) {
-      const yOffset = i * 75 - 50;
-      ctx.beginPath();
-      ctx.moveTo(0, yOffset);
-      ctx.bezierCurveTo(128, yOffset + 30, 384, yOffset - 20, 512, yOffset + 10);
-      ctx.stroke();
-    }
-
-    // Wood knot
-    const knotX = 220;
-    const knotY = 180;
-    ctx.fillStyle = 'rgba(0,0,0,0.05)';
-    ctx.strokeStyle = 'rgba(0,0,0,0.02)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(knotX, knotY, 15, 8, 0.08, 0, 2 * Math.PI);
-    ctx.fill();
-    ctx.stroke();
-    
-    for (let r = 20; r < 70; r += 12) {
-      ctx.beginPath();
-      ctx.ellipse(knotX, knotY, r, r * 0.45, 0.08, 0, 2 * Math.PI);
-      ctx.stroke();
-    }
+    drawWoodPatternOnCanvas(canvas, colorHex, type, false);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -187,26 +291,13 @@ export function getProceduralBumpTexture(type) {
   }
 
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
+  canvas.width = 512;
+  canvas.height = 512;
 
-  ctx.fillStyle = '#808080';
-  ctx.fillRect(0, 0, 256, 256);
-
-  if (type === 'wood') {
-    for (let y = 0; y < 256; y += Math.random() * 4 + 2) {
-      const isHigh = Math.random() > 0.5;
-      ctx.fillStyle = isHigh ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-      ctx.fillRect(0, y, 256, Math.random() * 2 + 1);
-    }
-  } else if (type === 'composite') {
-    for (let y = 0; y < 256; y += 4) {
-      ctx.fillStyle = 'rgba(0,0,0,0.04)';
-      ctx.fillRect(0, y, 256, 1);
-      ctx.fillStyle = 'rgba(255,255,255,0.02)';
-      ctx.fillRect(0, y + 2, 256, 1);
-    }
+  if (type.startsWith('composite')) {
+    drawCompositePatternOnCanvas(canvas, null, type, true);
+  } else {
+    drawWoodPatternOnCanvas(canvas, null, type, true);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -616,18 +707,23 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
 
   return (
     <group>
-      {boards.map(({ id, posX, posZ, sizeX, sizeZ, rotY }) => (
-        <mesh key={`board-${id}`} position={[posX * IN, boardH / 2 * IN, posZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
-          <boxGeometry args={[sizeX * IN, boardH * IN, sizeZ * IN]} />
-          <meshStandardMaterial 
-            map={texture} 
-            bumpMap={bumpTexture}
-            bumpScale={0.012}
-            roughness={type === 'composite' ? 0.85 : 0.6} 
-            metalness={0.02} 
-          />
-        </mesh>
-      ))}
+      {boards.map(({ id, posX, posZ, sizeX, sizeZ, rotY }, i) => {
+        const boardType = `${type}-${i % 5}`;
+        const boardTexture = getProceduralTexture(color, boardType);
+        const boardBump = getProceduralBumpTexture(boardType);
+        return (
+          <mesh key={`board-${id}`} position={[posX * IN, boardH / 2 * IN, posZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
+            <boxGeometry args={[sizeX * IN, boardH * IN, sizeZ * IN]} />
+            <meshStandardMaterial 
+              map={boardTexture} 
+              bumpMap={boardBump}
+              bumpScale={0.015}
+              roughness={type === 'composite' ? 0.8 : 0.65} 
+              metalness={0.02} 
+            />
+          </mesh>
+        );
+      })}
     </group>
   );
 }
@@ -635,7 +731,8 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
 function Joists({ positions, width, depth, joistSize, joistOrientation }) {
   const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
   const isHorizontal = joistOrientation === 'horizontal';
-  const joistTexture = getProceduralTexture('#5a4d3b', 'wood');
+  const joistTexture = getProceduralTexture('#6e5f4d', 'wood-0');
+  const joistBump = getProceduralBumpTexture('wood-0');
 
   return (
     <group>
@@ -647,7 +744,12 @@ function Joists({ positions, width, depth, joistSize, joistOrientation }) {
         return (
           <mesh key={`joist-${i}`} position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} castShadow receiveShadow>
             <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
-            <meshStandardMaterial map={joistTexture} roughness={0.8} />
+            <meshStandardMaterial 
+              map={joistTexture} 
+              roughness={0.8} 
+              bumpMap={joistBump}
+              bumpScale={0.012}
+            />
           </mesh>
         );
       })}
@@ -662,7 +764,8 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
   const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
   const ply = parseInt(beamConfig.split('-')[0]) || 2;
   const beamTopY = -joistActual.depth;
-  const beamTexture = getProceduralTexture('#4e3f2d', 'wood');
+  const beamTexture = getProceduralTexture('#564736', 'wood-1');
+  const beamBump = getProceduralBumpTexture('wood-1');
 
   return (
     <group>
@@ -686,7 +789,12 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
                 receiveShadow
               >
                 <boxGeometry args={[sizeX, actual.depth * IN, sizeZ]} />
-                <meshStandardMaterial map={beamTexture} roughness={0.8} />
+                <meshStandardMaterial 
+                  map={beamTexture} 
+                  roughness={0.78} 
+                  bumpMap={beamBump}
+                  bumpScale={0.015}
+                />
               </mesh>
             );
           })}
@@ -698,7 +806,8 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
 
 function Blocking({ blocking, joistSize }) {
   const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
-  const woodTexture = getProceduralTexture('#5a4d3b', 'wood');
+  const woodTexture = getProceduralTexture('#6e5f4d', 'wood-2');
+  const blockingBump = getProceduralBumpTexture('wood-2');
 
   if (!blocking || !blocking.enabled || !blocking.segments) return null;
 
@@ -723,7 +832,12 @@ function Blocking({ blocking, joistSize }) {
             receiveShadow
           >
             <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
-            <meshStandardMaterial map={woodTexture} roughness={0.8} />
+            <meshStandardMaterial 
+              map={woodTexture} 
+              roughness={0.8} 
+              bumpMap={blockingBump}
+              bumpScale={0.01}
+            />
           </mesh>
         );
       })}
@@ -768,7 +882,8 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
   const beamActual = LUMBER_ACTUAL[beamSize] || { depth: 9.25 };
   const topOfPost = -(joistActual.depth + beamActual.depth);
-  const postTexture = getProceduralTexture('#504230', 'wood');
+  const postTexture = getProceduralTexture('#5c4e3e', 'wood-3');
+  const postBump = getProceduralBumpTexture('wood-3');
 
   return (
     <group>
@@ -786,7 +901,12 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
             receiveShadow
           >
             <boxGeometry args={[nominalWidth * IN, postHeight * IN, nominalWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial 
+              map={postTexture} 
+              roughness={0.82} 
+              bumpMap={postBump}
+              bumpScale={0.015}
+            />
           </mesh>
         );
       })}
@@ -794,15 +914,20 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   );
 }
 
-function Railings({ railings, width, depth, height, species, deckMaterial }) {
+function Railings({ railings, width, depth, height, species, deckMaterial, deckColor }) {
   const guardHeight = RAILING_RULES.guardMinHeight; // 36"
   const postWidth = 3.5;
   const railWidth = 1.5;
   const balusterSpacing = RAILING_RULES.balusterMaxSpacing;
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0) * IN;
 
-  const { color, type } = getMaterialVisuals(deckMaterial, species);
-  const texture = getProceduralTexture(color, type);
+  const getBoardColor = () => {
+    const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
+    const opt = opts.find(o => o.value === deckColor);
+    return opt ? opt.color : (DECK_MATERIAL_COLORS[deckMaterial] || WOOD_COLORS[species] || '#c4a35a');
+  };
+  const color = getBoardColor();
+  const { type } = getMaterialVisuals(deckMaterial, species);
 
   const edges = useMemo(() => {
     const result = [];
@@ -821,7 +946,7 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
 
   return (
     <group>
-      {edges.map(({ edge, x1, z1, x2, z2 }) => {
+      {edges.map(({ edge, x1, z1, x2, z2 }, edgeIdx) => {
         const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
         const midX = (x1 + x2) / 2;
         const midZ = (z1 + z2) / 2;
@@ -848,11 +973,20 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
             {/* Corner posts with Caps */}
             {cornerPosts.map((p, i) => {
               const capY = deckTopY + guardHeight * IN;
+              const postVar = `${type}-${(edgeIdx * 2 + i) % 5}`;
+              const postTex = getProceduralTexture(color, postVar);
+              const postBump = getProceduralBumpTexture(postVar);
               return (
                 <group key={`rpost-group-${edge}-${i}`}>
                   <mesh position={[p.x * IN, deckTopY + guardHeight / 2 * IN, p.z * IN]} castShadow receiveShadow>
                     <boxGeometry args={[postWidth * IN, guardHeight * IN, postWidth * IN]} />
-                    <meshStandardMaterial map={texture} roughness={0.7} />
+                    <meshStandardMaterial 
+                      map={postTex} 
+                      bumpMap={postBump}
+                      bumpScale={0.015}
+                      roughness={type === 'composite' ? 0.8 : 0.65}
+                      metalness={0.02}
+                    />
                   </mesh>
 
                   {/* Post Cap */}
@@ -871,28 +1005,65 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
             })}
 
             {/* Top rail */}
-            <mesh position={[midX * IN, deckTopY + guardHeight * IN, midZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
-              <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
-              <meshStandardMaterial map={texture} roughness={0.65} />
-            </mesh>
+            {(() => {
+              const railVar = `${type}-${(edgeIdx * 2) % 5}`;
+              const railTex = getProceduralTexture(color, railVar);
+              const railBump = getProceduralBumpTexture(railVar);
+              return (
+                <mesh position={[midX * IN, deckTopY + guardHeight * IN, midZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
+                  <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
+                  <meshStandardMaterial 
+                    map={railTex} 
+                    bumpMap={railBump}
+                    bumpScale={0.015}
+                    roughness={type === 'composite' ? 0.8 : 0.65}
+                    metalness={0.02}
+                  />
+                </mesh>
+              );
+            })()}
 
             {/* Bottom rail */}
-            <mesh position={[midX * IN, deckTopY + 4 * IN, midZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
-              <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
-              <meshStandardMaterial map={texture} roughness={0.65} />
-            </mesh>
+            {(() => {
+              const railVar = `${type}-${(edgeIdx * 2 + 1) % 5}`;
+              const railTex = getProceduralTexture(color, railVar);
+              const railBump = getProceduralBumpTexture(railVar);
+              return (
+                <mesh position={[midX * IN, deckTopY + 4 * IN, midZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
+                  <boxGeometry args={[length * IN, railWidth * IN, railWidth * IN]} />
+                  <meshStandardMaterial 
+                    map={railTex} 
+                    bumpMap={railBump}
+                    bumpScale={0.015}
+                    roughness={type === 'composite' ? 0.8 : 0.65}
+                    metalness={0.02}
+                  />
+                </mesh>
+              );
+            })()}
 
             {/* Balusters */}
-            {balusters.map((b, i) => (
-              <mesh key={`bal-${edge}-${i}`} position={[b.x * IN, deckTopY + guardHeight / 2 * IN, b.z * IN]} castShadow receiveShadow>
-                <boxGeometry args={[1 * IN, (guardHeight - 2) * IN, 1 * IN]} />
-                {type === 'composite' ? (
-                  <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.7} />
-                ) : (
-                  <meshStandardMaterial map={texture} roughness={0.75} />
-                )}
-              </mesh>
-            ))}
+            {balusters.map((b, i) => {
+              const balVar = `${type}-${(edgeIdx * 11 + i) % 5}`;
+              const balTex = getProceduralTexture(color, balVar);
+              const balBump = getProceduralBumpTexture(balVar);
+              return (
+                <mesh key={`bal-${edge}-${i}`} position={[b.x * IN, deckTopY + guardHeight / 2 * IN, b.z * IN]} castShadow receiveShadow>
+                  <boxGeometry args={[1 * IN, (guardHeight - 2) * IN, 1 * IN]} />
+                  {type === 'composite' ? (
+                    <meshStandardMaterial color="#1e293b" roughness={0.4} metalness={0.7} />
+                  ) : (
+                    <meshStandardMaterial 
+                      map={balTex} 
+                      bumpMap={balBump}
+                      bumpScale={0.015}
+                      roughness={0.65}
+                      metalness={0.02}
+                    />
+                  )}
+                </mesh>
+              );
+            })}
           </group>
         );
       })}
@@ -900,7 +1071,7 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
   );
 }
 
-function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial }) {
+function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial, deckColor }) {
   if (!stairEdge || !stairCalcs || !section) return null;
 
   const stairWidth = stairCalcs.width || STAIR_RULES.maxStairWidth;
@@ -914,9 +1085,13 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
   const safeRiserHeight = stairCalcs.riserHeight || 7.25;
   const safeNumRisers = stairCalcs.numRisers || (safeNumTreads + 1);
 
-  const { color, type } = getMaterialVisuals(deckMaterial, species);
-  const texture = getProceduralTexture(color, type);
-  const woodTexture = getProceduralTexture('#5a4d3b', 'wood'); // wood texture for stringers
+  const getBoardColor = () => {
+    const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
+    const opt = opts.find(o => o.value === deckColor);
+    return opt ? opt.color : (DECK_MATERIAL_COLORS[deckMaterial] || WOOD_COLORS[species] || '#c4a35a');
+  };
+  const color = getBoardColor();
+  const { type } = getMaterialVisuals(deckMaterial, species);
 
   // Compute rotation around Y axis based on edge direction
   let rotY = 0;
@@ -965,47 +1140,83 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
   return (
     <group position={[centerX * IN, 0, centerZ * IN]} rotation={[0, rotY, 0]}>
       {/* Treads */}
-      {treads.map((t, i) => (
-        <mesh key={`tread-${i}`} position={[t.x * IN, t.y * IN, t.z * IN]} castShadow receiveShadow>
-          <boxGeometry args={[stairWidth * IN, treadThickness * IN, treadDepth * IN]} />
-          <meshStandardMaterial map={texture} roughness={0.7} />
-        </mesh>
-      ))}
+      {treads.map((t, i) => {
+        const treadVar = `${type}-${i % 5}`;
+        const treadTex = getProceduralTexture(color, treadVar);
+        const treadBump = getProceduralBumpTexture(treadVar);
+        return (
+          <mesh key={`tread-${i}`} position={[t.x * IN, t.y * IN, t.z * IN]} castShadow receiveShadow>
+            <boxGeometry args={[stairWidth * IN, treadThickness * IN, treadDepth * IN]} />
+            <meshStandardMaterial 
+              map={treadTex} 
+              bumpMap={treadBump}
+              bumpScale={0.015}
+              roughness={type === 'composite' ? 0.8 : 0.65}
+              metalness={0.02}
+            />
+          </mesh>
+        );
+      })}
 
       {/* Risers */}
-      {risers.map((r, i) => (
-        <mesh key={`riser-${i}`} position={[r.x * IN, r.y * IN, r.z * IN]} castShadow receiveShadow>
-          <boxGeometry args={[stairWidth * IN, safeRiserHeight * IN, 0.75 * IN]} />
-          <meshStandardMaterial map={texture} roughness={0.8} />
-        </mesh>
-      ))}
+      {risers.map((r, i) => {
+        const riserVar = `${type}-${(i + 2) % 5}`;
+        const riserTex = getProceduralTexture(color, riserVar);
+        const riserBump = getProceduralBumpTexture(riserVar);
+        return (
+          <mesh key={`riser-${i}`} position={[r.x * IN, r.y * IN, r.z * IN]} castShadow receiveShadow>
+            <boxGeometry args={[stairWidth * IN, safeRiserHeight * IN, 0.75 * IN]} />
+            <meshStandardMaterial 
+              map={riserTex} 
+              bumpMap={riserBump}
+              bumpScale={0.015}
+              roughness={type === 'composite' ? 0.8 : 0.65}
+              metalness={0.02}
+            />
+          </mesh>
+        );
+      })}
 
       {/* Left Stringer (flanking baseboard) */}
-      <mesh 
-        position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-        rotation={[theta, 0, 0]} 
-        castShadow 
-        receiveShadow
-      >
-        <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
-        <meshStandardMaterial map={woodTexture} roughness={0.8} />
-      </mesh>
+      {(() => {
+        const stringerVar = 'wood-4';
+        const strTex = getProceduralTexture('#5a4d3b', stringerVar);
+        const strBump = getProceduralBumpTexture(stringerVar);
+        return (
+          <mesh 
+            position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
+            rotation={[theta, 0, 0]} 
+            castShadow 
+            receiveShadow
+          >
+            <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
+            <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
+          </mesh>
+        );
+      })()}
 
       {/* Right Stringer (flanking baseboard) */}
-      <mesh 
-        position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-        rotation={[theta, 0, 0]} 
-        castShadow 
-        receiveShadow
-      >
-        <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
-        <meshStandardMaterial map={woodTexture} roughness={0.8} />
-      </mesh>
+      {(() => {
+        const stringerVar = 'wood-1';
+        const strTex = getProceduralTexture('#5a4d3b', stringerVar);
+        const strBump = getProceduralBumpTexture(stringerVar);
+        return (
+          <mesh 
+            position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
+            rotation={[theta, 0, 0]} 
+            castShadow 
+            receiveShadow
+          >
+            <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
+            <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
+          </mesh>
+        );
+      })()}
     </group>
   );
 }
 
-function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height: rawHeight }) {
+function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, deckColor, postSize, height: rawHeight }) {
   if (!rampEdge || !rampCalcs || !section) return null;
 
   const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) ? rawHeight : 36;
@@ -1021,12 +1232,13 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
   const treadThickness = 1.0;
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
 
-  const { color, type } = getMaterialVisuals(deckMaterial, species);
-  const texture = getProceduralTexture(color, type);
-  
-  // Textures for framing/posts
-  const woodTexture = getProceduralTexture('#5a4d3b', 'wood');
-  const postTexture = getProceduralTexture('#504230', 'wood');
+  const getBoardColor = () => {
+    const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
+    const opt = opts.find(o => o.value === deckColor);
+    return opt ? opt.color : (DECK_MATERIAL_COLORS[deckMaterial] || WOOD_COLORS[species] || '#c4a35a');
+  };
+  const color = getBoardColor();
+  const { type } = getMaterialVisuals(deckMaterial, species);
 
   const offset = getSubObjectOffset(section, 'ramp');
   let startX, startZ, rotY;
@@ -1078,11 +1290,21 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const y_mid = (currentY + nextY) / 2;
 
       // 1. Decking surface and 2x12 Sloped Stringers
+      const deckVar = `${type}-${j % 5}`;
+      const deckTex = getProceduralTexture(color, deckVar);
+      const deckBump = getProceduralBumpTexture(deckVar);
+
       elements.push(
         <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[theta, 0, 0]}>
           <mesh castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
             <boxGeometry args={[rampWidth * IN, treadThickness * IN, segSurfaceLength * IN]} />
-            <meshStandardMaterial map={texture} roughness={0.7} />
+            <meshStandardMaterial 
+              map={deckTex} 
+              bumpMap={deckBump}
+              bumpScale={0.015}
+              roughness={type === 'composite' ? 0.8 : 0.65}
+              metalness={0.02}
+            />
           </mesh>
           {(() => {
             const numStringers = Math.max(3, Math.ceil(rampWidth / 16) + 1);
@@ -1092,10 +1314,13 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
               if (numStringers > 1) {
                 x_pos = -rampWidth / 2 + 0.75 + s * (rampWidth - 1.5) / (numStringers - 1);
               }
+              const stringerVar = `wood-${(s + j) % 5}`;
+              const strTex = getProceduralTexture('#5a4d3b', stringerVar);
+              const strBump = getProceduralBumpTexture(stringerVar);
               stringerElements.push(
                 <mesh key={`stringer-${s}`} position={[x_pos * IN, -(treadThickness + stringerDepth / 2) * IN, 0]} castShadow receiveShadow>
                   <boxGeometry args={[1.5 * IN, stringerDepth * IN, segSurfaceLength * IN]} />
-                  <meshStandardMaterial map={woodTexture} roughness={0.8} />
+                  <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.012} roughness={0.8} />
                 </mesh>
               );
             }
@@ -1113,15 +1338,23 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const x_left = -rampWidth / 2 + postActualWidth / 2;
       const x_right = rampWidth / 2 - postActualWidth / 2;
 
+      const postLVar = `wood-${(j * 2) % 5}`;
+      const postLTex = getProceduralTexture('#504230', postLVar);
+      const postLBump = getProceduralBumpTexture(postLVar);
+
+      const postRVar = `wood-${(j * 2 + 1) % 5}`;
+      const postRTex = getProceduralTexture('#504230', postRVar);
+      const postRBump = getProceduralBumpTexture(postRVar);
+
       elements.push(
         <group key={`ramp-seg-posts-${j}`}>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postLTex} bumpMap={postLBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postRTex} bumpMap={postRBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         </group>
       );
@@ -1135,34 +1368,60 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const y_mid = currentY;
 
       // 1. Landing Decking Surface
+      const landVar = `${type}-${j % 5}`;
+      const landTex = getProceduralTexture(color, landVar);
+      const landBump = getProceduralBumpTexture(landVar);
+
       elements.push(
         <mesh key={`ramp-land-${j}`} position={[0, (y_mid - treadThickness / 2) * IN, z_mid * IN]} castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
           <boxGeometry args={[landingW * IN, treadThickness * IN, landingRun * IN]} />
-          <meshStandardMaterial map={texture} roughness={0.7} />
+          <meshStandardMaterial 
+            map={landTex} 
+            bumpMap={landBump}
+            bumpScale={0.015}
+            roughness={type === 'composite' ? 0.8 : 0.65}
+            metalness={0.02}
+          />
         </mesh>
       );
 
       // 2. Landing Framing (2x12 Joists)
       const framingElements = [];
+      const rimLVar = `wood-${(j * 3) % 5}`;
+      const rimLTex = getProceduralTexture('#5a4d3b', rimLVar);
+      const rimLBump = getProceduralBumpTexture(rimLVar);
+
+      const rimRVar = `wood-${(j * 3 + 1) % 5}`;
+      const rimRTex = getProceduralTexture('#5a4d3b', rimRVar);
+      const rimRBump = getProceduralBumpTexture(rimRVar);
+
       framingElements.push(
         <mesh key={`land-rim-l-${j}`} position={[-landingW / 2 + 0.75 * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
           <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
-          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          <meshStandardMaterial map={rimLTex} bumpMap={rimLBump} bumpScale={0.012} roughness={0.8} />
         </mesh>,
         <mesh key={`land-rim-r-${j}`} position={[(landingW / 2 - 0.75) * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
           <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
-          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          <meshStandardMaterial map={rimRTex} bumpMap={rimRBump} bumpScale={0.012} roughness={0.8} />
         </mesh>
       );
+
+      const rimFVar = `wood-${(j * 3 + 2) % 5}`;
+      const rimFTex = getProceduralTexture('#5a4d3b', rimFVar);
+      const rimFBump = getProceduralBumpTexture(rimFVar);
+
+      const rimBVar = `wood-${(j * 3 + 3) % 5}`;
+      const rimBTex = getProceduralTexture('#5a4d3b', rimBVar);
+      const rimBBump = getProceduralBumpTexture(rimBVar);
 
       framingElements.push(
         <mesh key={`land-rim-f-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (currentZ + 0.75) * IN]} castShadow receiveShadow>
           <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
-          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          <meshStandardMaterial map={rimFTex} bumpMap={rimFBump} bumpScale={0.012} roughness={0.8} />
         </mesh>,
         <mesh key={`land-rim-b-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (nextZ - 0.75) * IN]} castShadow receiveShadow>
           <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
-          <meshStandardMaterial map={woodTexture} roughness={0.8} />
+          <meshStandardMaterial map={rimBTex} bumpMap={rimBBump} bumpScale={0.012} roughness={0.8} />
         </mesh>
       );
 
@@ -1170,10 +1429,13 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const numIntJoists = Math.max(0, Math.ceil(innerW / 16) - 1);
       for (let s = 0; s < numIntJoists; s++) {
         const x_pos = -landingW / 2 + 1.5 + (s + 1) * innerW / (numIntJoists + 1);
+        const intVar = `wood-${(j * 4 + s) % 5}`;
+        const intTex = getProceduralTexture('#5a4d3b', intVar);
+        const intBump = getProceduralBumpTexture(intVar);
         framingElements.push(
           <mesh key={`land-int-joist-${s}-${j}`} position={[x_pos * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[1.5 * IN, stringerDepth * IN, (landingRun - 3) * IN]} />
-            <meshStandardMaterial map={woodTexture} roughness={0.8} />
+            <meshStandardMaterial map={intTex} bumpMap={intBump} bumpScale={0.012} roughness={0.8} />
           </mesh>
         );
       }
@@ -1191,23 +1453,39 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const z_front = currentZ + postActualWidth / 2;
       const z_back = nextZ - postActualWidth / 2;
 
+      const postL1Var = `wood-${(j * 4) % 5}`;
+      const postL1Tex = getProceduralTexture('#504230', postL1Var);
+      const postL1Bump = getProceduralBumpTexture(postL1Var);
+
+      const postR1Var = `wood-${(j * 4 + 1) % 5}`;
+      const postR1Tex = getProceduralTexture('#504230', postR1Var);
+      const postR1Bump = getProceduralBumpTexture(postR1Var);
+
+      const postL2Var = `wood-${(j * 4 + 2) % 5}`;
+      const postL2Tex = getProceduralTexture('#504230', postL2Var);
+      const postL2Bump = getProceduralBumpTexture(postL2Var);
+
+      const postR2Var = `wood-${(j * 4 + 3) % 5}`;
+      const postR2Tex = getProceduralTexture('#504230', postR2Var);
+      const postR2Bump = getProceduralBumpTexture(postR2Var);
+
       elements.push(
         <group key={`ramp-land-posts-${j}`}>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postL1Tex} bumpMap={postL1Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postR1Tex} bumpMap={postR1Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postL2Tex} bumpMap={postL2Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postTexture} roughness={0.85} />
+            <meshStandardMaterial map={postR2Tex} bumpMap={postR2Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         </group>
       );
@@ -1588,6 +1866,7 @@ export default function Scene3D() {
                     height={sec.height} 
                     species={materials.species}
                     deckMaterial={materials.deckMaterial}
+                    deckColor={materials.deckColor}
                   />
                   <Stairs 
                     section={sec}
@@ -1597,6 +1876,7 @@ export default function Scene3D() {
                     depth={sec.depth} 
                     species={materials.species}
                     deckMaterial={materials.deckMaterial}
+                    deckColor={materials.deckColor}
                   />
                   <Ramp 
                     section={sec}
@@ -1606,6 +1886,7 @@ export default function Scene3D() {
                     depth={sec.depth} 
                     species={materials.species} 
                     deckMaterial={materials.deckMaterial} 
+                    deckColor={materials.deckColor}
                     postSize={materials.postSize}
                     height={sec.height}
                   />
