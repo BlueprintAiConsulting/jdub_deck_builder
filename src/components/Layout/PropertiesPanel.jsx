@@ -580,6 +580,34 @@ export default function PropertiesPanel({ isMobile }) {
               ]}
               onChange={(v) => updateDeck({ beamCount: v === 'auto' ? 'auto' : Number(v) })}
             />
+            <div className="prop-field">
+              <label className="label" htmlFor="beam-setback-slider">Beam Setback / Cantilever (in)</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  id="beam-setback-slider"
+                  type="range"
+                  min="0"
+                  max={Math.max(0, (deck.joistOrientation === 'horizontal' ? deck.width : deck.depth) - 24)}
+                  value={deck.beamSetback !== undefined ? deck.beamSetback : 12}
+                  onChange={(e) => updateDeck({ beamSetback: Number(e.target.value) })}
+                  style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
+                />
+                <input
+                  id="beam-setback-input"
+                  className="input input--sm"
+                  type="number"
+                  min="0"
+                  max={Math.max(0, (deck.joistOrientation === 'horizontal' ? deck.width : deck.depth) - 24)}
+                  value={deck.beamSetback !== undefined ? deck.beamSetback : 12}
+                  onChange={(e) => {
+                    const limit = Math.max(0, (deck.joistOrientation === 'horizontal' ? deck.width : deck.depth) - 24);
+                    const val = Math.max(0, Math.min(limit, Number(e.target.value)));
+                    updateDeck({ beamSetback: val });
+                  }}
+                  style={{ width: '60px' }}
+                />
+              </div>
+            </div>
             <SelectField id="sel-post-size" label="Post Size" value={deck.postSize} options={POST_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ postSize: v })} />
           </CollapsibleSection>
 

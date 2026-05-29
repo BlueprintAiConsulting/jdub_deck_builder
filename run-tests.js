@@ -2208,7 +2208,7 @@ test('49. customizable support beams and automatic 12 ft joist span limit', () =
   store.getState().clearDeck();
 
   // 1. Add a deck section under 12 ft (e.g. 10 ft depth = 120 in)
-  store.getState().addSection({ x: 0, y: 0, width: 144, depth: 120 }, 'deck');
+  store.getState().addSection({ x: 0, y: 0, width: 144, depth: 120, beamSetback: 0 }, 'deck');
   const secId = store.getState().sections[0].id;
 
   let state = store.getState();
@@ -2243,6 +2243,53 @@ test('49. customizable support beams and automatic 12 ft joist span limit', () =
   state = store.getState();
   calcs = state.sectionCalcs[secId];
   assert.strictEqual(calcs.beams.count, 2, 'Restoring beamCount to auto should recalculate 2 beams for 180 in depth');
+});
+
+test('50. customizable support beam setbacks (cantilevers)', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // 1. Add a deck section (depth: 144 in = 12 ft)
+  store.getState().addSection({ x: 0, y: 0, width: 192, depth: 144 }, 'deck');
+  const secId = store.getState().sections[0].id;
+
+  let state = store.getState();
+  let calcs = state.sectionCalcs[secId];
+  // Default setback is 12 inches
+  assert.strictEqual(state.sections[0].beamSetback, 12, 'Default beamSetback should be 12 inches');
+  assert.strictEqual(calcs.beams.count, 1, 'Deck with 144 in depth should automatically get exactly 1 beam');
+  assert.deepStrictEqual(calcs.beams.positions, [132], 'Beam should be placed at depth - 12 (132 in)');
+
+  // 2. Change setback to 24 inches
+  store.getState().updateDeck({ beamSetback: 24 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(state.sections[0].beamSetback, 24, 'beamSetback should be updated to 24 in store');
+  assert.deepStrictEqual(calcs.beams.positions, [120], 'Beam should be placed at depth - 24 (120 in)');
+
+  // 3. Change depth to 15 ft (180 in) -> 2 beams
+  store.getState().updateDeck({ depth: 180 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.beams.count, 2, 'Depth of 180 should yield 2 beams');
+  // positions should be: ((180 - 24) / 2) * 1 = 78, and ((180 - 24) / 2) * 2 = 156
+  assert.deepStrictEqual(calcs.beams.positions, [78, 156], 'Beams should be distributed evenly with setback at 78 in and 156 in');
+
+  // 4. Test safety boundary: setback cannot exceed depth - 24
+  // For depth 180, max setback is 180 - 24 = 156. Let's set it to 170.
+  store.getState().updateDeck({ beamSetback: 170 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  // Safe setback clamped to 156
+  assert.deepStrictEqual(calcs.beams.positions, [12, 24], 'Beam positions should clamp to max safe setback (12 in and 24 in)');
+
+  // 5. Test safety boundary: setback cannot be negative. Let's set it to -10.
+  store.getState().updateDeck({ beamSetback: -10 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  // Safe setback clamped to 0
+  // positions: (180 / 2) * 1 = 90, (180 / 2) * 2 = 180
+  assert.deepStrictEqual(calcs.beams.positions, [90, 180], 'Beam positions should clamp to min safe setback 0');
 });
 
 // ─── EXECUTE ALL TESTS ───

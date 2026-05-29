@@ -119,6 +119,7 @@ function createSection(overrides = {}) {
     joistOrientation: 'vertical', // 'vertical' | 'horizontal'
     deckingOrientation: 'perpendicular', // 'perpendicular' | 'parallel' | 'diagonal'
     beamCount: 'auto', // 'auto' | 1 | 2 | 3 | 4
+    beamSetback: 12,
   };
   const merged = { ...base, ...overrides };
   if (!merged.vertices) {
@@ -212,6 +213,7 @@ function recalculateSection(section, materials, allSections = []) {
     ramp: rampObj,
     joistOrientation: section.joistOrientation || 'vertical',
     beamCount: section.beamCount || 'auto',
+    beamSetback: section.beamSetback !== undefined ? section.beamSetback : 12,
   });
   if (calcs.ramp && rampObj) {
     calcs.ramp.doesNotFit = doesRampOverlap(section, calcs.ramp, allSections);
@@ -470,6 +472,7 @@ export const useDeckStore = create((set, get) => ({
       depth: Math.max(minSize, snapToGrid(rect.depth || defaultD)),
     };
     const sec = createSection({
+      ...rect,
       ...snappedRect,
       type,
       ledgerAttached: type === 'landing' ? false : true,
@@ -810,7 +813,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Actions: Deck Config (applies to selected section or global materials) ---
   updateDeck: (updates) => {
     const state = get();
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -977,6 +980,7 @@ export const useDeckStore = create((set, get) => ({
       const normalizedSection = {
         joistOrientation: 'vertical',
         deckingOrientation: 'perpendicular',
+        beamSetback: 12,
         ...s,
         type,
         stairs: stairObj,
