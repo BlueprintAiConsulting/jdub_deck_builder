@@ -255,6 +255,7 @@ export default function Toolbar({ isMobile }) {
   const showToast = useDeckStore((s) => s.showToast);
   const isDirty = useDeckStore((s) => s.isDirty);
   const setDirty = useDeckStore((s) => s.setDirty);
+  const resetDeck = useDeckStore((s) => s.resetDeck);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
@@ -306,6 +307,15 @@ export default function Toolbar({ isMobile }) {
     const name = currentProjectName || 'My Deck Project';
     downloadProjectFile(name, sections, materials);
   }, [currentProjectName, sections, materials]);
+
+  const handleNewClick = useCallback(() => {
+    if (isDirty) {
+      const confirmDiscard = window.confirm("Are you sure you want to start a new project? Unsaved changes will be lost.");
+      if (!confirmDiscard) return;
+    }
+    resetDeck();
+    showToast('New project created.', 'success');
+  }, [isDirty, resetDeck, showToast]);
 
   const handleOpenClick = () => {
     setRecentProjects(listRecentProjects());
@@ -495,6 +505,14 @@ export default function Toolbar({ isMobile }) {
         </button>
 
         {/* Mobile Open, Save & Export */}
+        <button className="btn btn--ghost btn--icon" onClick={handleNewClick} aria-label="New Project" id="btn-new-mobile" title="New project">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </button>
         <button className="btn btn--ghost btn--icon" onClick={handleOpenClick} aria-label="Open Project" id="btn-open-mobile" title="Open project">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -633,6 +651,15 @@ export default function Toolbar({ isMobile }) {
 
       <div className="toolbar__group">
         {/* Save, Load & Export controls */}
+        <button className="btn btn--secondary btn--icon" onClick={handleNewClick} aria-label="Start new project" data-tooltip="Start New Project" id="btn-new-project">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          New
+        </button>
         <button className="btn btn--secondary btn--icon" onClick={handleOpenClick} aria-label="Open design" data-tooltip="Open Design" id="btn-open">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>

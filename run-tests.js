@@ -1907,6 +1907,56 @@ test('40. Ramp functionality: ADA & Utility modes, warnings, overlap logic, BOM 
   assert.strictEqual(updatedRampObj.mode, 'utility', 'updateRamp should successfully update mode');
 });
 
+test('41. Toolbar New Project action: prompt confirmation and reset flow', () => {
+  const triggerNewProject = (store, confirmResult) => {
+    let confirmCalled = false;
+    let confirmPrompt = '';
+    const originalConfirm = global.window.confirm;
+    
+    global.window.confirm = (msg) => {
+      confirmCalled = true;
+      confirmPrompt = msg;
+      return confirmResult;
+    };
+    
+    const isDirty = store.getState().isDirty;
+    if (isDirty) {
+      const confirmDiscard = global.window.confirm("Are you sure you want to start a new project? Unsaved changes will be lost.");
+      if (!confirmDiscard) {
+        global.window.confirm = originalConfirm;
+        return { resetOccurred: false, confirmCalled, confirmPrompt };
+      }
+    }
+    
+    store.getState().resetDeck();
+    global.window.confirm = originalConfirm;
+    return { resetOccurred: true, confirmCalled, confirmPrompt };
+  };
+
+  const store = useDeckStore;
+  
+  // Test case 1: isDirty is false
+  store.getState().resetDeck();
+  assert.strictEqual(store.getState().isDirty, false);
+  let res = triggerNewProject(store, false);
+  assert.strictEqual(res.resetOccurred, true, 'Should reset without prompt if not dirty');
+  assert.strictEqual(res.confirmCalled, false, 'Should not show confirm dialog if not dirty');
+  
+  // Test case 2: isDirty is true, confirm rejected
+  store.getState().setDirty(true);
+  assert.strictEqual(store.getState().isDirty, true);
+  res = triggerNewProject(store, false);
+  assert.strictEqual(res.resetOccurred, false, 'Should not reset if user cancels confirmation');
+  assert.strictEqual(res.confirmCalled, true, 'Confirm should be called');
+  assert.strictEqual(store.getState().isDirty, true, 'Project must remain dirty');
+  
+  // Test case 3: isDirty is true, confirm accepted
+  res = triggerNewProject(store, true);
+  assert.strictEqual(res.resetOccurred, true, 'Should reset if user accepts confirmation');
+  assert.strictEqual(res.confirmCalled, true, 'Confirm should be called');
+  assert.strictEqual(store.getState().isDirty, false, 'Project should be clean after reset');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
