@@ -267,6 +267,8 @@ export default function Toolbar({ isMobile }) {
   const loadProject = useDeckStore((s) => s.loadProject);
   const theme = useDeckStore((s) => s.theme);
   const toggleTheme = useDeckStore((s) => s.toggleTheme);
+  const showDimensions = useDeckStore((s) => s.showDimensions);
+  const toggleDimensions = useDeckStore((s) => s.toggleDimensions);
 
   const confirmSaveAs = () => {
     const trimmed = tempProjectName.trim();
@@ -534,6 +536,18 @@ export default function Toolbar({ isMobile }) {
         </button>
 
         <button
+          className={`btn btn--ghost btn--icon ${showDimensions ? 'btn--active' : ''}`}
+          onClick={toggleDimensions}
+          aria-label={showDimensions ? 'Hide Dimensions' : 'Show Dimensions'}
+          id="btn-dimensions-toggle-mobile"
+          title="Toggle Dimensions"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 3v18M19 3v18M5 12h14"/>
+          </svg>
+        </button>
+
+        <button
           className="btn btn--ghost btn--icon"
           onClick={toggleTheme}
           aria-label={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
@@ -695,6 +709,18 @@ export default function Toolbar({ isMobile }) {
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
           Export
+        </button>
+
+        <button
+          className={`btn btn--ghost btn--icon ${showDimensions ? 'btn--active' : ''}`}
+          onClick={toggleDimensions}
+          aria-label={showDimensions ? 'Hide Dimensions' : 'Show Dimensions'}
+          data-tooltip={showDimensions ? 'Hide Dimensions' : 'Show Dimensions'}
+          id="btn-dimensions-toggle"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 3v18M19 3v18M5 12h14"/>
+          </svg>
         </button>
 
         <button
