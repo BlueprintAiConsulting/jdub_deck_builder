@@ -2621,6 +2621,8 @@ export default function Canvas2D({ isMobile }) {
             transform: 'translateX(-50%)',
             zIndex: 9999
           }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="canvas-action-popup__title" style={{ fontSize: '10px', color: '#ff9f43', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '3px' }}>
@@ -2674,7 +2676,7 @@ export default function Canvas2D({ isMobile }) {
 
       {/* Settings Modal Overlay */}
       {showSettingsModal && selectedSectionId && (
-        <div className="settings-overlay-modal glass-panel animate-slide-right" onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: 80, left: 20, zIndex: 9998 }}>
+        <div className="settings-overlay-modal glass-panel animate-slide-right" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: 80, left: 20, zIndex: 9998 }}>
           {(() => {
             const selectedSec = sections.find((x) => x.id === selectedSectionId) || sections[0];
             const isStairs = selectedSubObjectType === 'stairs';
