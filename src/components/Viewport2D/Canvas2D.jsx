@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useDeckStore } from '../../store/deckStore';
 import { formatDimension } from '../../utils/units';
 import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData.js';
@@ -2611,7 +2612,7 @@ export default function Canvas2D({ isMobile }) {
       )}
 
       {/* Action Popup */}
-      {actionPopup && selectedSectionId && (
+      {actionPopup && selectedSectionId && createPortal(
         <div 
           className="canvas-action-popup animate-fade-in" 
           style={{ 
@@ -2671,11 +2672,12 @@ export default function Canvas2D({ isMobile }) {
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Settings Modal Overlay */}
-      {showSettingsModal && selectedSectionId && (
+      {showSettingsModal && selectedSectionId && createPortal(
         <div className="settings-overlay-modal glass-panel animate-slide-right" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: 80, left: 20, zIndex: 9998 }}>
           {(() => {
             const selectedSec = sections.find((x) => x.id === selectedSectionId) || sections[0];
@@ -2750,7 +2752,8 @@ export default function Canvas2D({ isMobile }) {
               </>
             );
           })()}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
