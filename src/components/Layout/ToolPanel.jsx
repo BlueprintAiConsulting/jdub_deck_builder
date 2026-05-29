@@ -195,10 +195,11 @@ export default function ToolPanel({ isMobile, onClose }) {
 
       <div className="tool-panel__section">
         <span className="label">View</span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="tool-panel__grid">
           <button
-            className={`tool-panel__btn tool-panel__btn--wide ${showGrid ? 'tool-panel__btn--active' : ''}`}
+            className={`tool-panel__btn ${showGrid ? 'tool-panel__btn--active' : ''}`}
             onClick={toggleGrid}
+            data-tooltip={showGrid ? "Hide Grid" : "Show Grid"}
             id="btn-toggle-grid"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -208,17 +209,18 @@ export default function ToolPanel({ isMobile, onClose }) {
               <line x1="9" y1="3" x2="9" y2="21"/>
               <line x1="15" y1="3" x2="15" y2="21"/>
             </svg>
-            <span>Grid</span>
+            <span className="tool-panel__label">Grid</span>
           </button>
           <button
-            className={`tool-panel__btn tool-panel__btn--wide ${showDimensions ? 'tool-panel__btn--active' : ''}`}
+            className={`tool-panel__btn ${showDimensions ? 'tool-panel__btn--active' : ''}`}
             onClick={toggleDimensions}
+            data-tooltip={showDimensions ? "Hide Dimensions" : "Show Dimensions"}
             id="btn-toggle-dimensions"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 3v18M19 3v18M5 12h14"/>
             </svg>
-            <span>Dimensions</span>
+            <span className="tool-panel__label">Dimensions</span>
           </button>
         </div>
       </div>
