@@ -5,17 +5,10 @@ import { formatDimension } from '../../utils/units';
 import {
   SPECIES_OPTIONS, JOIST_SIZES, JOIST_SPACINGS,
   POST_SIZE_OPTIONS, DECK_BOARD_OPTIONS, BEAM_CONFIGS, SOIL_CAPACITIES,
-} from '../Materials/materialData';
-import { WOOD_COLORS } from '../Materials/materialData';
+  DECK_MATERIAL_OPTIONS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS,
+  WOOD_COLORS
+} from '../Materials/materialData.js';
 import './PropertiesPanel.css';
-
-const DECK_MATERIALS = [
-  { value: 'PT-SYP', label: 'Pressure Treated' },
-  { value: 'CEDAR', label: 'Cedar' },
-  { value: 'REDWOOD', label: 'Redwood' },
-  { value: 'COMPOSITE', label: 'Composite' },
-  { value: 'PVC', label: 'PVC' },
-];
 
 /* ── Chevron icon ── */
 function ChevronDown({ open }) {
@@ -240,8 +233,58 @@ export default function PropertiesPanel({ isMobile }) {
             icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="12" rx="1"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="2" y1="14" x2="22" y2="14"/></svg>}
           >
             <SelectField id="sel-board-size" label="Board Size" value={deck.deckBoardSize} options={DECK_BOARD_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ deckBoardSize: v })} />
-            <SelectField id="sel-deck-material" label="Deck Material" value={deck.deckMaterial} options={DECK_MATERIALS} onChange={(v) => updateDeck({ deckMaterial: v })} />
+            <SelectField
+              id="sel-deck-material"
+              label="Deck Material"
+              value={deck.deckMaterial}
+              options={DECK_MATERIAL_OPTIONS}
+              onChange={(v) => updateDeck({ deckMaterial: v })}
+              swatch={DECK_MATERIAL_COLORS[deck.deckMaterial]}
+            />
             <SelectField id="sel-decking-orient" label="Decking Direction" value={deck.deckingOrientation || 'perpendicular'} options={[{ value: 'perpendicular', label: 'Perpendicular to Joists' }, { value: 'parallel', label: 'Parallel to Joists' }, { value: 'diagonal', label: '45° Diagonal' }]} onChange={(v) => updateDeck({ deckingOrientation: v })} />
+            {DECK_COLOR_OPTIONS[deck.deckMaterial] && DECK_COLOR_OPTIONS[deck.deckMaterial].length > 1 && (
+              <div className="prop-field">
+                <label className="label">Decking Color / Line</label>
+                <div className="swatch-picker">
+                  <div className="swatch-picker__active-label text-sm text-secondary" style={{ marginBottom: '8px', fontWeight: 500 }}>
+                    {(() => {
+                      const opts = DECK_COLOR_OPTIONS[deck.deckMaterial] || [];
+                      const opt = opts.find(o => o.value === deck.deckColor);
+                      return opt ? opt.label : 'Select color';
+                    })()}
+                  </div>
+                  <div className="swatch-picker__grid" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {(DECK_COLOR_OPTIONS[deck.deckMaterial] || []).map((opt) => {
+                      const isSelected = opt.value === deck.deckColor;
+                      return (
+                        <button
+                          key={opt.value}
+                          className={`swatch-picker__item ${isSelected ? 'swatch-picker__item--selected' : ''}`}
+                          onClick={() => updateDeck({ deckColor: opt.value })}
+                          title={opt.label}
+                          aria-label={opt.label}
+                          id={`swatch-${opt.value}`}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            borderRadius: '50%',
+                            background: opt.color,
+                            border: isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-default)',
+                            outlineOffset: isSelected ? '2px' : '0px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.15s ease, border-color 0.15s ease',
+                            padding: 0,
+                            boxShadow: isSelected ? '0 0 8px var(--accent-primary-glow)' : 'none',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </CollapsibleSection>
 
           <div className="divider" />

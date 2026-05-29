@@ -3,9 +3,10 @@
  * Multi-section deck design with interactive placement.
  */
 import { create } from 'zustand';
-import { calculateAll } from '../engine/structuralCalc';
-import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator';
-import { validateSectionsState } from '../utils/geometry';
+import { calculateAll } from '../engine/structuralCalc.js';
+import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator.js';
+import { validateSectionsState } from '../utils/geometry.js';
+import { DECK_COLOR_OPTIONS } from '../components/Materials/materialData.js';
 
 function doesRampOverlap(sec, rampCalcs, sections) {
   if (!sec.ramp || !rampCalcs) return false;
@@ -67,7 +68,7 @@ function doesRampOverlap(sec, rampCalcs, sections) {
 
 // Initialize theme on load to prevent flash of wrong theme
 if (typeof window !== 'undefined') {
-  const savedTheme = localStorage.getItem('deckforge_theme') || 'dark';
+  const savedTheme = localStorage.getItem('deckforge_theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
@@ -86,6 +87,7 @@ const DEFAULT_MATERIALS = {
   postSize: '6x6',
   deckBoardSize: '5/4x6',
   deckMaterial: 'PT-SYP',
+  deckColor: 'pine-natural',
   soilCapacity: 2000,
   unitPrices: {
     '2x8': 1.20,
@@ -97,7 +99,8 @@ const DEFAULT_MATERIALS = {
     'joist-hangers': 1.50,
     'post-bases': 7.50,
     'screws': 0.08,
-  }
+  },
+  wasteFactor: 10,
 };
 
 function createSection(overrides = {}) {
@@ -291,7 +294,7 @@ let nextToastId = 1;
 
 export const useDeckStore = create((set, get) => ({
   // --- View State ---
-  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'dark') : 'dark',
+  theme: typeof window !== 'undefined' ? (localStorage.getItem('deckforge_theme') || 'light') : 'light',
   viewMode: '2d',
   selectedTool: 'select',
   showGrid: true,
@@ -299,6 +302,24 @@ export const useDeckStore = create((set, get) => ({
   zoom: 1,
   panOffset: { x: 0, y: 0 },
   lightingPreset: 'daylight',
+  visibleLayers2d: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
+  visibleLayers3d: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
+  visibleLayers: {
+    decking: true,
+    framing: true,
+    foundation: true,
+    accessories: true,
+  },
 
   // --- Sections ---
   sections: [initialSection],
@@ -331,6 +352,28 @@ export const useDeckStore = create((set, get) => ({
   setSelectedTool: (tool) => set({ selectedTool: tool }),
   toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
   toggleDimensions: () => set((s) => ({ showDimensions: !s.showDimensions })),
+  toggleLayer: (layer, mode) => set((s) => {
+    const targetMode = mode || (s.viewMode === 'split' ? '2d' : s.viewMode);
+    if (targetMode === '3d') {
+      const next3d = {
+        ...s.visibleLayers3d,
+        [layer]: !s.visibleLayers3d[layer],
+      };
+      return {
+        visibleLayers3d: next3d,
+        visibleLayers: next3d,
+      };
+    } else {
+      const next2d = {
+        ...s.visibleLayers2d,
+        [layer]: !s.visibleLayers2d[layer],
+      };
+      return {
+        visibleLayers2d: next2d,
+        visibleLayers: next2d,
+      };
+    }
+  }),
   setZoom: (zoom) => set({ zoom: Math.max(0.25, Math.min(4, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
   setLightingPreset: (preset) => set({ lightingPreset: preset }),
@@ -715,6 +758,13 @@ export const useDeckStore = create((set, get) => ({
       else materialUpdates[key] = val;
     });
 
+    if (updates.deckMaterial && updates.deckMaterial !== state.materials.deckMaterial) {
+      const colors = DECK_COLOR_OPTIONS[updates.deckMaterial];
+      if (colors && colors.length > 0) {
+        materialUpdates.deckColor = colors[0].value;
+      }
+    }
+
     const newMaterials = { ...state.materials, ...materialUpdates };
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
@@ -862,6 +912,15 @@ export const useDeckStore = create((set, get) => ({
         ...(materials.unitPrices || {})
       }
     };
+    if (!normalizedMaterials.wasteFactor) {
+      normalizedMaterials.wasteFactor = 10;
+    }
+    if (normalizedMaterials.deckMaterial && !normalizedMaterials.deckColor) {
+      const colors = DECK_COLOR_OPTIONS[normalizedMaterials.deckMaterial];
+      if (colors && colors.length > 0) {
+        normalizedMaterials.deckColor = colors[0].value;
+      }
+    }
 
     const results = recalculateAll(normalizedSections, normalizedMaterials);
     

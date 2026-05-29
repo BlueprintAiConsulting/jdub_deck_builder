@@ -50,6 +50,14 @@ export default function ToolPanel({ isMobile, onClose }) {
   const showDimensions = useDeckStore((s) => s.showDimensions);
   const toggleDimensions = useDeckStore((s) => s.toggleDimensions);
   const resetDeck = useDeckStore((s) => s.resetDeck);
+  const viewMode = useDeckStore((s) => s.viewMode);
+  const visibleLayers2d = useDeckStore((s) => s.visibleLayers2d || { decking: true, framing: true, foundation: true, accessories: true });
+  const visibleLayers3d = useDeckStore((s) => s.visibleLayers3d || { decking: true, framing: true, foundation: true, accessories: true });
+  const toggleLayer = useDeckStore((s) => s.toggleLayer);
+
+  const [activeLayerTab, setActiveLayerTab] = React.useState('2d');
+  const activeMode = viewMode === 'split' ? activeLayerTab : (viewMode === '3d' ? '3d' : '2d');
+  const visibleLayers = activeMode === '3d' ? visibleLayers3d : visibleLayers2d;
 
   const handleToolSelect = (toolId) => {
     setSelectedTool(toolId);
@@ -199,6 +207,80 @@ export default function ToolPanel({ isMobile, onClose }) {
             <span className="tool-panel__template-size">16' × 12'</span>
           </div>
         </button>
+      </div>
+
+      <div className="divider" />
+
+      <div className="tool-panel__section">
+        <span className="label">Layers</span>
+        {viewMode === 'split' && (
+          <div className="tool-panel__layer-tabs" id="layer-viewport-tabs">
+            <button
+              className={`tool-panel__layer-tab ${activeLayerTab === '2d' ? 'tool-panel__layer-tab--active' : ''}`}
+              onClick={() => setActiveLayerTab('2d')}
+              title="Configure 2D Blueprint Layers"
+            >
+              2D
+            </button>
+            <button
+              className={`tool-panel__layer-tab ${activeLayerTab === '3d' ? 'tool-panel__layer-tab--active' : ''}`}
+              onClick={() => setActiveLayerTab('3d')}
+              title="Configure 3D Preview Layers"
+            >
+              3D
+            </button>
+          </div>
+        )}
+        <div className="tool-panel__grid">
+          <button
+            className={`tool-panel__btn ${visibleLayers.decking ? 'tool-panel__btn--active' : ''}`}
+            onClick={() => toggleLayer('decking', activeMode)}
+            data-tooltip={visibleLayers.decking ? "Hide Decking" : "Show Decking"}
+            id="btn-layer-decking"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18v4H3V6zm0 8h18v4H3v-4z"/>
+            </svg>
+            <span className="tool-panel__label">Decking</span>
+          </button>
+          
+          <button
+            className={`tool-panel__btn ${visibleLayers.framing ? 'tool-panel__btn--active' : ''}`}
+            onClick={() => toggleLayer('framing', activeMode)}
+            data-tooltip={visibleLayers.framing ? "Hide Framing" : "Show Framing"}
+            id="btn-layer-framing"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>
+            </svg>
+            <span className="tool-panel__label">Framing</span>
+          </button>
+
+          <button
+            className={`tool-panel__btn ${visibleLayers.foundation ? 'tool-panel__btn--active' : ''}`}
+            onClick={() => toggleLayer('foundation', activeMode)}
+            data-tooltip={visibleLayers.foundation ? "Hide Foundation" : "Show Foundation"}
+            id="btn-layer-foundation"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v20M5 17h14M8 12h8M10 7h4"/>
+            </svg>
+            <span className="tool-panel__label">Posts</span>
+          </button>
+
+          <button
+            className={`tool-panel__btn ${visibleLayers.accessories ? 'tool-panel__btn--active' : ''}`}
+            onClick={() => toggleLayer('accessories', activeMode)}
+            data-tooltip={visibleLayers.accessories ? "Hide Accessories" : "Show Accessories"}
+            id="btn-layer-accessories"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 19h16M4 15h12M4 11h8M4 7h4M20 5v14"/>
+            </svg>
+            <span className="tool-panel__label">Railings</span>
+          </button>
+        </div>
       </div>
     </aside>
   );

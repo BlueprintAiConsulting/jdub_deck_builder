@@ -102,8 +102,9 @@ const {
 } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
-const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/components/Viewport2D/Canvas2D.jsx');
+const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/utils/polygonUtils.js');
 const { renderBlueprint } = await import('./src/utils/blueprintRenderer.js');
+const { DECK_MATERIAL_OPTIONS, DECK_MATERIAL_COLORS } = await import('./src/components/Materials/materialData.js');
 
 // ─── TEST RUNNER UTILITIES ───
 const tests = [];
@@ -274,32 +275,32 @@ test('4. Landing survival check: landing dimensions survive alongside stairs in 
   assert.strictEqual(restoredLanding.height, 36, 'Landing height should survive');
 });
 
-test('5. Theme state toggle: defaults to dark, persists to localStorage and restores on reload', () => {
+test('5. Theme state toggle: defaults to light, persists to localStorage and restores on reload', () => {
   // Clear any existing localStorage
   mockLocalStorage.clear();
 
   // Test default theme on load
   const store = useDeckStore.getState();
-  assert.strictEqual(store.theme, 'dark', 'New users should default to dark theme');
+  assert.strictEqual(store.theme, 'light', 'New users should default to light theme');
 
   // Verify document.documentElement and meta setup
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should be initialized to dark');
-  assert.strictEqual(mockMeta.attributes['content'], '#060a14', 'Meta theme-color should match dark mode color');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should be initialized to light');
+  assert.strictEqual(mockMeta.attributes['content'], '#f8fafc', 'Meta theme-color should match light mode color');
 
-  // Toggle theme to light
+  // Toggle theme to dark
   store.toggleTheme();
   const stateAfterToggle = useDeckStore.getState();
-  assert.strictEqual(stateAfterToggle.theme, 'light', 'Theme should switch to light after toggleTheme()');
-  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'light', 'Theme selection must be written to localStorage');
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should update to light');
-  assert.strictEqual(mockMeta.attributes['content'], '#f8fafc', 'Meta theme-color should update to light mode color');
+  assert.strictEqual(stateAfterToggle.theme, 'dark', 'Theme should switch to dark after toggleTheme()');
+  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'dark', 'Theme selection must be written to localStorage');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
+  assert.strictEqual(mockMeta.attributes['content'], '#060a14', 'Meta theme-color should update to dark mode color');
 
-  // Toggle theme back to dark
+  // Toggle theme back to light
   stateAfterToggle.toggleTheme();
   const stateAfterToggle2 = useDeckStore.getState();
-  assert.strictEqual(stateAfterToggle2.theme, 'dark', 'Theme should switch back to dark after second toggleTheme()');
-  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'dark', 'Theme selection must be updated in localStorage');
-  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'dark', 'Document element theme attribute should update to dark');
+  assert.strictEqual(stateAfterToggle2.theme, 'light', 'Theme should switch back to light after second toggleTheme()');
+  assert.strictEqual(mockLocalStorage.getItem('deckforge_theme'), 'light', 'Theme selection must be updated in localStorage');
+  assert.strictEqual(mockDocumentElement.attributes['data-theme'], 'light', 'Document element theme attribute should update to light');
 });
 
 test('6. Multi-level heights check: multiple sections with different heights survive save/load round-trip with schemaVersion 2', () => {
@@ -727,81 +728,179 @@ test('17. Save/load round-trip after rigid drag: dragging a section, saving it, 
   assert.deepStrictEqual(restoredSec.vertices, movedSec.vertices, 'Restored vertices must match dragged vertices exactly');
 });
 
-test('18. Polygon Edge Splitting (Add Vertex): splitting an edge inserts a new vertex in vertices and updates state', () => {
+test('18. Vertex move: updating a single vertex\'s coordinates changes only that vertex; others are unchanged', () => {
   useDeckStore.getState().resetDeck();
   const initialSec = useDeckStore.getState().sections[0];
+  const oldVertices = initialSec.vertices.map(v => ({ ...v }));
 
-  // Starting vertices: 4-corner rectangle at x:0, y:0, w:192, d:144
-  // [ {x:0, y:0}, {x:192, y:0}, {x:192, y:144}, {x:0, y:144} ]
+  // Move vertex at index 1 (192, 0) to (144, 24)
+  useDeckStore.getState().dragVertex(initialSec.id, 1, 144, 24);
+
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
   
-  // Click on the edge between V1 (192, 0) and V2 (192, 144) at layout coordinates (192, 72)
-  const splitIdx = findEdgeSplitIndex(192, 72, initialSec.vertices, 12);
-  assert.strictEqual(splitIdx, 1, 'Edge split index should be 1 (between V1 and V2)');
+  // Verify vertex at index 1 changed
+  assert.strictEqual(updatedSec.vertices[1].x, 144, 'Vertex X must be 144');
+  assert.strictEqual(updatedSec.vertices[1].y, 24, 'Vertex Y must be 24');
 
-  // Call store addVertex to insert new vertex at splitIdx + 1 = 2
+  // Verify other vertices are unchanged
+  assert.deepStrictEqual(updatedSec.vertices[0], oldVertices[0], 'V0 must be unchanged');
+  assert.deepStrictEqual(updatedSec.vertices[2], oldVertices[2], 'V2 must be unchanged');
+  assert.deepStrictEqual(updatedSec.vertices[3], oldVertices[3], 'V3 must be unchanged');
+});
+
+test('19. Add vertex: inserting a vertex on an edge increases vertices array length by exactly one, and new vertex sits in array order', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+  const oldLen = initialSec.vertices.length;
+
+  const splitIdx = findEdgeSplitIndex(192, 72, initialSec.vertices, 12);
+  assert.strictEqual(splitIdx, 1, 'Split index must be 1 (edge between index 1 and 2)');
+
   const newV = { x: 192, y: 72 };
   useDeckStore.getState().addVertex(initialSec.id, 2, newV);
 
   const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
-  assert.strictEqual(updatedSec.vertices.length, 5, 'Vertices count must increase to 5');
-  assert.deepStrictEqual(updatedSec.vertices[2], newV, 'Inserted vertex must be at index 2');
-
-  // Verify bounding box (remains w:192, d:144 because split was on the boundary)
-  assert.strictEqual(updatedSec.x, 0);
-  assert.strictEqual(updatedSec.y, 0);
-  assert.strictEqual(updatedSec.width, 192);
-  assert.strictEqual(updatedSec.depth, 144);
+  assert.strictEqual(updatedSec.vertices.length, oldLen + 1, 'Vertices length must increase by exactly 1');
+  
+  // Check ordering: new vertex must sit between V1 and the old V2 (which is now V3)
+  assert.deepStrictEqual(updatedSec.vertices[1], { x: 192, y: 0 }, 'V1 remains the same');
+  assert.deepStrictEqual(updatedSec.vertices[2], newV, 'V2 is the newly added vertex');
+  assert.deepStrictEqual(updatedSec.vertices[3], { x: 192, y: 144 }, 'V3 is the shifted old V2');
 });
 
-test('19. Dragging a Vertex: dragging a vertex updates its coordinates, snaps to grid, and keeps bounding box synced', () => {
+test('20. Delete vertex: removing a vertex decreases the array length by one', () => {
   useDeckStore.getState().resetDeck();
   const initialSec = useDeckStore.getState().sections[0];
+  const oldLen = initialSec.vertices.length;
 
-  // Drag V1 (192, 0) to new location (144, 24)
-  useDeckStore.getState().dragVertex(initialSec.id, 1, 144, 24);
-
-  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
-  assert.strictEqual(updatedSec.vertices[1].x, 144, 'Vertex X must snap and update to 144');
-  assert.strictEqual(updatedSec.vertices[1].y, 24, 'Vertex Y must snap and update to 24');
-
-  // Check bounding box updates
-  // Vertices are now: [ {0,0}, {144,24}, {192,144}, {0,144} ]
-  // xs: 0, 144, 192, 0 -> min: 0, max: 192
-  // ys: 0, 24, 144, 144 -> min: 0, max: 144
-  assert.strictEqual(updatedSec.x, 0, 'Bounding box X must be minX (0)');
-  assert.strictEqual(updatedSec.y, 0, 'Bounding box Y must be minY (0)');
-  assert.strictEqual(updatedSec.width, 192, 'Bounding box width must be 192');
-  assert.strictEqual(updatedSec.depth, 144, 'Bounding box depth must be 144');
-
-  // Drag V2 (192, 144) outward to (240, 168)
-  useDeckStore.getState().dragVertex(initialSec.id, 2, 240, 168);
-  const updatedSec2 = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
-  assert.strictEqual(updatedSec2.width, 240, 'Bounding box width must expand to 240');
-  assert.strictEqual(updatedSec2.depth, 168, 'Bounding box depth must expand to 168');
-});
-
-test('20. Deleting a Vertex: deleting a vertex removes it, updates bounding box, and is blocked below 3 vertices', () => {
-  useDeckStore.getState().resetDeck();
-  const initialSec = useDeckStore.getState().sections[0];
-
-  // Delete V1 (192, 0)
   useDeckStore.getState().removeVertex(initialSec.id, 1);
 
   const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
-  assert.strictEqual(updatedSec.vertices.length, 3, 'Vertices count must decrease to 3');
-  
-  // Bounding box should update
-  // Remaining vertices: [ {0,0}, {192,144}, {0,144} ]
-  // minX:0, maxX:192, minY:0, maxY:144
-  assert.strictEqual(updatedSec.width, 192);
-  assert.strictEqual(updatedSec.depth, 144);
+  assert.strictEqual(updatedSec.vertices.length, oldLen - 1, 'Vertices length must decrease by exactly 1');
+});
 
-  // Attempt to delete another vertex (leaving only 2 vertices)
+test('21. Minimum-polygon guard: attempting to delete a vertex from a 3-vertex section is blocked, does not crash', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Delete V1 (leaves 3 vertices)
+  useDeckStore.getState().removeVertex(initialSec.id, 1);
+  const threeVertexSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(threeVertexSec.vertices.length, 3, 'Must have exactly 3 vertices');
+
+  // Attempt to delete V0 (would leave 2 vertices)
   useDeckStore.getState().removeVertex(initialSec.id, 0);
-  const updatedSec2 = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+
+  assert.strictEqual(updatedSec.vertices.length, 3, 'Vertex deletion below 3 must be blocked');
+  assert.deepStrictEqual(updatedSec.vertices, threeVertexSec.vertices, 'Vertices must remain identical to the 3-vertex state');
+});
+
+test('22. Derived fields: after a vertex edit, x/y equals the top-left of bounding box, and width/depth equal bounding box dimensions', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Drag V2 (192, 144) to new position (240, 168)
+  useDeckStore.getState().dragVertex(initialSec.id, 2, 240, 168);
+  const updatedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+
+  // Vertices are: [ {0,0}, {192,0}, {240,168}, {0,144} ]
+  // xs: 0, 192, 240, 0 -> min: 0, max: 240 -> w: 240
+  // ys: 0, 0, 168, 144 -> min: 0, max: 168 -> d: 168
+  assert.strictEqual(updatedSec.x, 0, 'Derived X must match bounding box minX (0)');
+  assert.strictEqual(updatedSec.y, 0, 'Derived Y must match bounding box minY (0)');
+  assert.strictEqual(updatedSec.width, 240, 'Derived width must match bounding box width (240)');
+  assert.strictEqual(updatedSec.depth, 168, 'Derived depth must match bounding box depth (168)');
+});
+
+test('23. Round-trip: a reshaped non-rectangular section (6-vertex L-shape) survives a .deck save/load cycle with all vertices intact', () => {
+  useDeckStore.getState().resetDeck();
+  const initialSec = useDeckStore.getState().sections[0];
+
+  // Starting vertices: [ {0,0}, {192,0}, {192,144}, {0,144} ]
+  // Let's split two edges to create a 6-vertex L-shape:
+  // Edge V1 -> V2: click at (192, 72) -> adds V2 at (192, 72)
+  useDeckStore.getState().addVertex(initialSec.id, 2, { x: 192, y: 72 });
   
-  // Should be blocked: vertices count remains 3
-  assert.strictEqual(updatedSec2.vertices.length, 3, 'Deletion below 3 vertices must be blocked');
+  // Edge V3 -> V4: click at (96, 144) -> adds V4 at (96, 144)
+  useDeckStore.getState().addVertex(initialSec.id, 4, { x: 96, y: 144 });
+
+  // Vertices are now: [ {0,0}, {192,0}, {192,72}, {192,144}, {96,144}, {0,144} ]
+  // Drag V3 (192, 144) to (96, 72) to make it an L-shape
+  useDeckStore.getState().dragVertex(initialSec.id, 3, 96, 72);
+
+  const lShapeSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+  assert.strictEqual(lShapeSec.vertices.length, 6, 'Should have exactly 6 vertices');
+
+  // Bounding box of L-shape:
+  // xs: 0, 192, 192, 96, 96, 0 -> min: 0, max: 192 -> w: 192
+  // ys: 0, 0, 72, 72, 144, 144 -> min: 0, max: 144 -> d: 144
+  assert.strictEqual(lShapeSec.width, 192);
+  assert.strictEqual(lShapeSec.depth, 144);
+
+  // Serialize the project
+  const sections = useDeckStore.getState().sections;
+  const materials = useDeckStore.getState().materials;
+  const serialized = serializeProject('L-Shape Project', sections, materials);
+  validateProjectData(serialized);
+
+  // Load project back
+  useDeckStore.getState().loadProject(serialized.sections, serialized.materials);
+  const loadedSec = useDeckStore.getState().sections.find(s => s.id === initialSec.id);
+
+  assert.ok(loadedSec, 'Restored section should exist');
+  assert.strictEqual(loadedSec.vertices.length, 6, 'Restored section must preserve 6 vertices');
+  assert.deepStrictEqual(loadedSec.vertices, lShapeSec.vertices, 'Restored vertices must match L-shape vertices in exact order');
+  assert.strictEqual(loadedSec.width, 192, 'Restored width must be 192');
+  assert.strictEqual(loadedSec.depth, 144, 'Restored depth must be 144');
+});
+
+test('24. Decking material options and color mapping: Timbertech Composite and Azek PVC options exist and resolve to correct rendering colors', () => {
+  // Verify Azek PVC and Timbertech Composite exist in options
+  const ttOption = DECK_MATERIAL_OPTIONS.find(opt => opt.value === 'TIMBERTECH');
+  const azekOption = DECK_MATERIAL_OPTIONS.find(opt => opt.value === 'AZEK');
+  
+  assert.ok(ttOption, 'Timbertech option must exist');
+  assert.ok(azekOption, 'Azek option must exist');
+  assert.strictEqual(ttOption.label, 'Timbertech Composite', 'Timbertech label must match');
+  assert.strictEqual(azekOption.label, 'Azek PVC', 'Azek label must match');
+  
+  // Verify they resolve to the correct hex color codes
+  assert.strictEqual(DECK_MATERIAL_COLORS['TIMBERTECH'], '#7e7568', 'Timbertech color must resolve to warm gray/brown');
+  assert.strictEqual(DECK_MATERIAL_COLORS['AZEK'], '#4b4e52', 'Azek color must resolve to dark gray');
+});
+
+test('25. Deck color state updates and backward compatibility migration: changing material updates color and loading project populates missing color', () => {
+  const store = useDeckStore.getState();
+  store.resetDeck();
+  
+  // Verify default color is set on reset
+  assert.strictEqual(store.materials.deckMaterial, 'PT-SYP');
+  assert.strictEqual(store.materials.deckColor, 'pine-natural');
+  
+  // Change deck material to AZEK
+  store.updateDeck({ deckMaterial: 'AZEK' });
+  const azekState = useDeckStore.getState();
+  assert.strictEqual(azekState.materials.deckMaterial, 'AZEK');
+  assert.strictEqual(azekState.materials.deckColor, 'azek-coastline', 'Changing to Azek PVC must snap to first color option (Coastline)');
+  
+  // Load a project with missing deckColor but set deckMaterial
+  const legacyProj = {
+    schemaVersion: 2,
+    projectName: 'Legacy Color Test',
+    sections: [
+      { id: 'sec-1', x: 0, y: 0, width: 144, depth: 120, height: 36, type: 'deck', vertices: [] }
+    ],
+    materials: {
+      deckMaterial: 'TIMBERTECH',
+      species: 'SYP'
+    }
+  };
+  
+  store.loadProject(legacyProj.sections, legacyProj.materials);
+  const loadedState = useDeckStore.getState();
+  assert.strictEqual(loadedState.materials.deckMaterial, 'TIMBERTECH');
+  assert.strictEqual(loadedState.materials.deckColor, 'tt-pecan', 'Loading legacy project with missing color must populate default Timbertech color');
 });
 
 test('21. Save writes to storage, not a file: save action updates localStorage and does not download a file', () => {

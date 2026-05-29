@@ -248,8 +248,20 @@ export default function AppShell() {
       <Toolbar />
       <div className="app-body">
         <ToolPanel />
-        <main className="viewport-container">
-          {viewMode === '2d' ? (
+        <main className={`viewport-container ${viewMode === 'split' ? 'viewport-container--split' : ''}`}>
+          {viewMode === 'split' ? (
+            <div className="split-view">
+              <div className="split-view__pane split-view__pane--2d">
+                <Canvas2D />
+              </div>
+              <div className="split-view__divider" />
+              <div className="split-view__pane split-view__pane--3d">
+                <Suspense fallback={<ViewportLoader />}>
+                  <Scene3D />
+                </Suspense>
+              </div>
+            </div>
+          ) : viewMode === '2d' ? (
             <Canvas2D />
           ) : (
             <Suspense fallback={<ViewportLoader />}>

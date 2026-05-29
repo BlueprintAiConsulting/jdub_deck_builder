@@ -1,4 +1,4 @@
-import { formatDimension } from './units';
+import { formatDimension } from './units.js';
 
 // Draw architectural dimension line on canvas
 export function drawDimensionLine(ctx, p1, p2, text, offset, isLightTheme = true) {

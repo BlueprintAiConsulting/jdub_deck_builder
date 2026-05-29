@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDeckStore } from '../../store/deckStore';
-import { WOOD_COLORS } from '../Materials/materialData';
+import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData';
 import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTables';
 import './Scene3D.css';
 
@@ -178,8 +179,14 @@ export function getVerticalIntersections(x, vertices) {
   return segments;
 }
 
-function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckBoardSize, joistOrientation, deckingOrientation }) {
-  const { color, type } = getMaterialVisuals(deckMaterial, species);
+function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, deckBoardSize, joistOrientation, deckingOrientation }) {
+  const getBoardColor = () => {
+    const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
+    const opt = opts.find(o => o.value === deckColor);
+    return opt ? opt.color : (DECK_MATERIAL_COLORS[deckMaterial] || WOOD_COLORS[species] || '#c4a35a');
+  };
+  const color = getBoardColor();
+  const { type } = getMaterialVisuals(deckMaterial, species);
   const texture = getProceduralTexture(color, type);
   const boardW = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.depth || 5.5;
   const boardH = LUMBER_ACTUAL[deckBoardSize || '5/4x6']?.width || 1.0;
@@ -819,12 +826,14 @@ function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSi
 }
 
 function HouseWall({ width, height }) {
-  const wallHeight = Math.max(height, 96);
+  // height is the deck height (e.g. 36 inches)
+  // We want the wall to extend 96 inches (8 feet) above the deck, and go all the way down to the ground.
+  const wallHeightAboveDeck = 96;
+  const totalWallHeight = height + wallHeightAboveDeck;
   const wallThick = 6;
-  const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
   return (
-    <mesh position={[width / 2 * IN, (deckTopY + wallHeight / 2) * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
-      <boxGeometry args={[(width + 24) * IN, wallHeight * IN, wallThick * IN]} />
+    <mesh position={[width / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -wallThick / 2 * IN]}>
+      <boxGeometry args={[(width + 24) * IN, totalWallHeight * IN, wallThick * IN]} />
       <meshStandardMaterial color="#3a3a4a" roughness={0.9} metalness={0.05} />
     </mesh>
   );
@@ -849,6 +858,53 @@ function GroundPlane({ lightingPreset }) {
   );
 }
 
+/* ── Camera Controller Helper Component ── */
+function CameraController({ viewTrigger, viewType, bounds, controlsRef, onViewComplete }) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (!viewType || !viewTrigger) return;
+
+    const cx = bounds.cx * IN;
+    const cz = bounds.cz * IN;
+    const cy = 0;
+    const size = Math.max(bounds.w, bounds.d) * IN;
+    const dist = Math.max(15, size * 1.5);
+
+    const controls = controlsRef.current;
+    
+    let targetPos = [cx, cy, cz];
+    let camPos = [camera.position.x, camera.position.y, camera.position.z];
+
+    if (viewType === 'iso') {
+      camPos = [cx + dist * 0.8, cy + dist * 0.8, cz + dist * 0.8];
+    } else if (viewType === 'top') {
+      camPos = [cx, cy + dist * 1.2, cz + 0.001];
+    } else if (viewType === 'front') {
+      camPos = [cx, cy + dist * 0.2, cz + dist];
+    } else if (viewType === 'side') {
+      camPos = [cx + dist, cy + dist * 0.2, cz];
+    } else if (viewType === 'reset') {
+      camPos = [
+        (bounds.cx + bounds.w) * IN * 1.2,
+        bounds.h * IN * 3,
+        (bounds.cz + bounds.d) * IN * 1.2,
+      ];
+    }
+
+    camera.position.set(...camPos);
+    if (controls) {
+      controls.target.set(...targetPos);
+      controls.update();
+    }
+    camera.lookAt(...targetPos);
+
+    onViewComplete();
+  }, [viewTrigger, viewType, bounds, controlsRef, onViewComplete, camera]);
+
+  return null;
+}
+
 export default function Scene3D() {
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
@@ -856,6 +912,7 @@ export default function Scene3D() {
   const materials = useDeckStore((s) => s.materials);
   const lightingPreset = useDeckStore((s) => s.lightingPreset) || 'daylight';
   const setLightingPreset = useDeckStore((s) => s.setLightingPreset);
+  const visibleLayers = useDeckStore((s) => s.visibleLayers3d || { decking: true, framing: true, foundation: true, accessories: true });
 
   const isNight = lightingPreset === 'night';
   const isGoldenHour = lightingPreset === 'goldenHour';
@@ -925,6 +982,15 @@ export default function Scene3D() {
       bgColor = '#0a1628';
     }
   }
+  
+  const [viewType, setViewType] = useState(null);
+  const [viewTrigger, setViewTrigger] = useState(0);
+  const controlsRef = useRef();
+
+  const triggerView = (type) => {
+    setViewType(type);
+    setViewTrigger(prev => prev + 1);
+  };
 
   const bounds = useMemo(() => {
     let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, maxH = 0;
@@ -950,7 +1016,15 @@ export default function Scene3D() {
           ]}
           fov={50}
         />
-        <OrbitControls target={cameraTarget} enableDamping dampingFactor={0.1} />
+        <OrbitControls ref={controlsRef} target={cameraTarget} enableDamping dampingFactor={0.1} />
+        
+        <CameraController
+          viewTrigger={viewTrigger}
+          viewType={viewType}
+          bounds={bounds}
+          controlsRef={controlsRef}
+          onViewComplete={() => setViewType(null)}
+        />
 
         <ambientLight intensity={ambientIntensity} color={ambientColor} />
         
@@ -985,50 +1059,59 @@ export default function Scene3D() {
           if (!calcs) return null;
           return (
             <group key={sec.id} position={[sec.x * IN, sec.height * IN, sec.y * IN]}>
-              <DeckBoards 
-                vertices={sec.vertices} 
-                secX={sec.x} 
-                secY={sec.y} 
-                species={materials.species} 
-                deckMaterial={materials.deckMaterial} 
-                deckBoardSize={materials.deckBoardSize} 
-                joistOrientation={sec.joistOrientation} 
-                deckingOrientation={sec.deckingOrientation} 
-              />
-              <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
-              <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
-              <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
-              
-              <Railings 
-                railings={sec.railings} 
-                width={sec.width} 
-                depth={sec.depth} 
-                height={sec.height} 
-                species={materials.species}
-                deckMaterial={materials.deckMaterial}
-                lightingPreset={lightingPreset}
-              />
-              
-              <Stairs 
-                stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} 
-                stairCalcs={calcs.stairs} 
-                width={sec.width} 
-                depth={sec.depth} 
-                species={materials.species}
-                deckMaterial={materials.deckMaterial}
-              />
-              
-              <Ramp 
-                rampEdge={typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp?.direction)} 
-                rampCalcs={calcs.ramp} 
-                width={sec.width} 
-                depth={sec.depth} 
-                species={materials.species} 
-                deckMaterial={materials.deckMaterial} 
-                postSize={materials.postSize}
-                height={sec.height}
-              />
-              
+              {visibleLayers.decking && (
+                <DeckBoards 
+                  vertices={sec.vertices} 
+                  secX={sec.x} 
+                  secY={sec.y} 
+                  species={materials.species} 
+                  deckMaterial={materials.deckMaterial} 
+                  deckColor={materials.deckColor}
+                  deckBoardSize={materials.deckBoardSize} 
+                  joistOrientation={sec.joistOrientation} 
+                  deckingOrientation={sec.deckingOrientation} 
+                />
+              )}
+              {visibleLayers.framing && (
+                <>
+                  <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+                  <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+                </>
+              )}
+              {visibleLayers.foundation && (
+                <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+              )}
+              {visibleLayers.accessories && (
+                <>
+                  <Railings 
+                    railings={sec.railings} 
+                    width={sec.width} 
+                    depth={sec.depth} 
+                    height={sec.height} 
+                    species={materials.species}
+                    deckMaterial={materials.deckMaterial}
+                    lightingPreset={lightingPreset}
+                  />
+                  <Stairs 
+                    stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} 
+                    stairCalcs={calcs.stairs} 
+                    width={sec.width} 
+                    depth={sec.depth} 
+                    species={materials.species}
+                    deckMaterial={materials.deckMaterial}
+                  />
+                  <Ramp 
+                    rampEdge={typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp?.direction)} 
+                    rampCalcs={calcs.ramp} 
+                    width={sec.width} 
+                    depth={sec.depth} 
+                    species={materials.species} 
+                    deckMaterial={materials.deckMaterial} 
+                    postSize={materials.postSize}
+                    height={sec.height}
+                  />
+                </>
+              )}
               {sec.ledgerAttached && <HouseWall width={sec.width} height={sec.height} />}
             </group>
           );
@@ -1084,6 +1167,21 @@ export default function Scene3D() {
             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
           </svg>
           <span>Night</span>
+        </button>
+      </div>
+
+      {/* Floating 3D Viewport Controls HUD */}
+      <div className="viewport-3d-hud" id="viewport-3d-hud">
+        <button className="btn btn--sm btn--ghost" onClick={() => triggerView('iso')} title="Isometric 3D View">ISO</button>
+        <button className="btn btn--sm btn--ghost" onClick={() => triggerView('top')} title="Top 2D Plan View">Top</button>
+        <button className="btn btn--sm btn--ghost" onClick={() => triggerView('front')} title="Front Elevation View">Front</button>
+        <button className="btn btn--sm btn--ghost" onClick={() => triggerView('side')} title="Side Elevation View">Side</button>
+        <div style={{ width: '1px', height: '14px', background: 'var(--border-default)', margin: '0 4px' }} />
+        <button className="btn btn--sm btn--ghost btn--icon" onClick={() => triggerView('reset')} title="Reset Camera" style={{ minWidth: '24px', minHeight: '24px', padding: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
         </button>
       </div>
     </div>
