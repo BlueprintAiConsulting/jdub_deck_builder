@@ -1928,7 +1928,7 @@ test('41. Toolbar New Project action: prompt confirmation and reset flow', () =>
       }
     }
     
-    store.getState().resetDeck();
+    store.getState().clearDeck();
     global.window.confirm = originalConfirm;
     return { resetOccurred: true, confirmCalled, confirmPrompt };
   };
@@ -1938,23 +1938,28 @@ test('41. Toolbar New Project action: prompt confirmation and reset flow', () =>
   // Test case 1: isDirty is false
   store.getState().resetDeck();
   assert.strictEqual(store.getState().isDirty, false);
+  assert.ok(store.getState().sections.length > 0, 'Before clear, should have sections');
   let res = triggerNewProject(store, false);
   assert.strictEqual(res.resetOccurred, true, 'Should reset without prompt if not dirty');
   assert.strictEqual(res.confirmCalled, false, 'Should not show confirm dialog if not dirty');
+  assert.strictEqual(store.getState().sections.length, 0, 'After clear, should have 0 sections (blank slate)');
   
   // Test case 2: isDirty is true, confirm rejected
+  store.getState().resetDeck();
   store.getState().setDirty(true);
   assert.strictEqual(store.getState().isDirty, true);
   res = triggerNewProject(store, false);
   assert.strictEqual(res.resetOccurred, false, 'Should not reset if user cancels confirmation');
   assert.strictEqual(res.confirmCalled, true, 'Confirm should be called');
   assert.strictEqual(store.getState().isDirty, true, 'Project must remain dirty');
+  assert.ok(store.getState().sections.length > 0, 'Sections should not be cleared');
   
   // Test case 3: isDirty is true, confirm accepted
   res = triggerNewProject(store, true);
   assert.strictEqual(res.resetOccurred, true, 'Should reset if user accepts confirmation');
   assert.strictEqual(res.confirmCalled, true, 'Confirm should be called');
   assert.strictEqual(store.getState().isDirty, false, 'Project should be clean after reset');
+  assert.strictEqual(store.getState().sections.length, 0, 'Sections should be completely empty (blank slate)');
 });
 
 // ─── EXECUTE ALL TESTS ───

@@ -855,6 +855,23 @@ export const useDeckStore = create((set, get) => ({
     });
   },
 
+  clearDeck: () => {
+    nextId = 1;
+    const mat = { ...DEFAULT_MATERIALS };
+    const results = recalculateAll([], mat);
+    set({
+      sections: [],
+      selectedSectionId: null,
+      materials: mat,
+      currentProjectName: '',
+      lightingPreset: 'daylight',
+      ...results,
+      history: [{ sections: [], materials: { ...mat } }],
+      historyIndex: 0,
+      isDirty: false,
+    });
+  },
+
   loadProject: (sections, materials) => {
     const normalizedSections = sections.map(s => {
       const type = s.type || 'deck';

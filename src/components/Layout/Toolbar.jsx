@@ -255,7 +255,7 @@ export default function Toolbar({ isMobile }) {
   const showToast = useDeckStore((s) => s.showToast);
   const isDirty = useDeckStore((s) => s.isDirty);
   const setDirty = useDeckStore((s) => s.setDirty);
-  const resetDeck = useDeckStore((s) => s.resetDeck);
+  const clearDeck = useDeckStore((s) => s.clearDeck);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
@@ -313,9 +313,9 @@ export default function Toolbar({ isMobile }) {
       const confirmDiscard = window.confirm("Are you sure you want to start a new project? Unsaved changes will be lost.");
       if (!confirmDiscard) return;
     }
-    resetDeck();
+    clearDeck();
     showToast('New project created.', 'success');
-  }, [isDirty, resetDeck, showToast]);
+  }, [isDirty, clearDeck, showToast]);
 
   const handleOpenClick = () => {
     setRecentProjects(listRecentProjects());
@@ -486,9 +486,11 @@ export default function Toolbar({ isMobile }) {
           >3D</button>
         </div>
 
-        <div className="toolbar__mobile-dims">
-          {formatDimension(deck.width)} × {formatDimension(deck.depth)}
-        </div>
+        {sectionCount > 0 && (
+          <div className="toolbar__mobile-dims">
+            {formatDimension(deck.width)} × {formatDimension(deck.depth)}
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
 
@@ -556,7 +558,7 @@ export default function Toolbar({ isMobile }) {
           )}
         </button>
 
-        <button className="btn btn--primary btn--icon toolbar__export-mobile" onClick={exportPDF} aria-label="Export PDF" id="btn-export">
+        <button className="btn btn--primary btn--icon toolbar__export-mobile" onClick={exportPDF} disabled={sectionCount === 0} aria-label="Export PDF" id="btn-export">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
@@ -614,29 +616,33 @@ export default function Toolbar({ isMobile }) {
       </div>
 
       {/* Dimension chip */}
-      <div className="toolbar__group toolbar__dims">
-        <span className="toolbar__dim-label">{formatDimension(deck.width)} × {formatDimension(deck.depth)}</span>
-        <span className="badge badge--warm">{sqft} sq ft</span>
-        {sectionCount > 1 && (
-          <span className="badge">{sectionCount} sections</span>
-        )}
-      </div>
+      {sectionCount > 0 && (
+        <div className="toolbar__group toolbar__dims">
+          <span className="toolbar__dim-label">{formatDimension(deck.width)} × {formatDimension(deck.depth)}</span>
+          <span className="badge badge--warm">{sqft} sq ft</span>
+          {sectionCount > 1 && (
+            <span className="badge">{sectionCount} sections</span>
+          )}
+        </div>
+      )}
 
       {/* Calc summary */}
-      <div className="toolbar__calc-summary">
-        <span className="toolbar__calc-chip" style={{ color: 'var(--accent-primary)' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="4" x2="4" y2="20"/></svg>
-          {calcs.joists}
-        </span>
-        <span className="toolbar__calc-chip" style={{ color: 'var(--accent-warm)' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="12" x2="20" y2="12"/></svg>
-          {calcs.beams}
-        </span>
-        <span className="toolbar__calc-chip" style={{ color: 'var(--accent-red)' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="6" y="6" width="12" height="12"/></svg>
-          {calcs.posts}
-        </span>
-      </div>
+      {sectionCount > 0 && (
+        <div className="toolbar__calc-summary">
+          <span className="toolbar__calc-chip" style={{ color: 'var(--accent-primary)' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="4" x2="4" y2="20"/></svg>
+            {calcs.joists}
+          </span>
+          <span className="toolbar__calc-chip" style={{ color: 'var(--accent-warm)' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="4" y1="12" x2="20" y2="12"/></svg>
+            {calcs.beams}
+          </span>
+          <span className="toolbar__calc-chip" style={{ color: 'var(--accent-red)' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="6" y="6" width="12" height="12"/></svg>
+            {calcs.posts}
+          </span>
+        </div>
+      )}
 
       <div className="toolbar__group">
         <button className="btn btn--ghost btn--icon" onClick={undo} disabled={historyIndex <= 0} aria-label="Undo (Ctrl+Z)" data-tooltip="Undo [⌘Z]" id="btn-undo">
@@ -717,7 +723,7 @@ export default function Toolbar({ isMobile }) {
           )}
         </button>
         
-        <button className="btn btn--primary" id="btn-export" onClick={exportPDF} aria-label="Export PDF report" data-tooltip="Export PDF Report">
+        <button className="btn btn--primary" id="btn-export" onClick={exportPDF} disabled={sectionCount === 0} aria-label="Export PDF report" data-tooltip="Export PDF Report">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Export PDF
         </button>
