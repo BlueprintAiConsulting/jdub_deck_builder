@@ -76,7 +76,7 @@ export function hitTestVertices(mx, my, vertices, S, panX, panY, cw, ch) {
 }
 
 function getStairHandlePositions(sec, S, ox, oy, sectionCalcs) {
-  const calcs = sectionCalcs[sec.id];
+  const calcs = sectionCalcs ? sectionCalcs[sec.id] : null;
   if (!sec.stairs || !calcs || !calcs.stairs) return null;
   const st = calcs.stairs;
   const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
@@ -129,7 +129,7 @@ function getStairHandlePositions(sec, S, ox, oy, sectionCalcs) {
 }
 
 function getRampHandlePositions(sec, S, ox, oy, sectionCalcs) {
-  const calcs = sectionCalcs[sec.id];
+  const calcs = sectionCalcs ? sectionCalcs[sec.id] : null;
   if (!sec.ramp || !calcs || !calcs.ramp) return null;
   const rm = calcs.ramp;
   const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
@@ -319,7 +319,7 @@ export default function Canvas2D({ isMobile }) {
             initialNumberOfSteps: selectedSubObjectType === 'stairs' ? (obj.numberOfSteps !== undefined ? obj.numberOfSteps : 5) : null,
             initialRampRun: selectedSubObjectType === 'ramp' ? (obj.run || 120) : null,
             initialOffset: obj.offset || 0,
-            initialTotalRun: selectedSubObjectType === 'stairs' ? (sectionCalcs[sel.id]?.stairs?.totalRun || 50) : null
+            initialTotalRun: selectedSubObjectType === 'stairs' ? (sectionCalcs && sectionCalcs[sel.id]?.stairs?.totalRun || 50) : null
           });
           return;
         }

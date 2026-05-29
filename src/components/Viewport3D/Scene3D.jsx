@@ -517,11 +517,16 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
 function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial }) {
   if (!stairEdge || !stairCalcs || !section) return null;
 
-  const { numRisers, numTreads, riserHeight, totalRun } = stairCalcs;
   const stairWidth = stairCalcs.width || STAIR_RULES.maxStairWidth;
   const treadDepth = stairCalcs.treadDepth || STAIR_RULES.idealTreadDepth;
   const treadThickness = 1.0;
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
+
+  const safeNumTreads = Math.max(1, stairCalcs.numTreads || 1);
+  const safeTreadDepth = treadDepth || 10;
+  const safeTotalRun = Math.max(1, stairCalcs.totalRun || (safeNumTreads * safeTreadDepth));
+  const safeRiserHeight = stairCalcs.riserHeight || 7.25;
+  const safeNumRisers = stairCalcs.numRisers || (safeNumTreads + 1);
 
   const { color, type } = getMaterialVisuals(deckMaterial, species);
   const texture = getProceduralTexture(color, type);
@@ -547,28 +552,28 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
 
   // Treads local coordinates (X is centered, Z runs forward 0 -> totalRun)
   const treads = [];
-  for (let i = 0; i < numTreads; i++) {
+  for (let i = 0; i < safeNumTreads; i++) {
     treads.push({
       x: 0,
-      y: deckTopY - (i + 1) * riserHeight,
-      z: (i + 0.5) * treadDepth,
+      y: deckTopY - (i + 1) * safeRiserHeight,
+      z: (i + 0.5) * safeTreadDepth,
     });
   }
 
   // Risers local coordinates (X is centered, Z is at the back of each step)
   const risers = [];
-  for (let i = 0; i < numTreads; i++) {
+  for (let i = 0; i < safeNumTreads; i++) {
     risers.push({
       x: 0,
-      y: deckTopY - (i + 0.5) * riserHeight,
-      z: i * treadDepth,
+      y: deckTopY - (i + 0.5) * safeRiserHeight,
+      z: i * safeTreadDepth,
     });
   }
 
   // Side stringers flanking the treads
-  const totalRise = numRisers * riserHeight;
-  const stringerLength = Math.sqrt(totalRise ** 2 + totalRun ** 2);
-  const theta = Math.atan2(totalRise, totalRun);
+  const totalRise = safeNumRisers * safeRiserHeight;
+  const stringerLength = Math.sqrt(totalRise ** 2 + safeTotalRun ** 2);
+  const theta = Math.atan2(totalRise, safeTotalRun);
   const stringerDepth = 11.25; // 2x12 lumber depth
 
   return (
