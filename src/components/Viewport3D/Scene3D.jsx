@@ -7,6 +7,7 @@ import { useDeckStore } from '../../store/deckStore';
 import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData';
 import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTables';
 import './Scene3D.css';
+import { getSubObjectOffset } from '../../utils/polygonUtils';
 
 const IN = 1 / 12; // inches to scene units (feet)
 
@@ -513,8 +514,8 @@ function Railings({ railings, width, depth, height, species, deckMaterial }) {
   );
 }
 
-function Stairs({ stairEdge, stairCalcs, width, depth, species, deckMaterial }) {
-  if (!stairEdge || !stairCalcs) return null;
+function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial }) {
+  if (!stairEdge || !stairCalcs || !section) return null;
 
   const { numRisers, numTreads, riserHeight, totalRun } = stairCalcs;
   const stairWidth = stairCalcs.width || STAIR_RULES.maxStairWidth;
@@ -524,78 +525,97 @@ function Stairs({ stairEdge, stairCalcs, width, depth, species, deckMaterial }) 
 
   const { color, type } = getMaterialVisuals(deckMaterial, species);
   const texture = getProceduralTexture(color, type);
+  const woodTexture = getProceduralTexture('#5a4d3b', 'wood'); // wood texture for stringers
 
-  let startX, startZ, dirX, dirZ, rotY;
-  const align = stairCalcs.align || 'center';
-  if (stairEdge === 's') {
-    startX = align === 'left' ? 0 : (align === 'right' ? width - stairWidth : width / 2 - stairWidth / 2);
-    startZ = depth;
-    dirX = 0; dirZ = 1; rotY = 0;
-  } else if (stairEdge === 'n') {
-    startX = align === 'left' ? 0 : (align === 'right' ? width - stairWidth : width / 2 - stairWidth / 2);
-    startZ = 0;
-    dirX = 0; dirZ = -1; rotY = Math.PI;
-  } else if (stairEdge === 'e') {
-    startX = width;
-    startZ = align === 'left' ? 0 : (align === 'right' ? depth - stairWidth : depth / 2 - stairWidth / 2);
-    dirX = 1; dirZ = 0; rotY = -Math.PI / 2;
-  } else {
-    startX = 0;
-    startZ = align === 'left' ? 0 : (align === 'right' ? depth - stairWidth : depth / 2 - stairWidth / 2);
-    dirX = -1; dirZ = 0; rotY = Math.PI / 2;
+  // Compute rotation around Y axis based on edge direction
+  let rotY = 0;
+  if (stairEdge === 's') rotY = 0;
+  else if (stairEdge === 'n') rotY = Math.PI;
+  else if (stairEdge === 'e') rotY = -Math.PI / 2;
+  else if (stairEdge === 'w') rotY = Math.PI / 2;
+
+  // Retrieve current visual offset of the stairs
+  const offset = getSubObjectOffset(section, 'stairs');
+  let centerX, centerZ;
+  if (stairEdge === 's' || stairEdge === 'n') {
+    centerX = offset + stairWidth / 2;
+    centerZ = stairEdge === 's' ? depth : 0;
+  } else { // 'e' or 'w'
+    centerX = stairEdge === 'e' ? width : 0;
+    centerZ = offset + stairWidth / 2;
   }
 
+  // Treads local coordinates (X is centered, Z runs forward 0 -> totalRun)
   const treads = [];
   for (let i = 0; i < numTreads; i++) {
-    const rise = deckTopY - (i + 1) * riserHeight;
-    const run = (i + 0.5) * treadDepth;
     treads.push({
-      x: startX + dirX * run,
-      y: rise,
-      z: startZ + dirZ * run,
+      x: 0,
+      y: deckTopY - (i + 1) * riserHeight,
+      z: (i + 0.5) * treadDepth,
     });
   }
 
-  const isVertical = stairEdge === 'n' || stairEdge === 's';
-  const treadW = isVertical ? stairWidth : treadDepth;
-  const treadD = isVertical ? treadDepth : stairWidth;
+  // Risers local coordinates (X is centered, Z is at the back of each step)
+  const risers = [];
+  for (let i = 0; i < numTreads; i++) {
+    risers.push({
+      x: 0,
+      y: deckTopY - (i + 0.5) * riserHeight,
+      z: i * treadDepth,
+    });
+  }
+
+  // Side stringers flanking the treads
+  const totalRise = numRisers * riserHeight;
+  const stringerLength = Math.sqrt(totalRise ** 2 + totalRun ** 2);
+  const theta = Math.atan2(totalRise, totalRun);
+  const stringerDepth = 11.25; // 2x12 lumber depth
 
   return (
-    <group>
+    <group position={[centerX * IN, 0, centerZ * IN]} rotation={[0, rotY, 0]}>
       {/* Treads */}
       {treads.map((t, i) => (
         <mesh key={`tread-${i}`} position={[t.x * IN, t.y * IN, t.z * IN]} castShadow receiveShadow>
-          <boxGeometry args={[treadW * IN, treadThickness * IN, treadD * IN]} />
+          <boxGeometry args={[stairWidth * IN, treadThickness * IN, treadDepth * IN]} />
           <meshStandardMaterial map={texture} roughness={0.7} />
         </mesh>
       ))}
 
       {/* Risers */}
-      {treads.map((t, i) => (
-        <mesh
-          key={`riser-${i}`}
-          position={[
-            t.x * IN,
-            (t.y + riserHeight / 2) * IN,
-            (t.z + dirZ * treadDepth / 2) * IN + (isVertical ? 0 : dirX * treadDepth / 2 * IN),
-          ]}
-          castShadow
-          receiveShadow
-        >
-          <boxGeometry args={[
-            (isVertical ? stairWidth : 0.75) * IN,
-            riserHeight * IN,
-            (isVertical ? 0.75 : stairWidth) * IN,
-          ]} />
+      {risers.map((r, i) => (
+        <mesh key={`riser-${i}`} position={[r.x * IN, r.y * IN, r.z * IN]} castShadow receiveShadow>
+          <boxGeometry args={[stairWidth * IN, riserHeight * IN, 0.75 * IN]} />
           <meshStandardMaterial map={texture} roughness={0.8} />
         </mesh>
       ))}
+
+      {/* Left Stringer (flanking baseboard) */}
+      <mesh 
+        position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (totalRun / 2) * IN]} 
+        rotation={[theta, 0, 0]} 
+        castShadow 
+        receiveShadow
+      >
+        <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
+        <meshStandardMaterial map={woodTexture} roughness={0.8} />
+      </mesh>
+
+      {/* Right Stringer (flanking baseboard) */}
+      <mesh 
+        position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (totalRun / 2) * IN]} 
+        rotation={[theta, 0, 0]} 
+        castShadow 
+        receiveShadow
+      >
+        <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
+        <meshStandardMaterial map={woodTexture} roughness={0.8} />
+      </mesh>
     </group>
   );
 }
 
-function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height: rawHeight }) {
-  if (!rampEdge || !rampCalcs) return null;
+function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, postSize, height: rawHeight }) {
+  if (!rampEdge || !rampCalcs || !section) return null;
 
   const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) ? rawHeight : 36;
   const safeRampWidth = Math.max(12, typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36);
@@ -617,23 +637,23 @@ function Ramp({ rampEdge, rampCalcs, width, depth, species, deckMaterial, postSi
   const woodTexture = getProceduralTexture('#5a4d3b', 'wood');
   const postTexture = getProceduralTexture('#504230', 'wood');
 
+  const offset = getSubObjectOffset(section, 'ramp');
   let startX, startZ, rotY;
-  const align = rampCalcs.align || 'center';
   if (rampEdge === 's') {
-    startX = align === 'left' ? 0 : (align === 'right' ? width - rampWidth : width / 2 - rampWidth / 2);
+    startX = offset;
     startZ = depth;
     rotY = 0;
   } else if (rampEdge === 'n') {
-    startX = align === 'left' ? 0 : (align === 'right' ? width - rampWidth : width / 2 - rampWidth / 2);
+    startX = offset;
     startZ = 0;
     rotY = Math.PI;
   } else if (rampEdge === 'e') {
     startX = width;
-    startZ = align === 'left' ? 0 : (align === 'right' ? depth - rampWidth : depth / 2 - rampWidth / 2);
+    startZ = offset;
     rotY = -Math.PI / 2;
   } else {
     startX = 0;
-    startZ = align === 'left' ? 0 : (align === 'right' ? depth - rampWidth : depth / 2 - rampWidth / 2);
+    startZ = offset;
     rotY = Math.PI / 2;
   }
 
@@ -1037,6 +1057,7 @@ export default function Scene3D() {
                     deckMaterial={materials.deckMaterial}
                   />
                   <Stairs 
+                    section={sec}
                     stairEdge={typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs?.direction)} 
                     stairCalcs={calcs.stairs} 
                     width={sec.width} 
@@ -1045,6 +1066,7 @@ export default function Scene3D() {
                     deckMaterial={materials.deckMaterial}
                   />
                   <Ramp 
+                    section={sec}
                     rampEdge={typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp?.direction)} 
                     rampCalcs={calcs.ramp} 
                     width={sec.width} 
