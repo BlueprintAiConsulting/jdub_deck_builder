@@ -15,11 +15,12 @@ const textureCache = {};
 
 function drawWoodPatternOnCanvas(canvas, colorHex, type, isBump = false) {
   const ctx = canvas.getContext('2d');
+  const safeColor = (typeof colorHex === 'string' && colorHex) ? colorHex : '#c4a35a';
   
   if (isBump) {
     ctx.fillStyle = '#808080';
   } else {
-    ctx.fillStyle = colorHex;
+    ctx.fillStyle = safeColor;
   }
   ctx.fillRect(0, 0, 512, 512);
 
@@ -127,11 +128,12 @@ function drawWoodPatternOnCanvas(canvas, colorHex, type, isBump = false) {
 
 function drawCompositePatternOnCanvas(canvas, colorHex, type, isBump = false) {
   const ctx = canvas.getContext('2d');
+  const safeColor = (typeof colorHex === 'string' && colorHex) ? colorHex : '#5c5650';
   
   if (isBump) {
     ctx.fillStyle = '#808080';
   } else {
-    ctx.fillStyle = colorHex;
+    ctx.fillStyle = safeColor;
   }
   ctx.fillRect(0, 0, 512, 512);
 
@@ -178,7 +180,8 @@ function drawCompositePatternOnCanvas(canvas, colorHex, type, isBump = false) {
 }
 
 export function getProceduralTexture(colorHex, type) {
-  const cacheKey = `${colorHex}-${type}`;
+  const safeColorHex = (typeof colorHex === 'string' && colorHex.match(/^#[0-9a-fA-F]{3,8}$/)) ? colorHex : '#c4a35a';
+  const cacheKey = `${safeColorHex}-${type}`;
   if (textureCache[cacheKey]) {
     return textureCache[cacheKey];
   }
@@ -191,7 +194,7 @@ export function getProceduralTexture(colorHex, type) {
     const ctx = canvas.getContext('2d');
     const numSlats = 16;
     const slatH = 512 / numSlats;
-    const baseColor = new THREE.Color(colorHex);
+    const baseColor = new THREE.Color(safeColorHex);
     
     for (let i = 0; i < numSlats; i++) {
       const y = i * slatH;
@@ -215,7 +218,7 @@ export function getProceduralTexture(colorHex, type) {
     }
   } else if (type === 'shingles') {
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = colorHex;
+    ctx.fillStyle = safeColorHex;
     ctx.fillRect(0, 0, 512, 512);
     
     const rowH = 32;
@@ -226,7 +229,7 @@ export function getProceduralTexture(colorHex, type) {
       for (let c = -1; c < 9; c++) {
         const x = c * colW + offset;
         const factor = 1 - (Math.random() * 0.12 - 0.06);
-        const shColor = new THREE.Color(colorHex).multiplyScalar(factor);
+        const shColor = new THREE.Color(safeColorHex).multiplyScalar(factor);
         
         ctx.fillStyle = shColor.getStyle();
         ctx.fillRect(x + 1, y + 1, colW - 2, rowH - 2);
@@ -238,7 +241,7 @@ export function getProceduralTexture(colorHex, type) {
     }
   } else if (type === 'grass') {
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = colorHex;
+    ctx.fillStyle = safeColorHex;
     ctx.fillRect(0, 0, 512, 512);
     
     for (let i = 0; i < 18000; i++) {
@@ -259,7 +262,7 @@ export function getProceduralTexture(colorHex, type) {
     }
   } else if (type === 'concrete') {
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = colorHex;
+    ctx.fillStyle = safeColorHex;
     ctx.fillRect(0, 0, 512, 512);
     
     for (let i = 0; i < 6000; i++) {
@@ -270,9 +273,9 @@ export function getProceduralTexture(colorHex, type) {
       ctx.fillRect(x, y, Math.random() * 2 + 1, Math.random() * 2 + 1);
     }
   } else if (type.startsWith('composite')) {
-    drawCompositePatternOnCanvas(canvas, colorHex, type, false);
+    drawCompositePatternOnCanvas(canvas, safeColorHex, type, false);
   } else {
-    drawWoodPatternOnCanvas(canvas, colorHex, type, false);
+    drawWoodPatternOnCanvas(canvas, safeColorHex, type, false);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -915,10 +918,10 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
 }
 
 function Railings({ railings, width, depth, height, species, deckMaterial, deckColor }) {
-  const guardHeight = RAILING_RULES.guardMinHeight; // 36"
+  const guardHeight = Math.max(24, RAILING_RULES.guardMinHeight || 36); // standard guardrail height min 24"
   const postWidth = 3.5;
   const railWidth = 1.5;
-  const balusterSpacing = RAILING_RULES.balusterMaxSpacing;
+  const balusterSpacing = Math.max(1.0, RAILING_RULES.balusterMaxSpacing || 4.0); // max 4 inches by code, min 1 inch
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0) * IN;
 
   const getBoardColor = () => {
@@ -931,6 +934,7 @@ function Railings({ railings, width, depth, height, species, deckMaterial, deckC
 
   const edges = useMemo(() => {
     const result = [];
+    if (!railings) return result;
     const entries = Object.entries(railings);
     entries.forEach(([edge, on]) => {
       if (!on) return;
@@ -1074,16 +1078,16 @@ function Railings({ railings, width, depth, height, species, deckMaterial, deckC
 function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial, deckColor }) {
   if (!stairEdge || !stairCalcs || !section) return null;
 
-  const stairWidth = stairCalcs.width || STAIR_RULES.maxStairWidth;
-  const treadDepth = stairCalcs.treadDepth || STAIR_RULES.idealTreadDepth;
+  const stairWidth = Math.max(12, stairCalcs.width || STAIR_RULES.maxStairWidth);
+  const treadDepth = Math.max(6, stairCalcs.treadDepth || STAIR_RULES.idealTreadDepth);
   const treadThickness = 1.0;
   const deckTopY = (LUMBER_ACTUAL['5/4x6']?.width || 1.0);
 
-  const safeNumTreads = Math.max(1, stairCalcs.numTreads || 1);
-  const safeTreadDepth = treadDepth || 10;
-  const safeTotalRun = Math.max(1, stairCalcs.totalRun || (safeNumTreads * safeTreadDepth));
-  const safeRiserHeight = stairCalcs.riserHeight || 7.25;
-  const safeNumRisers = stairCalcs.numRisers || (safeNumTreads + 1);
+  const safeNumTreads = Math.max(1, typeof stairCalcs.numTreads === 'number' ? stairCalcs.numTreads : 1);
+  const safeTreadDepth = Math.max(6, treadDepth || 10);
+  const safeTotalRun = Math.max(12, typeof stairCalcs.totalRun === 'number' ? stairCalcs.totalRun : (safeNumTreads * safeTreadDepth));
+  const safeRiserHeight = Math.max(3, typeof stairCalcs.riserHeight === 'number' ? stairCalcs.riserHeight : 7.25);
+  const safeNumRisers = Math.max(1, typeof stairCalcs.numRisers === 'number' ? stairCalcs.numRisers : (safeNumTreads + 1));
 
   const getBoardColor = () => {
     const opts = DECK_COLOR_OPTIONS[deckMaterial] || [];
@@ -1219,9 +1223,9 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
 function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, deckColor, postSize, height: rawHeight }) {
   if (!rampEdge || !rampCalcs || !section) return null;
 
-  const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) ? rawHeight : 36;
-  const safeRampWidth = Math.max(12, typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36);
-  const safeRun = Math.max(12, typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) ? rampCalcs.run : 12);
+  const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) && rawHeight > 0 ? rawHeight : 36;
+  const safeRampWidth = Math.max(12, typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) && rampCalcs.width > 0 ? rampCalcs.width : 36);
+  const safeRun = Math.max(12, typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) && rampCalcs.run > 0 ? rampCalcs.run : 12);
   const safeRise = Math.max(0, typeof rampCalcs.totalRise === 'number' && !isNaN(rampCalcs.totalRise) ? rampCalcs.totalRise : 0);
 
   const rampWidth = safeRampWidth;
@@ -1267,7 +1271,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
   const postActualWidth = postSize === '6x6' ? 5.5 : 3.5;
   const stringerDepth = 11.25; // 2x12
 
-  const N = rampCalcs.intermediateLandings || 0;
+  const N = Math.max(0, typeof rampCalcs.intermediateLandings === 'number' ? rampCalcs.intermediateLandings : 0);
   const numSegments = N + 1;
   const segRun = run / numSegments;
   const segRise = totalRise / numSegments;
