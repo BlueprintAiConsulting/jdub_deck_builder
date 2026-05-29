@@ -421,7 +421,7 @@ export default function Canvas2D({ isMobile }) {
         // Check vertex handles first
         const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
         if (vIdx !== -1) {
-          setActionPopup({ x: mx, y: my, id: sel.id, type: 'vertex', vertexIndex: vIdx });
+          setActionPopup({ x: e.clientX, y: e.clientY, id: sel.id, type: 'vertex', vertexIndex: vIdx });
           setInteraction({
             mode: 'dragging_vertex',
             vertexIndex: vIdx,
@@ -443,7 +443,7 @@ export default function Canvas2D({ isMobile }) {
       const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
       if (hit) {
         selectSection(hit.id, (hit.type !== 'deck' && hit.type !== 'post' && hit.type !== 'beam' && hit.type !== 'joist' && !hit.type.startsWith('railing')) ? hit.type : null);
-        setActionPopup({ x: mx, y: my, id: hit.id, type: hit.type });
+        setActionPopup({ x: e.clientX, y: e.clientY, id: hit.id, type: hit.type });
         if (hit.type === 'stairs' || hit.type === 'ramp') {
           const sec = sections.find((s) => s.id === hit.id);
           const initialOffset = getSubObjectOffset(sec, hit.type);
@@ -2615,11 +2615,11 @@ export default function Canvas2D({ isMobile }) {
         <div 
           className="canvas-action-popup animate-fade-in" 
           style={{ 
-            position: 'absolute', 
+            position: 'fixed', 
             left: `${actionPopup.x}px`, 
-            top: `${actionPopup.y - 55}px`, 
+            top: `${actionPopup.y - 70}px`, 
             transform: 'translateX(-50%)',
-            zIndex: 110
+            zIndex: 9999
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -2648,6 +2648,7 @@ export default function Canvas2D({ isMobile }) {
                 else if (t === 'joist') setActiveTab('joists');
                 else if (t === 'deck') setActiveTab('layout');
                 else if (t.startsWith('railing')) setActiveTab('layout');
+                selectSection(actionPopup.id, t !== 'deck' ? t : null);
                 setShowSettingsModal(true);
                 setActionPopup(null);
               }} title="Settings">
@@ -2673,7 +2674,7 @@ export default function Canvas2D({ isMobile }) {
 
       {/* Settings Modal Overlay */}
       {showSettingsModal && selectedSectionId && (
-        <div className="settings-overlay-modal glass-panel animate-slide-right" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-overlay-modal glass-panel animate-slide-right" onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: 80, left: 20, zIndex: 9998 }}>
           {(() => {
             const selectedSec = sections.find((x) => x.id === selectedSectionId) || sections[0];
             const isStairs = selectedSubObjectType === 'stairs';
