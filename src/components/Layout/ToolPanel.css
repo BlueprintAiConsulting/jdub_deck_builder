@@ -5,7 +5,7 @@
   flex-direction: column;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-default);
-  padding: 12px 8px;
+  padding: 10px 8px;
   overflow-y: hidden;
   gap: var(--space-1);
 }
@@ -22,17 +22,17 @@
 }
 
 .tool-panel__grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .tool-panel__btn {
   display: flex;
-  width: 37px;
-  height: 37px;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 5px 8px;
   border: 1px solid transparent;
   border-radius: var(--border-radius-md);
   background: transparent;
@@ -40,6 +40,7 @@
   cursor: pointer;
   transition: all var(--transition-base);
   position: relative;
+  width: 100%;
 }
 .tool-panel__btn:hover {
   background: var(--bg-hover);
@@ -63,18 +64,15 @@
   font-size: var(--text-xs);
 }
 .tool-panel__label {
-  display: none;
+  display: inline;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 /* Position tooltips to the right of the sidebar buttons */
 .tool-panel [data-tooltip]::after {
-  bottom: auto;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%) translateX(-4px);
-}
-.tool-panel [data-tooltip]:hover::after {
-  transform: translateY(-50%) translateX(0);
+  display: none;
 }
 /* Keyboard shortcut badge */
 .tool-panel__shortcut {
@@ -99,10 +97,10 @@
 /* Templates */
 .tool-panel__template {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--border-default);
   border-radius: var(--border-radius-md);
   background: var(--bg-tertiary);
@@ -116,23 +114,24 @@
   transform: translateY(-1px);
 }
 .tool-panel__template-preview {
-  width: 44px;
-  height: 32px;
+  width: 24px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .tool-panel__template-rect {
-  width: 36px;
-  height: 24px;
-  border: 2px solid var(--accent-warm);
-  border-radius: 3px;
+  width: 20px;
+  height: 14px;
+  border: 1.5px solid var(--accent-warm);
+  border-radius: 2px;
   opacity: 0.7;
 }
 .tool-panel__template-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 1px;
 }
 .tool-panel__template-name {
