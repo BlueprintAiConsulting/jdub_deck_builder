@@ -129,7 +129,7 @@ function DimensionInput({ id, label, valueInches, onChange, min = 12, max = 480 
   );
 }
 
-function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly }) {
+function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly, integer = false }) {
   const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? value.toString() : "");
 
   useEffect(() => {
@@ -143,6 +143,9 @@ function HardenedNumberInput({ value, onChange, min, max, step = 1, className = 
     if (isNaN(num) || localVal.trim() === "") {
       setLocalVal(value !== undefined && value !== null ? value.toString() : "");
       return;
+    }
+    if (integer) {
+      num = Math.round(num);
     }
     if (min !== undefined && num < min) num = min;
     if (max !== undefined && num > max) num = max;
@@ -305,52 +308,50 @@ export default function PropertiesPanel({ isMobile }) {
             >
               <div className="prop-field">
                 <label className="label" htmlFor="placement-stair-width">Stair Width (in)</label>
-                <input
+                <HardenedNumberInput
                   id="placement-stair-width"
                   className="input input--sm"
-                  type="number"
-                  min="36"
-                  max="96"
+                  min={36}
+                  max={96}
                   value={placementStairs.width}
-                  onChange={(e) => updatePlacementStairs({ width: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementStairs({ width: val })}
+                  integer={true}
                 />
               </div>
               <div className="prop-field">
                 <label className="label" htmlFor="placement-stair-steps">Number of Steps</label>
-                <input
+                <HardenedNumberInput
                   id="placement-stair-steps"
                   className="input input--sm"
-                  type="number"
-                  min="1"
-                  max="20"
+                  min={1}
+                  max={20}
                   value={placementStairs.numberOfSteps}
-                  onChange={(e) => updatePlacementStairs({ numberOfSteps: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementStairs({ numberOfSteps: val })}
+                  integer={true}
                 />
               </div>
               <div className="prop-field">
                 <label className="label" htmlFor="placement-stair-rise">Rise per Step (in)</label>
-                <input
+                <HardenedNumberInput
                   id="placement-stair-rise"
                   className="input input--sm"
-                  type="number"
-                  step="0.25"
-                  min="4"
-                  max="9"
+                  step={0.25}
+                  min={4}
+                  max={9}
                   value={placementStairs.rise}
-                  onChange={(e) => updatePlacementStairs({ rise: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementStairs({ rise: val })}
                 />
               </div>
               <div className="prop-field">
                 <label className="label" htmlFor="placement-stair-run">Run per Step (in)</label>
-                <input
+                <HardenedNumberInput
                   id="placement-stair-run"
                   className="input input--sm"
-                  type="number"
-                  step="0.25"
-                  min="8"
-                  max="14"
+                  step={0.25}
+                  min={8}
+                  max={14}
                   value={placementStairs.run}
-                  onChange={(e) => updatePlacementStairs({ run: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementStairs({ run: val })}
                 />
               </div>
             </CollapsibleSection>
@@ -385,29 +386,29 @@ export default function PropertiesPanel({ isMobile }) {
               />
               <div className="prop-field">
                 <label className="label" htmlFor="placement-ramp-width">Ramp Width (in)</label>
-                <input
+                <HardenedNumberInput
                   id="placement-ramp-width"
                   className="input input--sm"
-                  type="number"
-                  min="36"
-                  max="96"
+                  min={36}
+                  max={96}
                   value={placementRamp.width}
-                  onChange={(e) => updatePlacementRamp({ width: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementRamp({ width: val })}
+                  integer={true}
                 />
               </div>
               <div className="prop-field">
                 <label className="label" htmlFor="placement-ramp-run">Ramp Run (in)</label>
-                <input
+                <HardenedNumberInput
                   id="placement-ramp-run"
                   className="input input--sm"
-                  type="number"
-                  min="12"
-                  max="1000"
+                  min={12}
+                  max={1000}
                   value={placementRamp.run}
                   readOnly={placementRamp.mode === 'ada'}
                   disabled={placementRamp.mode === 'ada'}
                   style={placementRamp.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
-                  onChange={(e) => updatePlacementRamp({ run: Number(e.target.value) })}
+                  onChange={(val) => updatePlacementRamp({ run: val })}
+                  integer={true}
                 />
               </div>
             </CollapsibleSection>
@@ -662,19 +663,15 @@ export default function PropertiesPanel({ isMobile }) {
                   onChange={(e) => updateDeck({ beamSetback: Number(e.target.value) })}
                   style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
                 />
-                <input
+                <HardenedNumberInput
                   id="beam-setback-input"
                   className="input input--sm"
-                  type="number"
-                  min="0"
+                  min={0}
                   max={Math.max(0, (deck.joistOrientation === 'horizontal' ? deck.width : deck.depth) - 24)}
                   value={deck.beamSetback !== undefined ? deck.beamSetback : 12}
-                  onChange={(e) => {
-                    const limit = Math.max(0, (deck.joistOrientation === 'horizontal' ? deck.width : deck.depth) - 24);
-                    const val = Math.max(0, Math.min(limit, Number(e.target.value)));
-                    updateDeck({ beamSetback: val });
-                  }}
+                  onChange={(val) => updateDeck({ beamSetback: val })}
                   style={{ width: '60px' }}
+                  integer={true}
                 />
               </div>
             </div>
@@ -907,70 +904,70 @@ export default function PropertiesPanel({ isMobile }) {
                   onChange={(e) => updateStairs(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
                   style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
                 />
-                <input
+                <HardenedNumberInput
                   id="stair-offset"
                   className="input input--sm"
-                  type="number"
-                  min="0"
+                  min={0}
                   max={(() => {
                     const isVert = stairObj.direction === 'n' || stairObj.direction === 's';
                     const edgeLen = isVert ? currentSection.width : currentSection.depth;
                     return Math.max(0, edgeLen - stairObj.width);
                   })()}
                   value={Math.round(getSubObjectOffset(currentSection, 'stairs'))}
-                  onChange={(e) => updateStairs(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  onChange={(val) => updateStairs(selectedSectionId, { offset: val, align: 'custom' })}
                   style={{ width: '60px' }}
+                  integer={true}
                 />
               </div>
             </div>
             <div className="prop-field">
               <label className="label" htmlFor="stair-width">Stair Width (in)</label>
-              <input
+              <HardenedNumberInput
                 id="stair-width"
                 className="input input--sm"
-                type="number"
-                min="36"
-                max="96"
+                min={36}
+                max={96}
                 value={stairObj.width || 36}
-                onChange={(e) => updateStairs(selectedSectionId, { width: Number(e.target.value) })}
+                onChange={(val) => updateStairs(selectedSectionId, { width: val })}
+                integer={true}
               />
             </div>
             <div className="prop-field">
               <label className="label" htmlFor="stair-steps">Number of Steps</label>
-              <input
+              <HardenedNumberInput
                 id="stair-steps"
                 className="input input--sm"
-                type="number"
-                min="1"
-                max="20"
+                min={1}
+                max={20}
                 value={stairObj.numberOfSteps || 5}
-                onChange={(e) => updateStairs(selectedSectionId, { numberOfSteps: Number(e.target.value) })}
+                onChange={(val) => updateStairs(selectedSectionId, { numberOfSteps: val })}
+                integer={true}
               />
             </div>
             <div className="prop-field">
               <label className="label" htmlFor="stair-rise">Rise per Step (in)</label>
-              <input
+              <HardenedNumberInput
                 id="stair-rise"
                 className="input input--sm"
                 type="number"
-                step="0.25"
-                min="4"
-                max="9"
+                step={0.25}
+                min={4}
+                max={9}
                 value={stairObj.rise || 7.25}
-                onChange={(e) => updateStairs(selectedSectionId, { rise: Number(e.target.value) })}
+                onChange={(val) => updateStairs(selectedSectionId, { rise: val })}
               />
             </div>
             <div className="prop-field">
               <label className="label" htmlFor="stair-run">Run per Step (in)</label>
-              <input
+              <HardenedNumberInput
                 id="stair-run"
                 className="input input--sm"
                 type="number"
-                step="0.25"
-                min="8"
-                max="14"
+                step={0.25}
+                min={8}
+                max={14}
                 value={stairObj.run || 10}
-                onChange={(e) => updateStairs(selectedSectionId, { run: Number(e.target.value) })}
+                onChange={(val) => updateStairs(selectedSectionId, { run: val })}
               />
             </div>
             <button

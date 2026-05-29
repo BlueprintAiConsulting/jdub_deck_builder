@@ -219,7 +219,7 @@ export function generateBOM(config, calcs) {
   }
   const safeAreaSqIn = areaSqIn > 0 ? areaSqIn : ((width || 0) * (depth || 0));
 
-  const pictureFrameCount = config.pictureFrame || 0;
+  const pictureFrameCount = typeof config.pictureFrame === 'number' && !isNaN(config.pictureFrame) ? Math.max(0, config.pictureFrame) : (parseInt(config.pictureFrame) || 0);
   const isDeckingFlipped = config.deckingFlipped === true;
   
   // Resolve orientation
@@ -242,13 +242,13 @@ export function generateBOM(config, calcs) {
     }
   } else {
     const num = Number(divCountVal);
-    if (num > 0) {
+    if (num > 0 && !isNaN(num)) {
       hasDivider = true;
       dividerCountNum = num;
     }
   }
 
-  const boardsPerDiv = config.boardsPerDivider || 1;
+  const boardsPerDiv = typeof config.boardsPerDivider === 'number' && !isNaN(config.boardsPerDivider) ? Math.max(1, config.boardsPerDivider) : (parseInt(config.boardsPerDivider) || 1);
 
   // Calculate picture frame linear inches
   let pfLinearInches = 0;

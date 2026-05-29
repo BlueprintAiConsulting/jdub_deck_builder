@@ -13,7 +13,7 @@ import {
 } from '../../utils/polygonUtils.js';
 import './Canvas2D.css';
 
-function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly }) {
+function HardenedNumberInput({ value, onChange, min, max, step = 1, className = "settings-input", id, style, disabled, readOnly, integer = false }) {
   const [localVal, setLocalVal] = useState(value !== undefined && value !== null ? value.toString() : "");
 
   useEffect(() => {
@@ -27,6 +27,9 @@ function HardenedNumberInput({ value, onChange, min, max, step = 1, className = 
     if (isNaN(num) || localVal.trim() === "") {
       setLocalVal(value !== undefined && value !== null ? value.toString() : "");
       return;
+    }
+    if (integer) {
+      num = Math.round(num);
     }
     if (min !== undefined && num < min) num = min;
     if (max !== undefined && num > max) num = max;
@@ -1860,6 +1863,7 @@ export default function Canvas2D({ isMobile }) {
             max={96}
             value={stairObj.width || 36}
             onChange={(val) => updateStairs(selectedSec.id, { width: val })}
+            integer={true}
           />
         </div>
         <div className="settings-field">
@@ -1871,6 +1875,7 @@ export default function Canvas2D({ isMobile }) {
             max={20}
             value={stairObj.numberOfSteps || 5}
             onChange={(val) => updateStairs(selectedSec.id, { numberOfSteps: val })}
+            integer={true}
           />
         </div>
         <div className="settings-field">
@@ -1931,6 +1936,7 @@ export default function Canvas2D({ isMobile }) {
             max={96}
             value={rampObj.width || 36}
             onChange={(val) => updateRamp(selectedSec.id, { width: val })}
+            integer={true}
           />
         </div>
         <div className="settings-field">
@@ -1945,6 +1951,7 @@ export default function Canvas2D({ isMobile }) {
             disabled={rampObj.mode === 'ada'}
             style={rampObj.mode === 'ada' ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
             onChange={(val) => updateRamp(selectedSec.id, { run: val })}
+            integer={true}
           />
         </div>
       </div>
@@ -2137,13 +2144,13 @@ export default function Canvas2D({ isMobile }) {
         <div className="settings-field-row">
           <label className="settings-label">Post Offset From Ends</label>
           <div className="post-offset-input-wrap">
-            <input
-              type="number"
-              min="0"
+            <HardenedNumberInput
+              min={0}
               max={Math.max(0, Math.floor((selectedSec.width - 12) / 2))}
               value={selectedSec.postOffset !== undefined ? selectedSec.postOffset : 6}
-              onChange={(e) => updateDeck({ postOffset: Number(e.target.value) })}
+              onChange={(val) => updateDeck({ postOffset: val })}
               className="settings-input"
+              integer={true}
             />
             <span className="unit-label">" in</span>
           </div>
@@ -2455,6 +2462,7 @@ export default function Canvas2D({ isMobile }) {
                 max={480}
                 value={selectedSec.width}
                 onChange={(val) => updateDeck({ width: val })}
+                integer={true}
               />
             </div>
             <div className="settings-field">
@@ -2465,6 +2473,7 @@ export default function Canvas2D({ isMobile }) {
                 max={480}
                 value={selectedSec.depth}
                 onChange={(val) => updateDeck({ depth: val })}
+                integer={true}
               />
             </div>
           </div>
@@ -2478,6 +2487,7 @@ export default function Canvas2D({ isMobile }) {
                 max={168}
                 value={selectedSec.height}
                 onChange={(val) => updateDeck({ height: val })}
+                integer={true}
               />
             </div>
             <div className="settings-field">

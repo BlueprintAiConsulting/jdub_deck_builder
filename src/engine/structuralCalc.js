@@ -17,8 +17,10 @@ function getJoistSpanBucket(joistSpanFt) {
 /** Calculate joist layout for a given deck */
 export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, joistOrientation = 'vertical', vertices = null, secX = 0, secY = 0, blockingEnabled = true, blockingSpacing = 72) {
   const isHorizontal = joistOrientation === 'horizontal';
-  const width = isHorizontal ? deckDepthIn : deckWidthIn;
-  const depth = isHorizontal ? deckWidthIn : deckDepthIn;
+  const rawW = isHorizontal ? deckDepthIn : deckWidthIn;
+  const rawD = isHorizontal ? deckWidthIn : deckDepthIn;
+  const width = typeof rawW === 'number' && !isNaN(rawW) ? Math.max(12, rawW) : 120;
+  const depth = typeof rawD === 'number' && !isNaN(rawD) ? Math.max(12, rawD) : 120;
 
   const safeSpacing = (typeof joistSpacing === 'number' && joistSpacing > 0) ? joistSpacing : 16;
   const spans = JOIST_SPANS[species]?.[joistSize];
@@ -63,10 +65,11 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
 
   // Calculate blocking segments if enabled
   const blockingSegments = [];
-  if (blockingEnabled && positions.length > 1) {
-    const spanLength = isHorizontal ? deckWidthIn : deckDepthIn;
+  const safeSpanLength = typeof (isHorizontal ? deckWidthIn : deckDepthIn) === 'number' && !isNaN(isHorizontal ? deckWidthIn : deckDepthIn) ? Math.max(0, isHorizontal ? deckWidthIn : deckDepthIn) : 0;
+  if (blockingEnabled && positions.length > 1 && safeSpanLength > 0) {
+    const safeBlockingSpacing = (typeof blockingSpacing === 'number' && blockingSpacing > 0) ? blockingSpacing : 72;
     const blockCoords = [];
-    for (let coord = blockingSpacing; coord < spanLength - 6; coord += blockingSpacing) {
+    for (let coord = safeBlockingSpacing; coord < safeSpanLength - 6; coord += safeBlockingSpacing) {
       blockCoords.push(coord);
     }
 
@@ -121,8 +124,10 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
 // approximate for non-rectangular — bounding box layout
 export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical', beamCountOverride = 'auto', beamSetback = 12) {
   const isHorizontal = joistOrientation === 'horizontal';
-  const width = isHorizontal ? deckDepthIn : deckWidthIn;
-  const depth = isHorizontal ? deckWidthIn : deckDepthIn;
+  const rawW = isHorizontal ? deckDepthIn : deckWidthIn;
+  const rawD = isHorizontal ? deckWidthIn : deckDepthIn;
+  const width = typeof rawW === 'number' && !isNaN(rawW) ? Math.max(12, rawW) : 120;
+  const depth = typeof rawD === 'number' && !isNaN(rawD) ? Math.max(12, rawD) : 120;
 
   const joistSpanFt = (depth / 12);
   const bucket = getJoistSpanBucket(joistSpanFt);
@@ -161,20 +166,24 @@ export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation =
   const post = POST_SIZES[postSize] || POST_SIZES['6x6'];
   const posts = [];
   
-  const length = beams.length || 0;
-  const safeOffset = Math.max(0, Math.min(Math.max(0, (length - 12) / 2), postOffset !== undefined ? postOffset : 6));
+  const length = typeof beams?.length === 'number' && !isNaN(beams.length) ? Math.max(0, beams.length) : 0;
+  const postOffsetNum = typeof postOffset === 'number' && !isNaN(postOffset) ? postOffset : 6;
+  const safeOffset = Math.max(0, Math.min(Math.max(0, (length - 12) / 2), postOffsetNum));
 
-  beams.positions.forEach((beamCoord) => {
-    const count = Math.ceil(length / (beams.maxSpan || 96)) + 1;
+  const safeBeamPositions = Array.isArray(beams?.positions) ? beams.positions : [];
+  safeBeamPositions.forEach((beamCoord) => {
+    const rawCount = Math.ceil(length / (beams?.maxSpan || 96)) + 1;
+    const count = typeof rawCount === 'number' && !isNaN(rawCount) ? rawCount : 2;
     const safeCount = Math.max(2, count);
     const spanLength = length - 2 * safeOffset;
     const spacing = safeCount > 1 ? spanLength / (safeCount - 1) : 0;
     for (let i = 0; i < safeCount; i++) {
       const coord = safeOffset + i * spacing;
+      const heightVal = typeof deckHeightIn === 'number' && !isNaN(deckHeightIn) ? deckHeightIn : 36;
       if (isHorizontal) {
-        posts.push({ x: beamCoord, y: coord, height: deckHeightIn });
+        posts.push({ x: beamCoord, y: coord, height: heightVal });
       } else {
-        posts.push({ x: coord, y: beamCoord, height: deckHeightIn });
+        posts.push({ x: coord, y: beamCoord, height: heightVal });
       }
     }
   });
@@ -204,7 +213,7 @@ export function calculateFootings(posts, joistSpacing, beamMaxSpan, soilCapacity
 
 /** Calculate stair geometry */
 export function calculateStairs(totalRiseIn, stairOpt) {
-  if (totalRiseIn <= 0) return null;
+  if (typeof totalRiseIn !== 'number' || isNaN(totalRiseIn) || totalRiseIn <= 0) return null;
 
   if (stairOpt && typeof stairOpt === 'object') {
     const width = stairOpt.width || 36;

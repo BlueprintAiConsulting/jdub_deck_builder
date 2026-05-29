@@ -817,11 +817,16 @@ function Blocking({ blocking, joistSize }) {
   return (
     <group>
       {blocking.segments.map((seg, i) => {
-        const dx = seg.x2 - seg.x1;
-        const dz = seg.y2 - seg.y1;
-        const len = Math.sqrt(dx * dx + dz * dz);
-        const posX = (seg.x1 + seg.x2) / 2;
-        const posZ = (seg.y1 + seg.y2) / 2;
+        const x1 = typeof seg.x1 === 'number' && !isNaN(seg.x1) ? seg.x1 : 0;
+        const x2 = typeof seg.x2 === 'number' && !isNaN(seg.x2) ? seg.x2 : 0;
+        const y1 = typeof seg.y1 === 'number' && !isNaN(seg.y1) ? seg.y1 : 0;
+        const y2 = typeof seg.y2 === 'number' && !isNaN(seg.y2) ? seg.y2 : 0;
+
+        const dx = x2 - x1;
+        const dz = y2 - y1;
+        const len = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
+        const posX = (x1 + x2) / 2;
+        const posZ = (y1 + y2) / 2;
 
         const isHorizontal = Math.abs(dz) > Math.abs(dx);
         const sizeX = isHorizontal ? actual.width : len;
@@ -853,15 +858,20 @@ function Footers({ beamPositions, width, depth, joistOrientation, footerWidth, h
   const fWidth = footerWidth || 12;
   const fDepth = 12; // 12 inches deep concrete grade beam
   const fColor = '#8a8a8a';
-  const yPos = -(height + fDepth / 2);
+  const safeHeight = Math.max(1, typeof height === 'number' && !isNaN(height) ? height : 36);
+  const safeW = Math.max(1, typeof width === 'number' && !isNaN(width) ? width : 120);
+  const safeD = Math.max(1, typeof depth === 'number' && !isNaN(depth) ? depth : 120);
+  const yPos = -(safeHeight + 12 + fDepth / 2);
+  
+  const safeBeamPositions = Array.isArray(beamPositions) ? beamPositions : [];
   
   return (
     <group>
-      {beamPositions.map((coordIn, i) => {
-        const posX = isHorizontal ? coordIn * IN : (width / 2) * IN;
-        const posZ = isHorizontal ? (depth / 2) * IN : coordIn * IN;
-        const sizeX = isHorizontal ? fWidth * IN : width * IN;
-        const sizeZ = isHorizontal ? depth * IN : fWidth * IN;
+      {safeBeamPositions.map((coordIn, i) => {
+        const posX = isHorizontal ? coordIn * IN : (safeW / 2) * IN;
+        const posZ = isHorizontal ? (safeD / 2) * IN : coordIn * IN;
+        const sizeX = isHorizontal ? fWidth * IN : safeW * IN;
+        const sizeZ = isHorizontal ? safeD * IN : fWidth * IN;
         
         return (
           <mesh 
@@ -891,7 +901,7 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   return (
     <group>
       {posts.map((post, i) => {
-        const postHeight = Math.max(0.1, post.height + topOfPost);
+        const postHeight = Math.max(0.1, post.height + topOfPost + 12);
         return (
           <mesh
             key={`post-${i}`}
@@ -1507,8 +1517,10 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
 }
 
 function House({ width, height }) {
+  const safeW = Math.max(12, typeof width === 'number' && !isNaN(width) ? width : 120);
+  const safeH = Math.max(12, typeof height === 'number' && !isNaN(height) ? height : 36);
   const wallHeightAboveDeck = 96; // 8 feet
-  const totalWallHeight = height + wallHeightAboveDeck;
+  const totalWallHeight = safeH + wallHeightAboveDeck;
   const wallThick = 6;
   
   const sidingTexture = getProceduralTexture('#cbd5e1', 'siding');
@@ -1516,29 +1528,33 @@ function House({ width, height }) {
   const concreteTexture = getProceduralTexture('#b2bec3', 'concrete');
   
   // Apply texture wrap settings
-  sidingTexture.repeat.set(1.5, totalWallHeight / 64);
-  shingleTexture.repeat.set(2, 1);
+  if (sidingTexture && sidingTexture.repeat) {
+    sidingTexture.repeat.set(1.5, totalWallHeight / 64);
+  }
+  if (shingleTexture && shingleTexture.repeat) {
+    shingleTexture.repeat.set(2, 1);
+  }
   
   return (
-    <group position={[width / 2 * IN, 0, 0]}>
+    <group position={[safeW / 2 * IN, 0, 0]}>
       {/* 1. Main Siding Wall */}
-      <mesh position={[0, (wallHeightAboveDeck - height) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
-        <boxGeometry args={[(width + 36) * IN, totalWallHeight * IN, wallThick * IN]} />
+      <mesh position={[0, (wallHeightAboveDeck - safeH) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
+        <boxGeometry args={[(safeW + 36) * IN, totalWallHeight * IN, wallThick * IN]} />
         <meshStandardMaterial map={sidingTexture} roughness={0.8} />
       </mesh>
 
-      {/* 2. Concrete Foundation Base (below the deck floor level) */}
-      <mesh position={[0, -height / 2 * IN, -(wallThick - 0.5) / 2 * IN]} castShadow receiveShadow>
-        <boxGeometry args={[(width + 36) * IN, height * IN, (wallThick - 0.5) * IN]} />
+      {/* 2. Concrete Foundation Base (below the deck floor level, extends underground) */}
+      <mesh position={[0, -(safeH + 60) / 2 * IN, -(wallThick - 0.5) / 2 * IN]} castShadow receiveShadow>
+        <boxGeometry args={[(safeW + 36) * IN, (safeH + 60) * IN, (wallThick - 0.5) * IN]} />
         <meshStandardMaterial map={concreteTexture} roughness={0.9} />
       </mesh>
 
       {/* 3. Vertical White Corner Trim */}
-      <mesh position={[-(width + 36.5) / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -2.5 * IN]} castShadow>
+      <mesh position={[-(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -2.5 * IN]} castShadow>
         <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
-      <mesh position={[(width + 36.5) / 2 * IN, (wallHeightAboveDeck - height) / 2 * IN, -2.5 * IN]} castShadow>
+      <mesh position={[(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -2.5 * IN]} castShadow>
         <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
@@ -1569,9 +1585,9 @@ function House({ width, height }) {
       </group>
 
       {/* 5. Flanking Windows (Left and Right of the Door) */}
-      {width > 120 && (
+      {safeW > 120 && (
         <>
-          <group position={[-Math.max(48, width / 3.2) * IN, 48 * IN, 0.1 * IN]}>
+          <group position={[-Math.max(48, safeW / 3.2) * IN, 48 * IN, 0.1 * IN]}>
             <mesh castShadow>
               <boxGeometry args={[38 * IN, 54 * IN, 2.5 * IN]} />
               <meshStandardMaterial color="#f8fafc" roughness={0.4} />
@@ -1586,7 +1602,7 @@ function House({ width, height }) {
             </mesh>
           </group>
 
-          <group position={[Math.max(48, width / 3.2) * IN, 48 * IN, 0.1 * IN]}>
+          <group position={[Math.max(48, safeW / 3.2) * IN, 48 * IN, 0.1 * IN]}>
             <mesh castShadow>
               <boxGeometry args={[38 * IN, 54 * IN, 2.5 * IN]} />
               <meshStandardMaterial color="#f8fafc" roughness={0.4} />
@@ -1606,15 +1622,15 @@ function House({ width, height }) {
       {/* 6. Gabled Roof Overhang (above the wall, Y = wallHeightAboveDeck) */}
       <group position={[0, wallHeightAboveDeck * IN, 0]}>
         <mesh position={[0, 12 * IN, -30 * IN]} rotation={[-18 * Math.PI / 180, 0, 0]} castShadow>
-          <boxGeometry args={[(width + 42) * IN, 1 * IN, 84 * IN]} />
+          <boxGeometry args={[(safeW + 42) * IN, 1 * IN, 84 * IN]} />
           <meshStandardMaterial map={shingleTexture} roughness={0.95} />
         </mesh>
         <mesh position={[0, -0.5 * IN, 6 * IN]} castShadow>
-          <boxGeometry args={[(width + 40) * IN, 1 * IN, 12 * IN]} />
+          <boxGeometry args={[(safeW + 40) * IN, 1 * IN, 12 * IN]} />
           <meshStandardMaterial color="#ffffff" roughness={0.6} />
         </mesh>
         <mesh position={[0, -1.5 * IN, 12.2 * IN]} castShadow>
-          <boxGeometry args={[(width + 40.5) * IN, 4 * IN, 0.5 * IN]} />
+          <boxGeometry args={[(safeW + 40.5) * IN, 4 * IN, 0.5 * IN]} />
           <meshStandardMaterial color="#ffffff" roughness={0.5} />
         </mesh>
       </group>
@@ -1631,13 +1647,14 @@ function GroundPlane({ heightAxis }) {
   grassTexture.repeat.set(24, 24);
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, heightAxis * IN, 0]} receiveShadow>
       <planeGeometry args={[120, 120]} />
       <meshStandardMaterial 
         map={grassTexture}
         roughness={1.0} 
         transparent={heightAxis < 0}
         opacity={heightAxis < 0 ? 0.3 : 1.0}
+        depthWrite={heightAxis >= 0}
       />
     </mesh>
   );
@@ -1910,7 +1927,7 @@ export default function Scene3D() {
             isLightTheme ? '#cbd5e1' : '#1a2a4a', 
             isLightTheme ? '#e2e8f0' : '#111828'
           ]} 
-          position={[0, 0.01, 0]} 
+          position={[0, heightAxis * IN + 0.01, 0]} 
         />
       </Canvas>
 

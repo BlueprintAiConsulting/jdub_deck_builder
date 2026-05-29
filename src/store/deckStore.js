@@ -857,17 +857,24 @@ export const useDeckStore = create((set, get) => ({
           updates.boardsPerDivider = 1;
         }
       } else if (updates.dividerCount !== undefined || updates.boardsPerDivider !== undefined) {
-        const count = updates.dividerCount !== undefined ? updates.dividerCount : selectedSec.dividerCount;
-        const boards = updates.boardsPerDivider !== undefined ? updates.boardsPerDivider : selectedSec.boardsPerDivider;
+        let count = updates.dividerCount !== undefined ? updates.dividerCount : selectedSec.dividerCount;
+        let boards = updates.boardsPerDivider !== undefined ? updates.boardsPerDivider : selectedSec.boardsPerDivider;
         
         if (count === 'auto') {
           updates.divider = 'auto';
-        } else if (Number(count) === 0) {
-          updates.divider = 'none';
-        } else if (Number(boards) === 2) {
-          updates.divider = 'double';
         } else {
-          updates.divider = 'single';
+          const countNum = parseInt(count);
+          const boardsNum = parseInt(boards);
+          if (isNaN(countNum) || countNum <= 0) {
+            updates.divider = 'none';
+            updates.dividerCount = 0;
+          } else if (boardsNum === 2) {
+            updates.divider = 'double';
+            updates.boardsPerDivider = 2;
+          } else {
+            updates.divider = 'single';
+            updates.boardsPerDivider = 1;
+          }
         }
       }
     }
@@ -1169,12 +1176,19 @@ export const useDeckStore = create((set, get) => ({
   },
 
   addVertex: (id, insertIndex, newVertex) => {
+    if (!newVertex || typeof newVertex.x !== 'number' || typeof newVertex.y !== 'number' || isNaN(newVertex.x) || isNaN(newVertex.y)) {
+      return;
+    }
     const state = get();
+    const section = state.sections.find(s => s.id === id);
+    if (!section) return;
+
+    const idx = Math.max(0, Math.min(section.vertices.length, insertIndex));
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
       const updated = { ...s };
       const updatedVertices = [...s.vertices];
-      updatedVertices.splice(insertIndex, 0, newVertex);
+      updatedVertices.splice(idx, 0, newVertex);
       updated.vertices = updatedVertices;
       return updateBoundingBoxFromVertices(updated);
     });
@@ -1204,9 +1218,15 @@ export const useDeckStore = create((set, get) => ({
 
   removeVertex: (id, vertexIndex) => {
     const state = get();
+    const section = state.sections.find(s => s.id === id);
+    if (!section || vertexIndex < 0 || vertexIndex >= section.vertices.length) return;
+    if (section.vertices.length <= 3) {
+      state.showToast("A section must have at least 3 corner nodes", "warning");
+      return;
+    }
+
     const newSections = state.sections.map((s) => {
       if (s.id !== id) return s;
-      if (s.vertices.length <= 3) return s; // Minimum 3 vertices safety
       const updated = { ...s };
       const updatedVertices = [...s.vertices];
       updatedVertices.splice(vertexIndex, 1);
