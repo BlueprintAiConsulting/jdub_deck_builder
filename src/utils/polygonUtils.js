@@ -24,15 +24,255 @@ export function isPointInPolygon(px, py, vertices) {
 /**
  * Hit-test to find which section was clicked under point (mx, my) in canvas coordinates.
  */
-export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch) {
+export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch, sectionCalcs = {}) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
   const lx = (mx - ox) / S;
   const ly = (my - oy) / S;
   for (let i = sections.length - 1; i >= 0; i--) {
     const sec = sections[i];
+    // 1. Check main boundary
     if (isPointInPolygon(lx, ly, sec.vertices)) return sec.id;
+    
+    // 2. Check attached stairs bounding box
+    const calcs = sectionCalcs[sec.id];
+    if (sec.stairs && calcs && calcs.stairs) {
+      const st = calcs.stairs;
+      const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
+      const stairW = st.width;
+      const stairD = st.totalRun;
+      let stX, stY;
+      const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
+      const offset = (typeof sec.stairs === 'object' && typeof sec.stairs.offset === 'number') ? sec.stairs.offset : null;
+      
+      if (stairDir === 's') {
+        if (offset !== null) stX = sec.x + offset;
+        else if (align === 'left') stX = sec.x;
+        else if (align === 'right') stX = sec.x + sec.width - stairW;
+        else stX = sec.x + sec.width / 2 - stairW / 2;
+        stY = sec.y + sec.depth;
+      } else if (stairDir === 'n') {
+        if (offset !== null) stX = sec.x + offset;
+        else if (align === 'left') stX = sec.x;
+        else if (align === 'right') stX = sec.x + sec.width - stairW;
+        else stX = sec.x + sec.width / 2 - stairW / 2;
+        stY = sec.y - stairD;
+      } else if (stairDir === 'e') {
+        stX = sec.x + sec.width;
+        if (offset !== null) stY = sec.y + offset;
+        else if (align === 'left') stY = sec.y;
+        else if (align === 'right') stY = sec.y + sec.depth - stairW;
+        else stY = sec.y + sec.depth / 2 - stairW / 2;
+      } else {
+        stX = sec.x - stairD;
+        if (offset !== null) stY = sec.y + offset;
+        else if (align === 'left') stY = sec.y;
+        else if (align === 'right') stY = sec.y + sec.depth - stairW;
+        else stY = sec.y + sec.depth / 2 - stairW / 2;
+      }
+      
+      const isVert = stairDir === 'n' || stairDir === 's';
+      const sW = isVert ? stairW : stairD;
+      const sD = isVert ? stairD : stairW;
+      
+      if (lx >= stX && lx <= stX + sW && ly >= stY && ly <= stY + sD) {
+        return sec.id;
+      }
+    }
+    
+    // 3. Check attached ramp bounding box
+    if (sec.ramp && calcs && calcs.ramp) {
+      const rm = calcs.ramp;
+      const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
+      const rampW = rm.width;
+      const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
+      const rampD = footprintRun;
+      let rmX, rmY;
+      const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
+      const offset = (typeof sec.ramp === 'object' && typeof sec.ramp.offset === 'number') ? sec.ramp.offset : null;
+      
+      if (rampDir === 's') {
+        if (offset !== null) rmX = sec.x + offset;
+        else if (align === 'left') rmX = sec.x;
+        else if (align === 'right') rmX = sec.x + sec.width - rampW;
+        else rmX = sec.x + sec.width / 2 - rampW / 2;
+        rmY = sec.y + sec.depth;
+      } else if (rampDir === 'n') {
+        if (offset !== null) rmX = sec.x + offset;
+        else if (align === 'left') rmX = sec.x;
+        else if (align === 'right') rmX = sec.x + sec.width - rampW;
+        else rmX = sec.x + sec.width / 2 - rampW / 2;
+        rmY = sec.y - rampD;
+      } else if (rampDir === 'e') {
+        rmX = sec.x + sec.width;
+        if (offset !== null) rmY = sec.y + offset;
+        else if (align === 'left') rmY = sec.y;
+        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
+        else rmY = sec.y + sec.depth / 2 - rampW / 2;
+      } else {
+        rmX = sec.x - rampD;
+        if (offset !== null) rmY = sec.y + offset;
+        else if (align === 'left') rmY = sec.y;
+        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
+        else rmY = sec.y + sec.depth / 2 - rampW / 2;
+      }
+      
+      const isVert = rampDir === 'n' || rampDir === 's';
+      const rW = isVert ? rampW : rampD;
+      const rD = isVert ? rampD : rampW;
+      
+      if (lx >= rmX && lx <= rmX + rW && ly >= rmY && ly <= rmY + rD) {
+        return sec.id;
+      }
+    }
   }
   return null;
+}
+
+/**
+ * Hit-test to find specifically which sub-object (deck section body, stairs, ramp) was clicked.
+ * Returns { id: sectionId, type: 'deck' | 'stairs' | 'ramp' } or null.
+ */
+export function hitTestSubObject(mx, my, sections, S, panX, panY, cw, ch, sectionCalcs = {}) {
+  const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
+  const lx = (mx - ox) / S;
+  const ly = (my - oy) / S;
+  for (let i = sections.length - 1; i >= 0; i--) {
+    const sec = sections[i];
+    const calcs = sectionCalcs[sec.id];
+    
+    // Check attached stairs first
+    if (sec.stairs && calcs && calcs.stairs) {
+      const st = calcs.stairs;
+      const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
+      const stairW = st.width;
+      const stairD = st.totalRun;
+      let stX, stY;
+      const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
+      const offset = (typeof sec.stairs === 'object' && typeof sec.stairs.offset === 'number') ? sec.stairs.offset : null;
+      
+      if (stairDir === 's') {
+        if (offset !== null) stX = sec.x + offset;
+        else if (align === 'left') stX = sec.x;
+        else if (align === 'right') stX = sec.x + sec.width - stairW;
+        else stX = sec.x + sec.width / 2 - stairW / 2;
+        stY = sec.y + sec.depth;
+      } else if (stairDir === 'n') {
+        if (offset !== null) stX = sec.x + offset;
+        else if (align === 'left') stX = sec.x;
+        else if (align === 'right') stX = sec.x + sec.width - stairW;
+        else stX = sec.x + sec.width / 2 - stairW / 2;
+        stY = sec.y - stairD;
+      } else if (stairDir === 'e') {
+        stX = sec.x + sec.width;
+        if (offset !== null) stY = sec.y + offset;
+        else if (align === 'left') stY = sec.y;
+        else if (align === 'right') stY = sec.y + sec.depth - stairW;
+        else stY = sec.y + sec.depth / 2 - stairW / 2;
+      } else {
+        stX = sec.x - stairD;
+        if (offset !== null) stY = sec.y + offset;
+        else if (align === 'left') stY = sec.y;
+        else if (align === 'right') stY = sec.y + sec.depth - stairW;
+        else stY = sec.y + sec.depth / 2 - stairW / 2;
+      }
+      
+      const isVert = stairDir === 'n' || stairDir === 's';
+      const sW = isVert ? stairW : stairD;
+      const sD = isVert ? stairD : stairW;
+      
+      if (lx >= stX && lx <= stX + sW && ly >= stY && ly <= stY + sD) {
+        return { id: sec.id, type: 'stairs' };
+      }
+    }
+    
+    // Check attached ramp next
+    if (sec.ramp && calcs && calcs.ramp) {
+      const rm = calcs.ramp;
+      const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
+      const rampW = rm.width;
+      const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
+      const rampD = footprintRun;
+      let rmX, rmY;
+      const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
+      const offset = (typeof sec.ramp === 'object' && typeof sec.ramp.offset === 'number') ? sec.ramp.offset : null;
+      
+      if (rampDir === 's') {
+        if (offset !== null) rmX = sec.x + offset;
+        else if (align === 'left') rmX = sec.x;
+        else if (align === 'right') rmX = sec.x + sec.width - rampW;
+        else rmX = sec.x + sec.width / 2 - rampW / 2;
+        rmY = sec.y + sec.depth;
+      } else if (rampDir === 'n') {
+        if (offset !== null) rmX = sec.x + offset;
+        else if (align === 'left') rmX = sec.x;
+        else if (align === 'right') rmX = sec.x + sec.width - rampW;
+        else rmX = sec.x + sec.width / 2 - rampW / 2;
+        rmY = sec.y - rampD;
+      } else if (rampDir === 'e') {
+        rmX = sec.x + sec.width;
+        if (offset !== null) rmY = sec.y + offset;
+        else if (align === 'left') rmY = sec.y;
+        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
+        else rmY = sec.y + sec.depth / 2 - rampW / 2;
+      } else {
+        rmX = sec.x - rampD;
+        if (offset !== null) rmY = sec.y + offset;
+        else if (align === 'left') rmY = sec.y;
+        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
+        else rmY = sec.y + sec.depth / 2 - rampW / 2;
+      }
+      
+      const isVert = rampDir === 'n' || rampDir === 's';
+      const rW = isVert ? rampW : rampD;
+      const rD = isVert ? rampD : rampW;
+      
+      if (lx >= rmX && lx <= rmX + rW && ly >= rmY && ly <= rmY + rD) {
+        return { id: sec.id, type: 'ramp' };
+      }
+    }
+    
+    // Check main deck body last
+    if (isPointInPolygon(lx, ly, sec.vertices)) {
+      return { id: sec.id, type: 'deck' };
+    }
+  }
+  return null;
+}
+
+/**
+ * Gets the offset of a stair or ramp sub-object along its edge axis in inches.
+ */
+export function getSubObjectOffset(sec, type) {
+  if (type === 'stairs') {
+    const st = sec.stairs;
+    if (!st) return 0;
+    if (typeof st === 'object' && typeof st.offset === 'number') {
+      return st.offset;
+    }
+    const stairDir = typeof st === 'string' ? st : (st.direction || 's');
+    const align = (typeof st === 'object' && st.align) || 'center';
+    const stairW = (typeof st === 'object' && st.width) || 36;
+    const isVert = stairDir === 'n' || stairDir === 's';
+    const totalLength = isVert ? sec.width : sec.depth;
+    if (align === 'left') return 0;
+    if (align === 'right') return totalLength - stairW;
+    return totalLength / 2 - stairW / 2;
+  } else if (type === 'ramp') {
+    const rm = sec.ramp;
+    if (!rm) return 0;
+    if (typeof rm === 'object' && typeof rm.offset === 'number') {
+      return rm.offset;
+    }
+    const rampDir = typeof rm === 'string' ? rm : (rm.direction || 's');
+    const align = (typeof rm === 'object' && rm.align) || 'center';
+    const rampW = (typeof rm === 'object' && rm.width) || 36;
+    const isVert = rampDir === 'n' || rampDir === 's';
+    const totalLength = isVert ? sec.width : sec.depth;
+    if (align === 'left') return 0;
+    if (align === 'right') return totalLength - rampW;
+    return totalLength / 2 - rampW / 2;
+  }
+  return 0;
 }
 
 /**

@@ -7,7 +7,9 @@ import {
   isPointInPolygon,
   hitTestSection,
   getDistanceToSegment,
-  findEdgeSplitIndex
+  findEdgeSplitIndex,
+  hitTestSubObject,
+  getSubObjectOffset
 } from '../../utils/polygonUtils.js';
 import './Canvas2D.css';
 
@@ -98,8 +100,11 @@ export default function Canvas2D({ isMobile }) {
   const theme = useDeckStore((s) => s.theme);
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
+  const selectedSubObjectType = useDeckStore((s) => s.selectedSubObjectType);
   const attachStairs = useDeckStore((s) => s.attachStairs);
+  const updateStairs = useDeckStore((s) => s.updateStairs);
   const attachRamp = useDeckStore((s) => s.attachRamp);
+  const updateRamp = useDeckStore((s) => s.updateRamp);
   const removeVertex = useDeckStore((s) => s.removeVertex);
   const showGrid = useDeckStore((s) => s.showGrid);
   const showDimensions = useDeckStore((s) => s.showDimensions);
@@ -148,7 +153,7 @@ export default function Canvas2D({ isMobile }) {
 
     if (selectedTool === 'select') {
       const sel = sections.find((s) => s.id === selectedSectionId);
-      if (sel) {
+      if (sel && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
         // Check vertex handles first
         const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
         if (vIdx !== -1) {
@@ -168,10 +173,23 @@ export default function Canvas2D({ isMobile }) {
           return;
         }
       }
-      const hitId = hitTestSection(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h);
-      if (hitId) {
-        selectSection(hitId);
-        setInteraction({ mode: 'moving', dragStart: { x: mx, y: my } });
+      
+      const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
+      if (hit) {
+        selectSection(hit.id, hit.type !== 'deck' ? hit.type : null);
+        if (hit.type === 'stairs' || hit.type === 'ramp') {
+          const sec = sections.find((s) => s.id === hit.id);
+          const initialOffset = getSubObjectOffset(sec, hit.type);
+          setInteraction({
+            mode: 'dragging_subval',
+            subType: hit.type,
+            sectionId: hit.id,
+            dragStart: { x: mx, y: my },
+            initialOffset
+          });
+        } else {
+          setInteraction({ mode: 'moving', dragStart: { x: mx, y: my } });
+        }
       } else {
         selectSection(null);
         setInteraction({ mode: 'idle', dragStart: null, selectedVertexIndex: null });
@@ -180,7 +198,7 @@ export default function Canvas2D({ isMobile }) {
     }
 
     if (selectedTool === 'railing' || selectedTool === 'stairs' || selectedTool === 'ramp') {
-      const hitId = hitTestSection(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h);
+      const hitId = hitTestSection(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
       if (hitId) {
         const sec = sections.find((s) => s.id === hitId);
         const edge = getNearestEdge(mx, my, sec, S, panOffset.x, panOffset.y, size.w, size.h);
@@ -189,7 +207,7 @@ export default function Canvas2D({ isMobile }) {
         else attachRamp(hitId, edge);
       }
     }
-  }, [selectedTool, sections, selectedSectionId, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp]);
+  }, [selectedTool, sections, selectedSectionId, selectedSubObjectType, S, panOffset, size, selectSection, setInteraction, toggleRailing, attachStairs, attachRamp, updateStairs, updateRamp, sectionCalcs]);
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning) {
@@ -232,7 +250,32 @@ export default function Canvas2D({ isMobile }) {
       if (h.includes('n')) { u.y = sec.y + dy; u.depth = sec.depth - dy; }
       resizeSection(selectedSectionId, u);
     }
-  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection, dragVertex, size.w, size.h, panOffset.x, panOffset.y]);
+    if (interaction.mode === 'dragging_subval' && selectedSectionId) {
+      const sec = sections.find((s) => s.id === selectedSectionId);
+      if (sec) {
+        const type = interaction.subType;
+        const dx = (mx - interaction.dragStart.x) / S;
+        const dy = (my - interaction.dragStart.y) / S;
+        const st = type === 'stairs' ? sec.stairs : sec.ramp;
+        if (st) {
+          const dir = typeof st === 'string' ? st : (st.direction || 's');
+          const isVert = dir === 'n' || dir === 's';
+          const delta = isVert ? dx : dy;
+          const newOffset = Math.max(0, interaction.initialOffset + delta);
+          
+          const width = typeof st === 'object' ? (st.width || 36) : 36;
+          const totalLength = isVert ? sec.width : sec.depth;
+          const cappedOffset = Math.min(totalLength - width, newOffset);
+          
+          if (type === 'stairs') {
+            updateStairs(selectedSectionId, { offset: cappedOffset, align: 'custom' });
+          } else if (type === 'ramp') {
+            updateRamp(selectedSectionId, { offset: cappedOffset, align: 'custom' });
+          }
+        }
+      }
+    }
+  }, [isPanning, interaction, selectedSectionId, sections, S, setInteraction, moveSection, resizeSection, dragVertex, updateStairs, updateRamp, size.w, size.h, panOffset.x, panOffset.y]);
 
   const handleMouseUp = useCallback(() => {
     if (isPanning) { setIsPanning(false); return; }
@@ -255,6 +298,7 @@ export default function Canvas2D({ isMobile }) {
     if (interaction.mode === 'dragging_vertex') finishVertexDrag();
     if (interaction.mode === 'moving') finishMove();
     if (interaction.mode === 'resizing') setInteraction({ mode: 'idle', dragStart: null, resizeHandle: null });
+    if (interaction.mode === 'dragging_subval') setInteraction({ mode: 'idle', dragStart: null });
   }, [isPanning, interaction, size, panOffset, S, addSection, finishMove, setInteraction, finishVertexDrag]);
 
   // Touch handlers
@@ -275,9 +319,27 @@ export default function Canvas2D({ isMobile }) {
         return;
       }
       if (selectedTool === 'select') {
-        const hitId = hitTestSection(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h);
-        if (hitId) { selectSection(hitId); setInteraction({ mode: 'moving', dragStart: { x: mx, y: my } }); }
-        else { setIsPanning(true); lastMouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+        const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
+        if (hit) {
+          selectSection(hit.id, hit.type !== 'deck' ? hit.type : null);
+          if (hit.type === 'stairs' || hit.type === 'ramp') {
+            const sec = sections.find((s) => s.id === hit.id);
+            const initialOffset = getSubObjectOffset(sec, hit.type);
+            setInteraction({
+              mode: 'dragging_subval',
+              subType: hit.type,
+              sectionId: hit.id,
+              dragStart: { x: mx, y: my },
+              initialOffset
+            });
+          } else {
+            setInteraction({ mode: 'moving', dragStart: { x: mx, y: my } });
+          }
+        } else {
+          selectSection(null);
+          setIsPanning(true);
+          lastMouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
         return;
       }
       setIsPanning(true);
@@ -285,7 +347,7 @@ export default function Canvas2D({ isMobile }) {
     } else if (e.touches.length === 2) {
       lastTouchDistRef.current = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     }
-  }, [selectedTool, sections, S, panOffset, size, selectSection, addSection, setInteraction]);
+  }, [selectedTool, sections, S, panOffset, size, selectSection, addSection, setInteraction, updateStairs, updateRamp, sectionCalcs]);
 
   const handleTouchMove = useCallback((e) => {
     e.preventDefault();
@@ -299,6 +361,32 @@ export default function Canvas2D({ isMobile }) {
           moveSection(selectedSectionId, sec.x + dx, sec.y + dy);
           setInteraction({ dragStart: { x: mx, y: my } });
         }
+      } else if (interaction.mode === 'dragging_subval' && selectedSectionId) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
+        const sec = sections.find((s) => s.id === selectedSectionId);
+        if (sec) {
+          const type = interaction.subType;
+          const dx = (mx - interaction.dragStart.x) / S;
+          const dy = (my - interaction.dragStart.y) / S;
+          const st = type === 'stairs' ? sec.stairs : sec.ramp;
+          if (st) {
+            const dir = typeof st === 'string' ? st : (st.direction || 's');
+            const isVert = dir === 'n' || dir === 's';
+            const delta = isVert ? dx : dy;
+            const newOffset = Math.max(0, interaction.initialOffset + delta);
+            
+            const width = typeof st === 'object' ? (st.width || 36) : 36;
+            const totalLength = isVert ? sec.width : sec.depth;
+            const cappedOffset = Math.min(totalLength - width, newOffset);
+            
+            if (type === 'stairs') {
+              updateStairs(selectedSectionId, { offset: cappedOffset, align: 'custom' });
+            } else if (type === 'ramp') {
+              updateRamp(selectedSectionId, { offset: cappedOffset, align: 'custom' });
+            }
+          }
+        }
       } else if (isPanning) {
         const dx = e.touches[0].clientX - lastMouseRef.current.x, dy = e.touches[0].clientY - lastMouseRef.current.y;
         setPanOffset((p) => ({ x: p.x + dx, y: p.y + dy }));
@@ -309,13 +397,14 @@ export default function Canvas2D({ isMobile }) {
       setZoomScale((p) => Math.min(3, Math.max(0.3, p * (dist / lastTouchDistRef.current))));
       lastTouchDistRef.current = dist;
     }
-  }, [isPanning, interaction, selectedSectionId, sections, S, moveSection, setInteraction]);
+  }, [isPanning, interaction, selectedSectionId, sections, S, moveSection, setInteraction, updateStairs, updateRamp]);
 
   const handleTouchEnd = useCallback(() => {
     setIsPanning(false);
     lastTouchDistRef.current = null;
     if (interaction.mode === 'moving') finishMove();
-  }, [interaction, finishMove]);
+    if (interaction.mode === 'dragging_subval') setInteraction({ mode: 'idle', dragStart: null });
+  }, [interaction, finishMove, setInteraction]);
 
   // Global keyboard listener to delete active vertex via Backspace/Delete keys
   useEffect(() => {
@@ -635,32 +724,32 @@ export default function Canvas2D({ isMobile }) {
         const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
         const stairW = st.width * S;
         const stairD = st.totalRun * S;
-        ctx.fillStyle = isLightTheme ? 'rgba(219, 39, 119, 0.1)' : 'rgba(236, 72, 153, 0.15)';
-        ctx.strokeStyle = isLightTheme ? '#db2777' : '#ec4899';
-        ctx.lineWidth = 1.5;
+        
+        const isStairsSelected = isSelected && selectedSubObjectType === 'stairs';
+        ctx.fillStyle = isStairsSelected 
+          ? (isLightTheme ? 'rgba(29, 78, 216, 0.1)' : 'rgba(59, 130, 246, 0.15)')
+          : (isLightTheme ? 'rgba(219, 39, 119, 0.1)' : 'rgba(236, 72, 153, 0.15)');
+        ctx.strokeStyle = isStairsSelected 
+          ? '#1d4ed8' 
+          : (isLightTheme ? '#db2777' : '#ec4899');
+        ctx.lineWidth = isStairsSelected ? 3.0 : 1.5;
+        
         let stX, stY;
-        const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
+        const offset = getSubObjectOffset(sec, 'stairs');
         if (stairDir === 's') {
-          if (align === 'left') stX = sx;
-          else if (align === 'right') stX = sx + sw - stairW;
-          else stX = sx + sw / 2 - stairW / 2;
+          stX = sx + offset * S;
           stY = sy + sd;
         } else if (stairDir === 'n') {
-          if (align === 'left') stX = sx;
-          else if (align === 'right') stX = sx + sw - stairW;
-          else stX = sx + sw / 2 - stairW / 2;
+          stX = sx + offset * S;
           stY = sy - stairD;
         } else if (stairDir === 'e') {
           stX = sx + sw;
-          if (align === 'left') stY = sy;
-          else if (align === 'right') stY = sy + sd - stairW;
-          else stY = sy + sd / 2 - stairW / 2;
+          stY = sy + offset * S;
         } else {
           stX = sx - stairD;
-          if (align === 'left') stY = sy;
-          else if (align === 'right') stY = sy + sd - stairW;
-          else stY = sy + sd / 2 - stairW / 2;
+          stY = sy + offset * S;
         }
+        
         const isVert = stairDir === 'n' || stairDir === 's';
         const sW = isVert ? stairW : stairD;
         const sD = isVert ? stairD : stairW;
@@ -684,30 +773,29 @@ export default function Canvas2D({ isMobile }) {
         const rampW = rm.width * S;
         const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
         const rampD = footprintRun * S;
-        ctx.lineWidth = 1.5;
+        
+        const isRampSelected = isSelected && selectedSubObjectType === 'ramp';
+        const rampStrokeStyle = isRampSelected 
+          ? '#1d4ed8' 
+          : null; // fallback to specific segment color if not selected
+        const rampLineWidth = isRampSelected ? 3.0 : 1.5;
+        
         let rmX, rmY;
-        const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
+        const offset = getSubObjectOffset(sec, 'ramp');
         if (rampDir === 's') {
-          if (align === 'left') rmX = sx;
-          else if (align === 'right') rmX = sx + sw - rampW;
-          else rmX = sx + sw / 2 - rampW / 2;
+          rmX = sx + offset * S;
           rmY = sy + sd;
         } else if (rampDir === 'n') {
-          if (align === 'left') rmX = sx;
-          else if (align === 'right') rmX = sx + sw - rampW;
-          else rmX = sx + sw / 2 - rampW / 2;
+          rmX = sx + offset * S;
           rmY = sy - rampD;
         } else if (rampDir === 'e') {
           rmX = sx + sw;
-          if (align === 'left') rmY = sy;
-          else if (align === 'right') rmY = sy + sd - rampW;
-          else rmY = sy + sd / 2 - rampW / 2;
+          rmY = sy + offset * S;
         } else {
           rmX = sx - rampD;
-          if (align === 'left') rmY = sy;
-          else if (align === 'right') rmY = sy + sd - rampW;
-          else rmY = sy + sd / 2 - rampW / 2;
+          rmY = sy + offset * S;
         }
+        
         const isVert = rampDir === 'n' || rampDir === 's';
         const rW = isVert ? rampW : rampD;
         const rD = isVert ? rampD : rampW;
@@ -756,13 +844,17 @@ export default function Canvas2D({ isMobile }) {
             segH = width_in * S;
           }
           
-          ctx.fillStyle = isLanding 
-            ? (isLightTheme ? 'rgba(16, 185, 129, 0.15)' : 'rgba(52, 211, 153, 0.2)')
-            : (isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)');
-          ctx.strokeStyle = isLanding
+          ctx.fillStyle = isRampSelected
+            ? (isLightTheme ? 'rgba(29, 78, 216, 0.1)' : 'rgba(59, 130, 246, 0.15)')
+            : (isLanding 
+              ? (isLightTheme ? 'rgba(16, 185, 129, 0.15)' : 'rgba(52, 211, 153, 0.2)')
+              : (isLightTheme ? 'rgba(124, 58, 237, 0.1)' : 'rgba(139, 92, 246, 0.15)'));
+              
+          ctx.strokeStyle = rampStrokeStyle || (isLanding
             ? (isLightTheme ? '#10b981' : '#34d399')
-            : (isLightTheme ? '#7c3aed' : '#a78bfa');
+            : (isLightTheme ? '#7c3aed' : '#a78bfa'));
             
+          ctx.lineWidth = rampLineWidth;
           ctx.fillRect(segX, segY, segW, segH);
           ctx.strokeRect(segX, segY, segW, segH);
           
@@ -772,13 +864,18 @@ export default function Canvas2D({ isMobile }) {
             ctx.lineTo(segX + segW, segY + segH);
             ctx.moveTo(segX + segW, segY);
             ctx.lineTo(segX, segY + segH);
-            ctx.strokeStyle = isLightTheme ? 'rgba(16, 185, 129, 0.3)' : 'rgba(52, 211, 153, 0.4)';
+            ctx.strokeStyle = isRampSelected 
+              ? 'rgba(29, 78, 216, 0.3)' 
+              : (isLightTheme ? 'rgba(16, 185, 129, 0.3)' : 'rgba(52, 211, 153, 0.4)');
             ctx.stroke();
           }
         }
         
         // Draw directional arrows or sloped lines inside the ramp
-        ctx.strokeStyle = isLightTheme ? '#7c3aed' : '#a78bfa';
+        ctx.strokeStyle = isRampSelected 
+          ? '#1d4ed8' 
+          : (isLightTheme ? '#7c3aed' : '#a78bfa');
+        ctx.lineWidth = rampLineWidth;
         ctx.beginPath();
         if (isVert) {
           const startY = rampDir === 's' ? rmY : rmY + rD;

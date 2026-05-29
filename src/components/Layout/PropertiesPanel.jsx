@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDeckStore } from '../../store/deckStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatDimension } from '../../utils/units';
+import { getSubObjectOffset } from '../../utils/polygonUtils.js';
 import {
   SPECIES_OPTIONS, JOIST_SIZES, JOIST_SPACINGS,
   POST_SIZE_OPTIONS, DECK_BOARD_OPTIONS, BEAM_CONFIGS, SOIL_CAPACITIES,
@@ -114,6 +115,7 @@ export default function PropertiesPanel({ isMobile }) {
   const calcs = useDeckStore(useShallow((s) => s.sectionCalcs[s.selectedSectionId] || Object.values(s.sectionCalcs)[0]));
   const sections = useDeckStore((s) => s.sections);
   const selectedSectionId = useDeckStore((s) => s.selectedSectionId);
+  const selectedSubObjectType = useDeckStore((s) => s.selectedSubObjectType);
   const setDimension = useDeckStore((s) => s.setDimension);
   const updateDeck = useDeckStore((s) => s.updateDeck);
   const selectSection = useDeckStore((s) => s.selectSection);
@@ -155,6 +157,41 @@ export default function PropertiesPanel({ isMobile }) {
           {healthStatus === 'ok' ? 'All spans within limits' : 'Span limit exceeded'}
         </span>
       </div>
+
+      {/* Delete Selection Header/Action Button */}
+      {selectedSectionId && (
+        <div className="props-panel__action-row" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-default)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            {selectedSubObjectType === 'stairs' ? 'Selected: Stairs' : selectedSubObjectType === 'ramp' ? 'Selected: Ramp' : `Selected: Section ${sectionIndex + 1}`}
+          </span>
+          <button
+            className="btn btn--sm"
+            style={{ 
+              backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+              color: '#ef4444', 
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              fontSize: '11px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              if (selectedSubObjectType === 'stairs') {
+                attachStairs(selectedSectionId, stairObj.direction); // this toggles/removes it
+              } else if (selectedSubObjectType === 'ramp') {
+                attachRamp(selectedSectionId, rampObj.direction); // this toggles/removes it
+              } else {
+                if (window.confirm("Are you sure you want to delete this deck section?")) {
+                  removeSection(selectedSectionId);
+                }
+              }
+            }}
+            id="btn-delete-selected-object"
+          >
+            ✕ Delete
+          </button>
+        </div>
+      )}
 
       {/* Section Selector */}
       {sections.length > 1 && (
@@ -358,9 +395,42 @@ export default function PropertiesPanel({ isMobile }) {
                 { value: 'center', label: 'Center' },
                 { value: 'left', label: 'Left / Top Edge' },
                 { value: 'right', label: 'Right / Bottom Edge' },
+                { value: 'custom', label: 'Custom' },
               ]}
               onChange={(v) => updateStairs(selectedSectionId, { align: v })}
             />
+            <div className="prop-field">
+              <label className="label" htmlFor="stair-offset">Position along Edge (in)</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  id="stair-offset-slider"
+                  type="range"
+                  min="0"
+                  max={(() => {
+                    const isVert = stairObj.direction === 'n' || stairObj.direction === 's';
+                    const edgeLen = isVert ? currentSection.width : currentSection.depth;
+                    return Math.max(0, edgeLen - stairObj.width);
+                  })()}
+                  value={Math.round(getSubObjectOffset(currentSection, 'stairs'))}
+                  onChange={(e) => updateStairs(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
+                />
+                <input
+                  id="stair-offset"
+                  className="input input--sm"
+                  type="number"
+                  min="0"
+                  max={(() => {
+                    const isVert = stairObj.direction === 'n' || stairObj.direction === 's';
+                    const edgeLen = isVert ? currentSection.width : currentSection.depth;
+                    return Math.max(0, edgeLen - stairObj.width);
+                  })()}
+                  value={Math.round(getSubObjectOffset(currentSection, 'stairs'))}
+                  onChange={(e) => updateStairs(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  style={{ width: '60px' }}
+                />
+              </div>
+            </div>
             <div className="prop-field">
               <label className="label" htmlFor="stair-width">Stair Width (in)</label>
               <input
@@ -457,7 +527,7 @@ export default function PropertiesPanel({ isMobile }) {
               ]}
               onChange={(v) => updateRamp(selectedSectionId, { direction: v })}
             />
-            <SelectField
+             <SelectField
               id="sel-ramp-align"
               label="Ramp Alignment"
               value={rampObj.align || 'center'}
@@ -465,9 +535,42 @@ export default function PropertiesPanel({ isMobile }) {
                 { value: 'center', label: 'Center' },
                 { value: 'left', label: 'Left / Top Edge' },
                 { value: 'right', label: 'Right / Bottom Edge' },
+                { value: 'custom', label: 'Custom' },
               ]}
               onChange={(v) => updateRamp(selectedSectionId, { align: v })}
             />
+            <div className="prop-field">
+              <label className="label" htmlFor="ramp-offset">Position along Edge (in)</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  id="ramp-offset-slider"
+                  type="range"
+                  min="0"
+                  max={(() => {
+                    const isVert = rampObj.direction === 'n' || rampObj.direction === 's';
+                    const edgeLen = isVert ? currentSection.width : currentSection.depth;
+                    return Math.max(0, edgeLen - rampObj.width);
+                  })()}
+                  value={Math.round(getSubObjectOffset(currentSection, 'ramp'))}
+                  onChange={(e) => updateRamp(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  style={{ flexGrow: 1, accentColor: 'var(--accent-primary)' }}
+                />
+                <input
+                  id="ramp-offset"
+                  className="input input--sm"
+                  type="number"
+                  min="0"
+                  max={(() => {
+                    const isVert = rampObj.direction === 'n' || rampObj.direction === 's';
+                    const edgeLen = isVert ? currentSection.width : currentSection.depth;
+                    return Math.max(0, edgeLen - rampObj.width);
+                  })()}
+                  value={Math.round(getSubObjectOffset(currentSection, 'ramp'))}
+                  onChange={(e) => updateRamp(selectedSectionId, { offset: Number(e.target.value), align: 'custom' })}
+                  style={{ width: '60px' }}
+                />
+              </div>
+            </div>
             <SelectField
               id="sel-ramp-mode"
               label="Ramp Mode"

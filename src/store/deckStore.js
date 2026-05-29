@@ -324,6 +324,7 @@ export const useDeckStore = create((set, get) => ({
   // --- Sections ---
   sections: [initialSection],
   selectedSectionId: initialSection.id,
+  selectedSubObjectType: null,
   materials: { ...DEFAULT_MATERIALS },
   currentProjectName: '',
   toast: null,
@@ -413,7 +414,7 @@ export const useDeckStore = create((set, get) => ({
   })),
 
   // --- Actions: Sections ---
-  selectSection: (id) => set({ selectedSectionId: id }),
+  selectSection: (id, subType = null) => set({ selectedSectionId: id, selectedSubObjectType: subType }),
 
   addSection: (rect, type = 'deck') => {
     const state = get();
@@ -471,9 +472,8 @@ export const useDeckStore = create((set, get) => ({
 
   removeSection: (id) => {
     const state = get();
-    if (state.sections.length <= 1) return; // can't delete last section
     const newSections = state.sections.filter((s) => s.id !== id);
-    const newSelected = state.selectedSectionId === id ? newSections[0].id : state.selectedSectionId;
+    const newSelected = newSections.length > 0 ? (state.selectedSectionId === id ? newSections[0].id : state.selectedSectionId) : null;
     const results = recalculateAll(newSections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
@@ -481,6 +481,7 @@ export const useDeckStore = create((set, get) => ({
     set({
       sections: newSections,
       selectedSectionId: newSelected,
+      selectedSubObjectType: null,
       ...results,
       history: newHistory,
       historyIndex: newHistory.length - 1,
@@ -845,6 +846,7 @@ export const useDeckStore = create((set, get) => ({
     set({
       sections: [sec],
       selectedSectionId: sec.id,
+      selectedSubObjectType: null,
       materials: mat,
       currentProjectName: '',
       lightingPreset: 'daylight',
@@ -862,6 +864,7 @@ export const useDeckStore = create((set, get) => ({
     set({
       sections: [],
       selectedSectionId: null,
+      selectedSubObjectType: null,
       materials: mat,
       currentProjectName: '',
       lightingPreset: 'daylight',

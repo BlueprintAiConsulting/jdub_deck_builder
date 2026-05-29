@@ -102,7 +102,7 @@ const {
 } = await import('./src/lib/projectIO.js');
 const { useDeckStore } = await import('./src/store/deckStore.js');
 const { calculatePosts } = await import('./src/engine/structuralCalc.js');
-const { isPointInPolygon, hitTestSection, findEdgeSplitIndex } = await import('./src/utils/polygonUtils.js');
+const { isPointInPolygon, hitTestSection, findEdgeSplitIndex, hitTestSubObject, getSubObjectOffset } = await import('./src/utils/polygonUtils.js');
 const { renderBlueprint } = await import('./src/utils/blueprintRenderer.js');
 const { DECK_MATERIAL_OPTIONS, DECK_MATERIAL_COLORS } = await import('./src/components/Materials/materialData.js');
 
@@ -1960,6 +1960,104 @@ test('41. Toolbar New Project action: prompt confirmation and reset flow', () =>
   assert.strictEqual(res.confirmCalled, true, 'Confirm should be called');
   assert.strictEqual(store.getState().isDirty, false, 'Project should be clean after reset');
   assert.strictEqual(store.getState().sections.length, 0, 'Sections should be completely empty (blank slate)');
+});
+
+test('42. hitTestSection supports selecting attached stairs and ramps', () => {
+  const sections = [
+    {
+      id: 'sec-deck',
+      x: 0,
+      y: 0,
+      width: 120,
+      depth: 120,
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 120, y: 120 },
+        { x: 0, y: 120 }
+      ],
+      stairs: { direction: 's' },
+      ramp: { direction: 'e' }
+    }
+  ];
+  
+  const sectionCalcs = {
+    'sec-deck': {
+      stairs: { width: 36, totalRun: 48, numTreads: 4 },
+      ramp: { width: 36, run: 120, intermediateLandings: 0 }
+    }
+  };
+  
+  // Click inside deck body at absolute (450, 350)
+  let hit = hitTestSection(450, 350, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.strictEqual(hit, 'sec-deck', 'Clicking inside deck should select it');
+  
+  // Click inside stairs at absolute (450, 430)
+  hit = hitTestSection(450, 430, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.strictEqual(hit, 'sec-deck', 'Clicking inside attached stairs should select its parent deck');
+  
+  // Click inside ramp at absolute (550, 350)
+  hit = hitTestSection(550, 350, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.strictEqual(hit, 'sec-deck', 'Clicking inside attached ramp should select its parent deck');
+  
+  // Click outside all
+  hit = hitTestSection(200, 200, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.strictEqual(hit, null, 'Clicking outside should not select anything');
+});
+
+test('43. hitTestSubObject returns correct sub-object types', () => {
+  const sections = [
+    {
+      id: 'sec-deck',
+      x: 0,
+      y: 0,
+      width: 120,
+      depth: 120,
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 120, y: 0 },
+        { x: 120, y: 120 },
+        { x: 0, y: 120 }
+      ],
+      stairs: { direction: 's', width: 36, offset: 42 },
+      ramp: { direction: 'e', width: 36, offset: 10 }
+    }
+  ];
+  
+  const sectionCalcs = {
+    'sec-deck': {
+      stairs: { width: 36, totalRun: 48, numTreads: 4 },
+      ramp: { width: 36, run: 120, intermediateLandings: 0 }
+    }
+  };
+  
+  // Click inside deck body at absolute (450, 350)
+  let hit = hitTestSubObject(450, 350, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.deepStrictEqual(hit, { id: 'sec-deck', type: 'deck' }, 'Clicking inside deck should select deck');
+  
+  // Click inside stairs (offset 42) at absolute (450, 430) -> lx should be (450-400)/1 = 50, which is within [42, 78]
+  hit = hitTestSubObject(450, 430, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.deepStrictEqual(hit, { id: 'sec-deck', type: 'stairs' }, 'Clicking inside stairs should select stairs');
+  
+  // Click inside ramp (offset 10) at absolute (550, 310) -> ly should be (310-300)/1 = 10, which is within [10, 46]
+  hit = hitTestSubObject(550, 310, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  assert.deepStrictEqual(hit, { id: 'sec-deck', type: 'ramp' }, 'Clicking inside ramp should select ramp');
+});
+
+test('44. removeSection on the last section transitions to empty slate', () => {
+  const store = useDeckStore;
+  // Initialize with 1 section
+  store.getState().clearDeck();
+  store.getState().addSection({ x: 0, y: 0, width: 120, depth: 120 }, 'deck');
+  
+  assert.strictEqual(store.getState().sections.length, 1, 'Should have exactly 1 section');
+  const secId = store.getState().sections[0].id;
+  
+  // Now remove it
+  store.getState().removeSection(secId);
+  
+  assert.strictEqual(store.getState().sections.length, 0, 'Should allow removing the last section, leaving 0 sections');
+  assert.strictEqual(store.getState().selectedSectionId, null, 'Selected section should be null');
 });
 
 // ─── EXECUTE ALL TESTS ───
