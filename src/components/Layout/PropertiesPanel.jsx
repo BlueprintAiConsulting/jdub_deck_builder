@@ -732,7 +732,26 @@ export default function PropertiesPanel({ isMobile }) {
               onChange={(v) => updateDeck({ deckMaterial: v })}
               swatch={DECK_MATERIAL_COLORS[deck.deckMaterial]}
             />
-            <SelectField id="sel-decking-orient" label="Decking Direction" value={deck.deckingOrientation || 'perpendicular'} options={[{ value: 'perpendicular', label: 'Perpendicular to Joists' }, { value: 'parallel', label: 'Parallel to Joists' }, { value: 'diagonal', label: '45° Diagonal' }]} onChange={(v) => updateDeck({ deckingOrientation: v })} />
+            <SelectField
+              id="sel-decking-orient"
+              label="Decking Direction"
+              value={deck.deckingOrientation === 'diagonal' ? 'diagonal-up' : (deck.deckingOrientation || 'perpendicular')}
+              options={[
+                { value: 'perpendicular', label: 'Perpendicular to Joists' },
+                { value: 'parallel', label: 'Parallel to Joists' },
+                { value: 'diagonal-up', label: 'Diagonal Up (45°)' },
+                { value: 'diagonal-down', label: 'Diagonal Down (-45°)' }
+              ]}
+              onChange={(v) => {
+                const deckingLayout = (v === 'diagonal-up' || v === 'diagonal-down') ? v : 'straight';
+                const deckingFlipped = v === 'diagonal-down';
+                updateDeck({
+                  deckingOrientation: v,
+                  deckingLayout,
+                  deckingFlipped
+                });
+              }}
+            />
             <SelectField 
               id="sel-picture-frame" 
               label="Picture Frame" 

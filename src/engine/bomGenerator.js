@@ -220,7 +220,7 @@ export function generateBOM(config, calcs) {
   const safeAreaSqIn = areaSqIn > 0 ? areaSqIn : ((width || 0) * (depth || 0));
 
   const pictureFrameCount = typeof config.pictureFrame === 'number' && !isNaN(config.pictureFrame) ? Math.max(0, config.pictureFrame) : (parseInt(config.pictureFrame) || 0);
-  const isDeckingFlipped = config.deckingFlipped === true;
+  const isDeckingFlipped = config.deckingFlipped === true || deckingOrientation === 'diagonal-down';
   
   // Resolve orientation
   let runsVertical = joistOrientation === 'vertical' ? (deckingOrientation === 'parallel') : (deckingOrientation !== 'parallel');
@@ -273,7 +273,7 @@ export function generateBOM(config, calcs) {
   const fieldLinearIn = fieldArea / boardSpacing;
   const totalLinearInNeeded = fieldLinearIn + pfLinearInches + divLinearInches;
 
-  if (deckingOrientation === 'diagonal') {
+  if (deckingOrientation === 'diagonal' || deckingOrientation === 'diagonal-up' || deckingOrientation === 'diagonal-down') {
     const maxDiagonal = Math.sqrt((width || 0) ** 2 + (depth || 0) ** 2) || 96;
     deckBoardLen = optimalBoardLength(maxDiagonal);
     const singleBoardLenIn = deckBoardLen * 12;

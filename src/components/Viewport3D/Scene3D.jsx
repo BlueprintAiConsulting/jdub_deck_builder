@@ -413,7 +413,7 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
     const joistOrient = joistOrientation || 'vertical';
     const deckingOpt = deckingOrientation || 'perpendicular';
     const pfCount = pictureFrame || 0;
-    const isFlipped = deckingFlipped === true;
+    const isFlipped = deckingFlipped === true || deckingOpt === 'diagonal-down';
 
     const arr = [];
     
@@ -564,7 +564,7 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
     }
 
     // 4. Generate Field Decking Boards
-    if (deckingOpt === 'diagonal') {
+    if (deckingOpt === 'diagonal' || deckingOpt === 'diagonal-up' || deckingOpt === 'diagonal-down') {
       const theta = isFlipped ? -Math.PI / 4 : Math.PI / 4;
       const cosNeg = Math.cos(-theta);
       const sinNeg = Math.sin(-theta);

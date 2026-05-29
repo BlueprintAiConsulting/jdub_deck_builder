@@ -1071,10 +1071,10 @@ export default function Canvas2D({ isMobile }) {
           const deckingOpt = sec.deckingOrientation || 'perpendicular';
           const joistsVertical = (sec.joistOrientation !== 'horizontal');
           const pictureFrame = sec.pictureFrame || 0;
-          const isFlipped = sec.deckingFlipped === true;
+          const isFlipped = sec.deckingFlipped === true || deckingOpt === 'diagonal-down';
           
           let drawMode = 'horizontal';
-          if (deckingOpt === 'diagonal') {
+          if (deckingOpt === 'diagonal' || deckingOpt === 'diagonal-up' || deckingOpt === 'diagonal-down') {
             drawMode = 'diagonal';
           } else {
             if (joistsVertical) {
@@ -1083,7 +1083,7 @@ export default function Canvas2D({ isMobile }) {
               drawMode = (deckingOpt === 'parallel') ? 'horizontal' : 'vertical';
             }
           }
-          if (isFlipped) {
+          if (isFlipped && drawMode !== 'diagonal') {
             if (drawMode === 'horizontal') drawMode = 'vertical';
             else if (drawMode === 'vertical') drawMode = 'horizontal';
           }
@@ -2190,16 +2190,21 @@ export default function Canvas2D({ isMobile }) {
   };
 
   const renderLayoutTab = (selectedSec) => {
-    // Resolve Layout Mode
-    const layout = selectedSec.deckingLayout || 'straight';
+    const deckingOpt = selectedSec.deckingOrientation || 'perpendicular';
+    const isFlipped = selectedSec.deckingFlipped === true || deckingOpt === 'diagonal-down';
+
+    // Resolve Layout Mode (handle legacy values gracefully)
+    const layout = selectedSec.deckingLayout || (
+      (deckingOpt === 'diagonal' || deckingOpt === 'diagonal-up' || deckingOpt === 'diagonal-down')
+        ? (isFlipped ? 'diagonal-down' : 'diagonal-up')
+        : 'straight'
+    );
     
     // Stepper help values
     const pictureFrameValue = selectedSec.pictureFrame || 0;
     
     // Resolve divider auto details
     const joistsVertical = (selectedSec.joistOrientation !== 'horizontal');
-    const deckingOpt = selectedSec.deckingOrientation || 'perpendicular';
-    const isFlipped = selectedSec.deckingFlipped === true;
     let runsVertical = joistsVertical ? (deckingOpt === 'parallel') : (deckingOpt !== 'parallel');
     if (isFlipped) runsVertical = !runsVertical;
     const gap = selectedSec.deckBoardGap !== undefined ? selectedSec.deckBoardGap : 0.125;
@@ -2252,7 +2257,7 @@ export default function Canvas2D({ isMobile }) {
               className={`layout-card ${layout === 'diagonal-up' ? 'layout-card--active' : ''}`}
               onClick={() => updateDeck({ 
                 deckingLayout: 'diagonal-up', 
-                deckingOrientation: 'diagonal', 
+                deckingOrientation: 'diagonal-up', 
                 deckingFlipped: false 
               })}
             >
@@ -2275,7 +2280,7 @@ export default function Canvas2D({ isMobile }) {
               className={`layout-card ${layout === 'diagonal-down' ? 'layout-card--active' : ''}`}
               onClick={() => updateDeck({ 
                 deckingLayout: 'diagonal-down', 
-                deckingOrientation: 'diagonal', 
+                deckingOrientation: 'diagonal-down', 
                 deckingFlipped: true 
               })}
             >

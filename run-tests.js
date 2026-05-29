@@ -2444,6 +2444,33 @@ test('53. decking layout, picture framing, and divider configurations', () => {
   assert.strictEqual(updatedSec.deckBoardGap, 0.25, 'deckBoardGap should update to 0.25');
 });
 
+test('54. diagonal up and down orientations and legacy fallback compatibility', async () => {
+  const { generateBOM } = await import('./src/engine/bomGenerator.js');
+
+  // 1. Check diagonal-up orientation
+  const configUp = {
+    width: 192, depth: 144, height: 36,
+    deckingOrientation: 'diagonal-up',
+    deckingFlipped: false,
+    vertices: [{ x: 0, y: 0 }, { x: 192, y: 0 }, { x: 192, y: 144 }, { x: 0, y: 144 }]
+  };
+  const bomUp = generateBOM(configUp, { joists: { count: 13, length: 144 }, beams: { count: 1, positions: [132] }, posts: { posts: [] }, footings: { count: 3 }, stairs: null });
+  const boardsUp = bomUp.find(item => item.id === 'deck-boards');
+  assert.ok(boardsUp, 'BOM must include deck boards for diagonal-up');
+
+  // 2. Check diagonal-down orientation
+  const configDown = {
+    width: 192, depth: 144, height: 36,
+    deckingOrientation: 'diagonal-down',
+    deckingFlipped: true,
+    vertices: [{ x: 0, y: 0 }, { x: 192, y: 0 }, { x: 192, y: 144 }, { x: 0, y: 144 }]
+  };
+  const bomDown = generateBOM(configDown, { joists: { count: 13, length: 144 }, beams: { count: 1, positions: [132] }, posts: { posts: [] }, footings: { count: 3 }, stairs: null });
+  const boardsDown = bomDown.find(item => item.id === 'deck-boards');
+  assert.ok(boardsDown, 'BOM must include deck boards for diagonal-down');
+  assert.strictEqual(boardsDown.length, boardsUp.length, 'Diagonal up and down should calculate identical board lengths');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 
