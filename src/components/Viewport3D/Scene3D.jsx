@@ -1111,8 +1111,8 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
   let rotY = 0;
   if (stairEdge === 's') rotY = 0;
   else if (stairEdge === 'n') rotY = Math.PI;
-  else if (stairEdge === 'e') rotY = -Math.PI / 2;
-  else if (stairEdge === 'w') rotY = Math.PI / 2;
+  else if (stairEdge === 'e') rotY = Math.PI / 2;
+  else if (stairEdge === 'w') rotY = -Math.PI / 2;
 
   // Retrieve current visual offset of the stairs
   const offset = getSubObjectOffset(section, 'stairs');
@@ -1199,7 +1199,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
         return (
           <mesh 
             position={[(-stairWidth / 2 - 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-            rotation={[theta, 0, 0]} 
+            rotation={[-theta, 0, 0]} 
             castShadow 
             receiveShadow
           >
@@ -1217,7 +1217,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
         return (
           <mesh 
             position={[(stairWidth / 2 + 0.75) * IN, (deckTopY - totalRise / 2) * IN, (safeTotalRun / 2) * IN]} 
-            rotation={[theta, 0, 0]} 
+            rotation={[-theta, 0, 0]} 
             castShadow 
             receiveShadow
           >
@@ -1267,11 +1267,11 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
   } else if (rampEdge === 'e') {
     startX = width;
     startZ = offset;
-    rotY = -Math.PI / 2;
+    rotY = Math.PI / 2;
   } else {
     startX = 0;
     startZ = offset;
-    rotY = Math.PI / 2;
+    rotY = -Math.PI / 2;
   }
 
   // Position at top-center of the ramp (at the deck edge)
@@ -1309,7 +1309,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       const deckBump = getProceduralBumpTexture(deckVar);
 
       elements.push(
-        <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[theta, 0, 0]}>
+        <group key={`ramp-seg-${j}`} position={[0, y_mid * IN, z_mid * IN]} rotation={[-theta, 0, 0]}>
           <mesh castShadow receiveShadow userData={{ type: 'ramp-decking' }}>
             <boxGeometry args={[rampWidth * IN, treadThickness * IN, segSurfaceLength * IN]} />
             <meshStandardMaterial 

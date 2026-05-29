@@ -231,70 +231,83 @@ export function hitTestSubObject(mx, my, sections, S, panX, panY, cw, ch, sectio
       }
     }
     
-    // Check main deck body last
-    if (isPointInPolygon(lx, ly, sec.vertices)) {
-      // Check posts
+    // Check if point is inside or close to any boundary edge of the deck section
+    const isInside = isPointInPolygon(lx, ly, sec.vertices);
+    const isNearEdge = (() => {
+      if (isInside) return true;
+      for (let j = 0; j < sec.vertices.length; j++) {
+        const v1 = sec.vertices[j];
+        const v2 = sec.vertices[(j + 1) % sec.vertices.length];
+        if (getDistanceToSegment(lx, ly, v1.x, v1.y, v2.x, v2.y) < 12) {
+          return true;
+        }
+      }
+      return false;
+    })();
+
+    if (isNearEdge) {
+      // Check posts (tolerance: 12 inches)
       if (calcs && calcs.posts && calcs.posts.posts) {
         for (const post of calcs.posts.posts) {
           const px = sec.x + post.x;
           const py = sec.y + post.y;
           const dist = Math.sqrt((lx - px) ** 2 + (ly - py) ** 2);
-          if (dist < 10) {
+          if (dist < 12) {
             return { id: sec.id, type: 'post' };
           }
         }
       }
 
-      // Check beams
+      // Check beams (tolerance: 10 inches)
       if (calcs && calcs.beams && calcs.beams.positions) {
         const joistsVertical = (sec.joistOrientation !== 'horizontal');
         if (joistsVertical) {
           for (const yIn of calcs.beams.positions) {
             const by = sec.y + yIn;
-            if (lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - by) < 6) {
+            if (lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - by) < 10) {
               return { id: sec.id, type: 'beam' };
             }
           }
         } else {
           for (const xIn of calcs.beams.positions) {
             const bx = sec.x + xIn;
-            if (ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - bx) < 6) {
+            if (ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - bx) < 10) {
               return { id: sec.id, type: 'beam' };
             }
           }
         }
       }
 
-      // Check railings
+      // Check railings (tolerance: 12 inches)
       if (sec.railings) {
-        if (sec.railings.n && lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - sec.y) < 8) {
+        if (sec.railings.n && lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - sec.y) < 12) {
           return { id: sec.id, type: 'railing-n' };
         }
-        if (sec.railings.s && lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - (sec.y + sec.depth)) < 8) {
+        if (sec.railings.s && lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - (sec.y + sec.depth)) < 12) {
           return { id: sec.id, type: 'railing-s' };
         }
-        if (sec.railings.e && ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - (sec.x + sec.width)) < 8) {
+        if (sec.railings.e && ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - (sec.x + sec.width)) < 12) {
           return { id: sec.id, type: 'railing-e' };
         }
-        if (sec.railings.w && ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - sec.x) < 8) {
+        if (sec.railings.w && ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - sec.x) < 12) {
           return { id: sec.id, type: 'railing-w' };
         }
       }
 
-      // Check joists
+      // Check joists (tolerance: 6 inches)
       if (calcs && calcs.joists && calcs.joists.positions) {
         const joistsVertical = (sec.joistOrientation !== 'horizontal');
         if (joistsVertical) {
           for (const xIn of calcs.joists.positions) {
             const jx = sec.x + xIn;
-            if (ly >= sec.y && ly <= sec.y + sec.depth && Math.abs(lx - jx) < 4) {
+            if (ly >= sec.y - 8 && ly <= sec.y + sec.depth + 8 && Math.abs(lx - jx) < 6) {
               return { id: sec.id, type: 'joist' };
             }
           }
         } else {
           for (const yIn of calcs.joists.positions) {
             const jy = sec.y + yIn;
-            if (lx >= sec.x && lx <= sec.x + sec.width && Math.abs(ly - jy) < 4) {
+            if (lx >= sec.x - 8 && lx <= sec.x + sec.width + 8 && Math.abs(ly - jy) < 6) {
               return { id: sec.id, type: 'joist' };
             }
           }
