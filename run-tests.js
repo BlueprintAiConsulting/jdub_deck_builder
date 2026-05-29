@@ -2203,6 +2203,48 @@ test('48. placement configurations and auto-selection of attached stairs/ramps',
   assert.strictEqual(store.getState().selectedTool, 'select', 'Tool should auto-switch to select');
 });
 
+test('49. customizable support beams and automatic 12 ft joist span limit', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+
+  // 1. Add a deck section under 12 ft (e.g. 10 ft depth = 120 in)
+  store.getState().addSection({ x: 0, y: 0, width: 144, depth: 120 }, 'deck');
+  const secId = store.getState().sections[0].id;
+
+  let state = store.getState();
+  let calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.beams.count, 1, 'Deck under 12 ft depth should automatically get exactly 1 beam');
+  assert.deepStrictEqual(calcs.beams.positions, [120], 'Beam should be placed at the outer depth edge');
+
+  // 2. Change deck depth to 15 ft (180 in) -> exceeds 12 ft limit
+  store.getState().updateDeck({ depth: 180 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.beams.count, 2, 'Deck over 12 ft (180 in) depth should automatically get 2 beams');
+  assert.deepStrictEqual(calcs.beams.positions, [90, 180], 'Beams should be distributed evenly at 90 in and 180 in');
+
+  // 3. Manually override beamCount to 3 beams
+  store.getState().updateDeck({ beamCount: 3 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(state.sections[0].beamCount, 3, 'beamCount should update to 3 in store');
+  assert.strictEqual(calcs.beams.count, 3, 'calculateBeams count should equal 3');
+  assert.deepStrictEqual(calcs.beams.positions, [60, 120, 180], 'Beams should be distributed evenly at 60 in, 120 in, and 180 in');
+
+  // 4. Manually override beamCount to 1 beam (even though depth is 15 ft)
+  store.getState().updateDeck({ beamCount: 1 });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.beams.count, 1, 'Manual beam override to 1 should be honored');
+  assert.deepStrictEqual(calcs.beams.positions, [180], 'Single beam should be placed at the end');
+
+  // 5. Restore beamCount to 'auto'
+  store.getState().updateDeck({ beamCount: 'auto' });
+  state = store.getState();
+  calcs = state.sectionCalcs[secId];
+  assert.strictEqual(calcs.beams.count, 2, 'Restoring beamCount to auto should recalculate 2 beams for 180 in depth');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

@@ -567,6 +567,19 @@ export default function PropertiesPanel({ isMobile }) {
             <SelectField id="sel-joist-spacing" label="Joist Spacing" value={deck.joistSpacing} options={JOIST_SPACINGS.map((s) => ({ value: s, label: `${s}" o.c.` }))} onChange={(v) => updateDeck({ joistSpacing: Number(v) })} />
             <SelectField id="sel-joist-orient" label="Joist Direction" value={deck.joistOrientation || 'vertical'} options={[{ value: 'vertical', label: 'Vertical (N-S)' }, { value: 'horizontal', label: 'Horizontal (E-W)' }]} onChange={(v) => updateDeck({ joistOrientation: v })} />
             <SelectField id="sel-beam-config" label="Beam Config" value={deck.beamConfig} options={BEAM_CONFIGS} onChange={(v) => updateDeck({ beamConfig: v })} />
+            <SelectField
+              id="sel-beam-count"
+              label="Support Beams"
+              value={deck.beamCount || 'auto'}
+              options={[
+                { value: 'auto', label: 'Automatic (12 ft Limit)' },
+                { value: '1', label: '1 Beam' },
+                { value: '2', label: '2 Beams' },
+                { value: '3', label: '3 Beams' },
+                { value: '4', label: '4 Beams' },
+              ]}
+              onChange={(v) => updateDeck({ beamCount: v === 'auto' ? 'auto' : Number(v) })}
+            />
             <SelectField id="sel-post-size" label="Post Size" value={deck.postSize} options={POST_SIZE_OPTIONS.map((s) => ({ value: s, label: s }))} onChange={(v) => updateDeck({ postSize: v })} />
           </CollapsibleSection>
 
