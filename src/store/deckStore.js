@@ -875,8 +875,8 @@ export const useDeckStore = create((set, get) => ({
     });
   },
 
-  loadProject: (sections, materials) => {
-    const normalizedSections = sections.map(s => {
+  loadProject: (sections = [], materials = {}) => {
+    const normalizedSections = (sections || []).map(s => {
       const type = s.type || 'deck';
       let stairObj = s.stairs;
       let rampObj = s.ramp || null;

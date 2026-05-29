@@ -2060,6 +2060,24 @@ test('44. removeSection on the last section transitions to empty slate', () => {
   assert.strictEqual(store.getState().selectedSectionId, null, 'Selected section should be null');
 });
 
+test('45. validateProjectData, saveProjectToLocalStorage, and loadProject support blank projects with 0 sections', () => {
+  const store = useDeckStore;
+  store.getState().clearDeck();
+  assert.strictEqual(store.getState().sections.length, 0, 'Should start with 0 sections');
+  
+  // Save it manually
+  saveProjectToLocalStorage('Empty Project Test', store.getState().sections, store.getState().materials);
+  
+  // Load it back
+  const loaded = loadProjectFromLocalStorage('Empty Project Test');
+  assert.ok(loaded, 'Should successfully load empty project from storage without throwing');
+  assert.strictEqual(loaded.sections.length, 0, 'Loaded project should have 0 sections');
+  
+  // Apply load to store
+  store.getState().loadProject(loaded.sections, loaded.materials);
+  assert.strictEqual(store.getState().sections.length, 0, 'Store should successfully update to 0 sections');
+});
+
 // ─── EXECUTE ALL TESTS ───
 console.log('DeckForge Test Runner — Executing Automated Tests...\n');
 

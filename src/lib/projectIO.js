@@ -152,9 +152,39 @@ export function validateProjectData(data) {
   if (data.schemaVersion !== SCHEMA_VERSION) {
     throw new Error(`Unsupported schemaVersion. Found: ${data.schemaVersion}, Expected: ${SCHEMA_VERSION}.`);
   }
-  if (!Array.isArray(data.sections) || data.sections.length === 0) {
-    throw new Error('Invalid project file: sections must be a non-empty list.');
+  if (!Array.isArray(data.sections)) {
+    throw new Error('Invalid project file: sections must be a list.');
   }
+  
+  // Validate and heal sections/vertices
+  data.sections.forEach((sec, idx) => {
+    if (!sec || typeof sec !== 'object') {
+      throw new Error(`Invalid section at index ${idx}.`);
+    }
+    if (!sec.id) {
+      sec.id = `sec-${idx + 1}`;
+    }
+    if (sec.width === undefined || isNaN(sec.width) || sec.width <= 0) sec.width = 144;
+    if (sec.depth === undefined || isNaN(sec.depth) || sec.depth <= 0) sec.depth = 120;
+    if (sec.x === undefined || isNaN(sec.x)) sec.x = 0;
+    if (sec.y === undefined || isNaN(sec.y)) sec.y = 0;
+    
+    if (!Array.isArray(sec.vertices) || sec.vertices.length < 3) {
+      sec.vertices = [
+        { x: sec.x, y: sec.y },
+        { x: sec.x + sec.width, y: sec.y },
+        { x: sec.x + sec.width, y: sec.y + sec.depth },
+        { x: sec.x, y: sec.y + sec.depth }
+      ];
+    } else {
+      sec.vertices.forEach((v, vIdx) => {
+        if (!v || typeof v !== 'object' || typeof v.x !== 'number' || typeof v.y !== 'number' || isNaN(v.x) || isNaN(v.y)) {
+          throw new Error(`Invalid vertex coordinates at section ${sec.id} index ${vIdx}.`);
+        }
+      });
+    }
+  });
+
   if (!data.materials || typeof data.materials !== 'object') {
     throw new Error('Invalid project file: materials configuration is missing.');
   }
