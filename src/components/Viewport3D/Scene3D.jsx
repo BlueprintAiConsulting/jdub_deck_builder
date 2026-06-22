@@ -1047,7 +1047,7 @@ function Posts({ posts, postSize, joistSize, beamConfig, vertices, secX, secY })
   );
 }
 
-function Railings({ railings, width, depth, height, species, deckMaterial, deckColor }) {
+function Railings({ railings, width, depth, height, species, deckMaterial, deckColor, vertices, secX, secY }) {
   const guardHeight = Math.max(24, RAILING_RULES.guardMinHeight || 36); // standard guardrail height min 24"
   const postWidth = 3.5;
   const railWidth = 1.5;
