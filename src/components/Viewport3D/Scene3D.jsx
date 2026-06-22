@@ -179,7 +179,44 @@ function drawCompositePatternOnCanvas(canvas, colorHex, type, isBump = false) {
   }
 }
 
+
+import { TextureLoader, RepeatWrapping, SRGBColorSpace, Color } from 'three';
+const textureLoader = new TextureLoader();
+const staticTextures = {};
+
+function loadStaticTexture(name, repeatX = 1, repeatY = 1, isColor = true) {
+  const key = name + repeatX + repeatY + isColor;
+  if (staticTextures[key]) return staticTextures[key];
+  const tex = textureLoader.load('/textures/' + name + '.png');
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
+  tex.repeat.set(repeatX, repeatY);
+  if (isColor) tex.colorSpace = SRGBColorSpace;
+  staticTextures[key] = tex;
+  return tex;
+}
+
 export function getProceduralTexture(colorHex, type) {
+  if (type === 'siding') return loadStaticTexture('siding', 1, 1);
+  if (type === 'concrete') return loadStaticTexture('concrete', 4, 4);
+  if (type === 'shingles') return loadStaticTexture('shingles', 4, 4);
+  if (type && type.startsWith('wood')) return loadStaticTexture('wood_grain', 1, 4, false); // grayscale
+  if (type && type.startsWith('composite')) return loadStaticTexture('composite_grain', 1, 4, false); // grayscale
+  
+  // fallback for grass or undefined
+  if (type === 'grass') {
+    return _legacyProceduralTexture(colorHex, type);
+  }
+  return null;
+}
+
+function _legacyProceduralBumpTexture(type) {
+  if (type && type.startsWith('wood')) return loadStaticTexture('wood_grain', 1, 4, false);
+  if (type && type.startsWith('composite')) return loadStaticTexture('composite_grain', 1, 4, false);
+  return null;
+}
+
+function _legacyProceduralTexture(colorHex, type) {
   const safeColorHex = (typeof colorHex === 'string' && colorHex.match(/^#[0-9a-fA-F]{3,8}$/)) ? colorHex : '#c4a35a';
   const cacheKey = `${safeColorHex}-${type}`;
   if (textureCache[cacheKey]) {
@@ -1204,7 +1241,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
             receiveShadow
           >
             <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
-            <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         );
       })()}
@@ -1222,7 +1259,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
             receiveShadow
           >
             <boxGeometry args={[1.5 * IN, stringerDepth * IN, stringerLength * IN]} />
-            <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={strTex} bumpMap={strBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         );
       })()}
@@ -1334,7 +1371,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
               stringerElements.push(
                 <mesh key={`stringer-${s}`} position={[x_pos * IN, -(treadThickness + stringerDepth / 2) * IN, 0]} castShadow receiveShadow>
                   <boxGeometry args={[1.5 * IN, stringerDepth * IN, segSurfaceLength * IN]} />
-                  <meshStandardMaterial map={strTex} bumpMap={strBump} bumpScale={0.012} roughness={0.8} />
+                  <meshStandardMaterial color={color} map={strTex} bumpMap={strBump} bumpScale={0.012} roughness={0.8} />
                 </mesh>
               );
             }
@@ -1364,11 +1401,11 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
         <group key={`ramp-seg-posts-${j}`}>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postLTex} bumpMap={postLBump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postLTex} bumpMap={postLBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postRTex} bumpMap={postRBump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postRTex} bumpMap={postRBump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         </group>
       );
@@ -1412,11 +1449,11 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       framingElements.push(
         <mesh key={`land-rim-l-${j}`} position={[-landingW / 2 + 0.75 * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
           <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
-          <meshStandardMaterial map={rimLTex} bumpMap={rimLBump} bumpScale={0.012} roughness={0.8} />
+          <meshStandardMaterial color={color} map={rimLTex} bumpMap={rimLBump} bumpScale={0.012} roughness={0.8} />
         </mesh>,
         <mesh key={`land-rim-r-${j}`} position={[(landingW / 2 - 0.75) * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
           <boxGeometry args={[1.5 * IN, stringerDepth * IN, landingRun * IN]} />
-          <meshStandardMaterial map={rimRTex} bumpMap={rimRBump} bumpScale={0.012} roughness={0.8} />
+          <meshStandardMaterial color={color} map={rimRTex} bumpMap={rimRBump} bumpScale={0.012} roughness={0.8} />
         </mesh>
       );
 
@@ -1431,11 +1468,11 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
       framingElements.push(
         <mesh key={`land-rim-f-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (currentZ + 0.75) * IN]} castShadow receiveShadow>
           <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
-          <meshStandardMaterial map={rimFTex} bumpMap={rimFBump} bumpScale={0.012} roughness={0.8} />
+          <meshStandardMaterial color={color} map={rimFTex} bumpMap={rimFBump} bumpScale={0.012} roughness={0.8} />
         </mesh>,
         <mesh key={`land-rim-b-${j}`} position={[0, (y_mid - treadThickness - stringerDepth / 2) * IN, (nextZ - 0.75) * IN]} castShadow receiveShadow>
           <boxGeometry args={[(landingW - 3) * IN, stringerDepth * IN, 1.5 * IN]} />
-          <meshStandardMaterial map={rimBTex} bumpMap={rimBBump} bumpScale={0.012} roughness={0.8} />
+          <meshStandardMaterial color={color} map={rimBTex} bumpMap={rimBBump} bumpScale={0.012} roughness={0.8} />
         </mesh>
       );
 
@@ -1449,7 +1486,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
         framingElements.push(
           <mesh key={`land-int-joist-${s}-${j}`} position={[x_pos * IN, (y_mid - treadThickness - stringerDepth / 2) * IN, z_mid * IN]} castShadow receiveShadow>
             <boxGeometry args={[1.5 * IN, stringerDepth * IN, (landingRun - 3) * IN]} />
-            <meshStandardMaterial map={intTex} bumpMap={intBump} bumpScale={0.012} roughness={0.8} />
+            <meshStandardMaterial color={color} map={intTex} bumpMap={intBump} bumpScale={0.012} roughness={0.8} />
           </mesh>
         );
       }
@@ -1487,19 +1524,19 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
         <group key={`ramp-land-posts-${j}`}>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postL1Tex} bumpMap={postL1Bump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postL1Tex} bumpMap={postL1Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_front * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postR1Tex} bumpMap={postR1Bump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postR1Tex} bumpMap={postR1Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_left * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postL2Tex} bumpMap={postL2Bump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postL2Tex} bumpMap={postL2Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
           <mesh position={[x_right * IN, y_post_center_in * IN, z_back * IN]} castShadow receiveShadow>
             <boxGeometry args={[postActualWidth * IN, postHeight_in * IN, postActualWidth * IN]} />
-            <meshStandardMaterial map={postR2Tex} bumpMap={postR2Bump} bumpScale={0.015} roughness={0.8} />
+            <meshStandardMaterial color={color} map={postR2Tex} bumpMap={postR2Bump} bumpScale={0.015} roughness={0.8} />
           </mesh>
         </group>
       );
