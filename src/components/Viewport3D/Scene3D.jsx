@@ -187,7 +187,7 @@ const staticTextures = {};
 function loadStaticTexture(name, repeatX = 1, repeatY = 1, isColor = true) {
   const key = name + repeatX + repeatY + isColor;
   if (staticTextures[key]) return staticTextures[key];
-  const tex = textureLoader.load('/textures/' + name + '.png');
+  const tex = textureLoader.load(import.meta.env.BASE_URL + 'textures/' + name + '.png');
   tex.wrapS = RepeatWrapping;
   tex.wrapT = RepeatWrapping;
   tex.repeat.set(repeatX, repeatY);
