@@ -388,23 +388,16 @@ export function getHorizontalIntersections(y, vertices) {
     const minY = Math.min(a.y, b.y);
     const maxY = Math.max(a.y, b.y);
     
-    if (y >= minY && y <= maxY && minY !== maxY) {
+    if (y >= minY && y < maxY) {
       const x = a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y);
       intersections.push(x);
     }
   }
   
   const sorted = intersections.sort((a, b) => a - b);
-  const unique = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (unique.length === 0 || Math.abs(sorted[i] - unique[unique.length - 1]) > 0.001) {
-      unique.push(sorted[i]);
-    }
-  }
-  
   const segments = [];
-  for (let i = 0; i < unique.length - 1; i += 2) {
-    segments.push({ startX: unique[i], endX: unique[i + 1] });
+  for (let i = 0; i < sorted.length - 1; i += 2) {
+    segments.push({ startX: sorted[i], endX: sorted[i + 1] });
   }
   return segments;
 }
@@ -418,23 +411,16 @@ export function getVerticalIntersections(x, vertices) {
     const minX = Math.min(a.x, b.x);
     const maxX = Math.max(a.x, b.x);
     
-    if (x >= minX && x <= maxX && minX !== maxX) {
+    if (x >= minX && x < maxX) {
       const y = a.y + ((x - a.x) * (b.y - a.y)) / (b.x - a.x);
       intersections.push(y);
     }
   }
   
   const sorted = intersections.sort((a, b) => a - b);
-  const unique = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (unique.length === 0 || Math.abs(sorted[i] - unique[unique.length - 1]) > 0.001) {
-      unique.push(sorted[i]);
-    }
-  }
-  
   const segments = [];
-  for (let i = 0; i < unique.length - 1; i += 2) {
-    segments.push({ startY: unique[i], endY: unique[i + 1] });
+  for (let i = 0; i < sorted.length - 1; i += 2) {
+    segments.push({ startY: sorted[i], endY: sorted[i + 1] });
   }
   return segments;
 }
@@ -778,36 +764,59 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
   );
 }
 
-function Joists({ positions, width, depth, joistSize, joistOrientation }) {
+function Joists({ positions, width, depth, joistSize, joistOrientation, vertices, secX, secY }) {
   const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
   const isHorizontal = joistOrientation === 'horizontal';
   const joistTexture = getProceduralTexture('#6e5f4d', 'wood-0');
   const joistBump = getProceduralBumpTexture('wood-0');
 
+  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+
   return (
     <group>
       {positions.map((coordIn, i) => {
-        const posX = isHorizontal ? width / 2 : coordIn;
-        const posZ = isHorizontal ? coordIn : depth / 2;
-        const sizeX = isHorizontal ? width : actual.width;
-        const sizeZ = isHorizontal ? actual.width : depth;
-        return (
-          <mesh key={`joist-${i}`} position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} castShadow receiveShadow>
-            <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
-            <meshStandardMaterial 
-              map={joistTexture} color={joistTexture?.customColor || '#ffffff'} 
-              roughness={0.8} 
-              bumpMap={joistBump}
-              bumpScale={0.012}
-            />
-          </mesh>
-        );
+        let segments = [];
+        if (localVertices && localVertices.length >= 3) {
+          if (isHorizontal) {
+            const hSegs = getHorizontalIntersections(coordIn, localVertices);
+            hSegs.forEach(seg => {
+              if (seg.endX - seg.startX > 0.5) segments.push(seg);
+            });
+          } else {
+            const vSegs = getVerticalIntersections(coordIn, localVertices);
+            vSegs.forEach(seg => {
+              if (seg.endY - seg.startY > 0.5) segments.push(seg);
+            });
+          }
+        } else {
+          if (isHorizontal) segments.push({ startX: 0, endX: width });
+          else segments.push({ startY: 0, endY: depth });
+        }
+
+        return segments.map((seg, sIdx) => {
+          const posX = isHorizontal ? (seg.startX + seg.endX) / 2 : coordIn;
+          const posZ = isHorizontal ? coordIn : (seg.startY + seg.endY) / 2;
+          const sizeX = isHorizontal ? (seg.endX - seg.startX) : actual.width;
+          const sizeZ = isHorizontal ? actual.width : (seg.endY - seg.startY);
+          
+          return (
+            <mesh key={`joist-${i}-${sIdx}`} position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} castShadow receiveShadow>
+              <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
+              <meshStandardMaterial 
+                map={joistTexture} color={joistTexture?.customColor || '#ffffff'} 
+                roughness={0.8} 
+                bumpMap={joistBump}
+                bumpScale={0.012}
+              />
+            </mesh>
+          );
+        });
       })}
     </group>
   );
 }
 
-function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrientation }) {
+function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrientation, vertices, secX, secY }) {
   const isHorizontal = joistOrientation === 'horizontal';
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
   const actual = LUMBER_ACTUAL[beamSize] || { width: 1.5, depth: 9.25 };
@@ -817,53 +826,86 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
   const beamTexture = getProceduralTexture('#564736', 'wood-1');
   const beamBump = getProceduralBumpTexture('wood-1');
 
+  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+
   return (
     <group>
-      {beamPositions.map((coordIn, i) => (
-        <group key={`beam-${i}`}>
-          {Array.from({ length: ply }, (_, p) => {
-            const offset = (p - (ply - 1) / 2) * actual.width;
-            const posX = isHorizontal ? coordIn * IN : (width / 2 + offset) * IN;
-            const posZ = isHorizontal ? (depth / 2 + offset) * IN : coordIn * IN;
-            const sizeX = isHorizontal ? actual.width * IN : width * IN;
-            const sizeZ = isHorizontal ? depth * IN : actual.width * IN;
-            return (
-              <mesh
-                key={`beam-${i}-${p}`}
-                position={[
-                  posX,
-                  (beamTopY - actual.depth / 2) * IN,
-                  posZ,
-                ]}
-                castShadow
-                receiveShadow
-              >
-                <boxGeometry args={[sizeX, actual.depth * IN, sizeZ]} />
-                <meshStandardMaterial 
-                  map={beamTexture} color={beamTexture?.customColor || '#ffffff'} 
-                  roughness={0.78} 
-                  bumpMap={beamBump}
-                  bumpScale={0.015}
-                />
-              </mesh>
-            );
-          })}
-        </group>
-      ))}
+      {beamPositions.map((coordIn, i) => {
+        let segments = [];
+        if (localVertices && localVertices.length >= 3) {
+          if (isHorizontal) {
+            // If joists are horizontal, beams run vertical
+            const vSegs = getVerticalIntersections(coordIn, localVertices);
+            vSegs.forEach(seg => { if (seg.endY - seg.startY > 0.5) segments.push(seg); });
+          } else {
+            // If joists are vertical, beams run horizontal
+            const hSegs = getHorizontalIntersections(coordIn, localVertices);
+            hSegs.forEach(seg => { if (seg.endX - seg.startX > 0.5) segments.push(seg); });
+          }
+        } else {
+          if (isHorizontal) segments.push({ startY: 0, endY: depth });
+          else segments.push({ startX: 0, endX: width });
+        }
+
+        return segments.map((seg, sIdx) => (
+          <group key={`beam-${i}-${sIdx}`}>
+            {Array.from({ length: ply }, (_, p) => {
+              const offset = (p - (ply - 1) / 2) * actual.width;
+              const posX = isHorizontal ? coordIn + offset : (seg.startX + seg.endX) / 2;
+              const posZ = isHorizontal ? (seg.startY + seg.endY) / 2 : coordIn + offset;
+              const sizeX = isHorizontal ? actual.width : (seg.endX - seg.startX);
+              const sizeZ = isHorizontal ? (seg.endY - seg.startY) : actual.width;
+              return (
+                <mesh
+                  key={`beam-${i}-${sIdx}-${p}`}
+                  position={[
+                    posX * IN,
+                    (beamTopY - actual.depth / 2) * IN,
+                    posZ * IN,
+                  ]}
+                  castShadow
+                  receiveShadow
+                >
+                  <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
+                  <meshStandardMaterial 
+                    map={beamTexture} color={beamTexture?.customColor || '#ffffff'} 
+                    roughness={0.78} 
+                    bumpMap={beamBump}
+                    bumpScale={0.015}
+                  />
+                </mesh>
+              );
+            })}
+          </group>
+        ));
+      })}
     </group>
   );
 }
 
-function Blocking({ blocking, joistSize }) {
+function Blocking({ blocking, joistSize, vertices, secX, secY, width, depth }) {
   const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
   const woodTexture = getProceduralTexture('#6e5f4d', 'wood-2');
   const blockingBump = getProceduralBumpTexture('wood-2');
 
-  if (!blocking || !blocking.enabled || !blocking.segments) return null;
+  if (!blocking || !blocking.enabled) return null;
+
+  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+  const segments = [];
+
+  if (localVertices && localVertices.length >= 3) {
+    for (let i = 0; i < localVertices.length; i++) {
+      const v1 = localVertices[i];
+      const v2 = localVertices[(i + 1) % localVertices.length];
+      segments.push({ x1: v1.x, y1: v1.y, x2: v2.x, y2: v2.y });
+    }
+  } else if (blocking.segments) {
+    segments.push(...blocking.segments);
+  }
 
   return (
     <group>
-      {blocking.segments.map((seg, i) => {
+      {segments.map((seg, i) => {
         const x1 = typeof seg.x1 === 'number' && !isNaN(seg.x1) ? seg.x1 : 0;
         const x2 = typeof seg.x2 === 'number' && !isNaN(seg.x2) ? seg.x2 : 0;
         const y1 = typeof seg.y1 === 'number' && !isNaN(seg.y1) ? seg.y1 : 0;
@@ -875,18 +917,17 @@ function Blocking({ blocking, joistSize }) {
         const posX = (x1 + x2) / 2;
         const posZ = (y1 + y2) / 2;
 
-        const isHorizontal = Math.abs(dz) > Math.abs(dx);
-        const sizeX = isHorizontal ? actual.width : len;
-        const sizeZ = isHorizontal ? len : actual.width;
-
+        const rotY = Math.atan2(dz, dx);
+        
         return (
           <mesh 
             key={`block-${i}`} 
             position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} 
+            rotation={[0, -rotY, 0]}
             castShadow 
             receiveShadow
           >
-            <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
+            <boxGeometry args={[len * IN, actual.depth * IN, actual.width * IN]} />
             <meshStandardMaterial 
               map={woodTexture} color={woodTexture?.customColor || '#ffffff'} 
               roughness={0.8} 
@@ -900,43 +941,68 @@ function Blocking({ blocking, joistSize }) {
   );
 }
 
-function Footers({ beamPositions, width, depth, joistOrientation, footerWidth, height }) {
+function Footers({ beamPositions, width, depth, joistOrientation, footerWidth, height, vertices, secX, secY }) {
   const isHorizontal = joistOrientation === 'horizontal';
   const fWidth = footerWidth || 12;
   const fDepth = 12; // 12 inches deep concrete grade beam
   const fColor = '#8a8a8a';
   const safeHeight = Math.max(1, typeof height === 'number' && !isNaN(height) ? height : 36);
-  const safeW = Math.max(1, typeof width === 'number' && !isNaN(width) ? width : 120);
-  const safeD = Math.max(1, typeof depth === 'number' && !isNaN(depth) ? depth : 120);
   const yPos = -(safeHeight + 12 + fDepth / 2);
-  
+  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
   const safeBeamPositions = Array.isArray(beamPositions) ? beamPositions : [];
   
   return (
     <group>
       {safeBeamPositions.map((coordIn, i) => {
-        const posX = isHorizontal ? coordIn * IN : (safeW / 2) * IN;
-        const posZ = isHorizontal ? (safeD / 2) * IN : coordIn * IN;
-        const sizeX = isHorizontal ? fWidth * IN : safeW * IN;
-        const sizeZ = isHorizontal ? safeD * IN : fWidth * IN;
-        
-        return (
-          <mesh 
-            key={`footer-${i}`} 
-            position={[posX, yPos * IN, posZ]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[sizeX, fDepth * IN, sizeZ]} />
-            <meshStandardMaterial color={fColor} roughness={0.9} />
-          </mesh>
-        );
+        let segments = [];
+        if (localVertices && localVertices.length >= 3) {
+          if (isHorizontal) {
+            const vSegs = getVerticalIntersections(coordIn, localVertices);
+            vSegs.forEach(seg => { if (seg.endY - seg.startY > 0.5) segments.push(seg); });
+          } else {
+            const hSegs = getHorizontalIntersections(coordIn, localVertices);
+            hSegs.forEach(seg => { if (seg.endX - seg.startX > 0.5) segments.push(seg); });
+          }
+        } else {
+          if (isHorizontal) segments.push({ startY: 0, endY: depth });
+          else segments.push({ startX: 0, endX: width });
+        }
+
+        return segments.map((seg, sIdx) => {
+          const posX = isHorizontal ? coordIn : (seg.startX + seg.endX) / 2;
+          const posZ = isHorizontal ? (seg.startY + seg.endY) / 2 : coordIn;
+          const sizeX = isHorizontal ? fWidth : (seg.endX - seg.startX);
+          const sizeZ = isHorizontal ? (seg.endY - seg.startY) : fWidth;
+          
+          return (
+            <mesh 
+              key={`footer-${i}-${sIdx}`} 
+              position={[posX * IN, yPos * IN, posZ * IN]}
+              castShadow
+              receiveShadow
+            >
+              <boxGeometry args={[sizeX * IN, fDepth * IN, sizeZ * IN]} />
+              <meshStandardMaterial color={fColor} roughness={0.9} />
+            </mesh>
+          );
+        });
       })}
     </group>
   );
 }
 
-function Posts({ posts, postSize, joistSize, beamConfig }) {
+function pointInPolygon(x, y, vertices) {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const xi = vertices[i].x, yi = vertices[i].y;
+    const xj = vertices[j].x, yj = vertices[j].y;
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function Posts({ posts, postSize, joistSize, beamConfig, vertices, secX, secY }) {
   const nominalWidth = postSize === '6x6' ? 5.5 : 3.5;
   const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
@@ -945,9 +1011,16 @@ function Posts({ posts, postSize, joistSize, beamConfig }) {
   const postTexture = getProceduralTexture('#5c4e3e', 'wood-3');
   const postBump = getProceduralBumpTexture('wood-3');
 
+  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+
   return (
     <group>
       {posts.map((post, i) => {
+        if (localVertices && localVertices.length >= 3) {
+          if (!pointInPolygon(post.x, post.y, localVertices)) {
+            return null; // Skip posts outside the custom polygon
+          }
+        }
         const postHeight = Math.max(0.1, post.height + topOfPost + 12);
         return (
           <mesh
@@ -992,18 +1065,47 @@ function Railings({ railings, width, depth, height, species, deckMaterial, deckC
   const edges = useMemo(() => {
     const result = [];
     if (!railings) return result;
-    const entries = Object.entries(railings);
-    entries.forEach(([edge, on]) => {
-      if (!on) return;
-      let x1, z1, x2, z2;
-      if (edge === 'n') { x1 = 0; z1 = 0; x2 = width; z2 = 0; }
-      else if (edge === 's') { x1 = 0; z1 = depth; x2 = width; z2 = depth; }
-      else if (edge === 'w') { x1 = 0; z1 = 0; x2 = 0; z2 = depth; }
-      else if (edge === 'e') { x1 = width; z1 = 0; x2 = width; z2 = depth; }
-      result.push({ edge, x1, z1, x2, z2 });
-    });
+    
+    const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+    
+    if (localVertices && localVertices.length >= 3) {
+      for (let i = 0; i < localVertices.length; i++) {
+        const v1 = localVertices[i];
+        const v2 = localVertices[(i + 1) % localVertices.length];
+        
+        const dx = v2.x - v1.x;
+        const dz = v2.y - v1.y;
+        
+        // Outward normal for clockwise vertices
+        const nx = -dz;
+        const nz = dx;
+        
+        let edgeLabel = '';
+        if (Math.abs(nx) > Math.abs(nz)) {
+          edgeLabel = nx < 0 ? 'w' : 'e';
+        } else {
+          edgeLabel = nz < 0 ? 'n' : 's';
+        }
+        
+        if (railings[edgeLabel]) {
+          result.push({ edge: edgeLabel, x1: v1.x, z1: v1.y, x2: v2.x, z2: v2.y });
+        }
+      }
+    } else {
+      // Fallback for rectangular
+      const entries = Object.entries(railings);
+      entries.forEach(([edge, on]) => {
+        if (!on) return;
+        let x1, z1, x2, z2;
+        if (edge === 'n') { x1 = 0; z1 = 0; x2 = width; z2 = 0; }
+        else if (edge === 's') { x1 = 0; z1 = depth; x2 = width; z2 = depth; }
+        else if (edge === 'w') { x1 = 0; z1 = 0; x2 = 0; z2 = depth; }
+        else if (edge === 'e') { x1 = width; z1 = 0; x2 = width; z2 = depth; }
+        result.push({ edge, x1, z1, x2, z2 });
+      });
+    }
     return result;
-  }, [railings, width, depth]);
+  }, [railings, width, depth, vertices, secX, secY]);
 
   return (
     <group>
