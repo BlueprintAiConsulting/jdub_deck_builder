@@ -1234,7 +1234,86 @@ function Railings({ railings, width, depth, height, species, deckMaterial, deckC
   );
 }
 
-function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial, deckColor }) {
+function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objectWidth, fallbackWidth, fallbackDepth) {
+  if (!vertices || vertices.length < 3) {
+    let centerX, centerZ, rotY = 0;
+    if (targetEdge === 's' || targetEdge === 'n') {
+      centerX = offset + objectWidth / 2;
+      centerZ = targetEdge === 's' ? fallbackDepth : 0;
+      rotY = targetEdge === 's' ? 0 : Math.PI;
+    } else {
+      centerX = targetEdge === 'e' ? fallbackWidth : 0;
+      centerZ = offset + objectWidth / 2;
+      rotY = targetEdge === 'e' ? -Math.PI / 2 : Math.PI / 2;
+    }
+    return { centerX, centerZ, rotY };
+  }
+
+  const localVertices = vertices.map(v => ({ x: v.x - secX, y: v.y - secY }));
+  let targetSegments = [];
+
+  for (let i = 0; i < localVertices.length; i++) {
+    const v1 = localVertices[i];
+    const v2 = localVertices[(i + 1) % localVertices.length];
+    const dx = v2.x - v1.x;
+    const dz = v2.y - v1.y;
+    const nx = -dz;
+    const nz = dx;
+    let edgeLabel = '';
+    if (Math.abs(nx) > Math.abs(nz)) {
+      edgeLabel = nx < 0 ? 'w' : 'e';
+    } else {
+      edgeLabel = nz < 0 ? 'n' : 's';
+    }
+    if (edgeLabel === targetEdge) {
+      targetSegments.push({ v1, v2, dx, dz, len: Math.sqrt(dx*dx + dz*dz) });
+    }
+  }
+
+  if (targetSegments.length === 0) {
+     return getEdgeTransform(null, 0, 0, targetEdge, offset, objectWidth, fallbackWidth, fallbackDepth);
+  }
+
+  let selectedSeg = targetSegments[0];
+
+  if (targetEdge === 's' || targetEdge === 'n') {
+    const targetX = offset + objectWidth / 2;
+    selectedSeg = targetSegments.find(s => 
+      (targetX >= Math.min(s.v1.x, s.v2.x) && targetX <= Math.max(s.v1.x, s.v2.x))
+    ) || targetSegments[0];
+    
+    if (Math.abs(selectedSeg.dx) > 0.001) {
+       const t = (targetX - selectedSeg.v1.x) / selectedSeg.dx;
+       const z = selectedSeg.v1.y + t * selectedSeg.dz;
+       return { 
+         centerX: targetX, 
+         centerZ: z, 
+         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
+       };
+    } else {
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
+    }
+  } else {
+    const targetZ = offset + objectWidth / 2;
+    selectedSeg = targetSegments.find(s => 
+      (targetZ >= Math.min(s.v1.y, s.v2.y) && targetZ <= Math.max(s.v1.y, s.v2.y))
+    ) || targetSegments[0];
+
+    if (Math.abs(selectedSeg.dz) > 0.001) {
+       const t = (targetZ - selectedSeg.v1.y) / selectedSeg.dz;
+       const x = selectedSeg.v1.x + t * selectedSeg.dx;
+       return { 
+         centerX: x, 
+         centerZ: targetZ, 
+         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
+       };
+    } else {
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
+    }
+  }
+}
+
+function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial, deckColor, vertices, secX, secY }) {
   if (!stairEdge || !stairCalcs || !section) return null;
 
   const stairWidth = Math.max(12, stairCalcs.width || STAIR_RULES.maxStairWidth);
@@ -1256,23 +1335,9 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
   const color = getBoardColor();
   const { type } = getMaterialVisuals(deckMaterial, species);
 
-  // Compute rotation around Y axis based on edge direction
-  let rotY = 0;
-  if (stairEdge === 's') rotY = 0;
-  else if (stairEdge === 'n') rotY = Math.PI;
-  else if (stairEdge === 'e') rotY = -Math.PI / 2;
-  else if (stairEdge === 'w') rotY = Math.PI / 2;
-
   // Retrieve current visual offset of the stairs
   const offset = getSubObjectOffset(section, 'stairs');
-  let centerX, centerZ;
-  if (stairEdge === 's' || stairEdge === 'n') {
-    centerX = offset + stairWidth / 2;
-    centerZ = stairEdge === 's' ? depth : 0;
-  } else { // 'e' or 'w'
-    centerX = stairEdge === 'e' ? width : 0;
-    centerZ = offset + stairWidth / 2;
-  }
+  const { centerX, centerZ, rotY } = getEdgeTransform(vertices, secX, secY, stairEdge, offset, stairWidth, width, depth);
 
   // Treads local coordinates (X is centered, Z runs forward 0 -> totalRun)
   const treads = [];
@@ -1379,7 +1444,7 @@ function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMat
   );
 }
 
-function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, deckColor, postSize, height: rawHeight }) {
+function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMaterial, deckColor, postSize, height: rawHeight, vertices, secX, secY }) {
   if (!rampEdge || !rampCalcs || !section) return null;
 
   const safeHeight = typeof rawHeight === 'number' && !isNaN(rawHeight) && rawHeight > 0 ? rawHeight : 36;
@@ -1404,28 +1469,7 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
   const { type } = getMaterialVisuals(deckMaterial, species);
 
   const offset = getSubObjectOffset(section, 'ramp');
-  let startX, startZ, rotY;
-  if (rampEdge === 's') {
-    startX = offset;
-    startZ = depth;
-    rotY = 0;
-  } else if (rampEdge === 'n') {
-    startX = offset;
-    startZ = 0;
-    rotY = Math.PI;
-  } else if (rampEdge === 'e') {
-    startX = width;
-    startZ = offset;
-    rotY = -Math.PI / 2;
-  } else {
-    startX = 0;
-    startZ = offset;
-    rotY = Math.PI / 2;
-  }
-
-  // Position at top-center of the ramp (at the deck edge)
-  const groupX = (rampEdge === 's' || rampEdge === 'n') ? startX + rampWidth / 2 : startX;
-  const groupZ = (rampEdge === 'e' || rampEdge === 'w') ? startZ + rampWidth / 2 : startZ;
+  const { centerX: groupX, centerZ: groupZ, rotY } = getEdgeTransform(vertices, secX, secY, rampEdge, offset, rampWidth, width, depth);
 
   const postActualWidth = postSize === '6x6' ? 5.5 : 3.5;
   const stringerDepth = 11.25; // 2x12
