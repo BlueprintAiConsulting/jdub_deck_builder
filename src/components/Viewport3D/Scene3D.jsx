@@ -7,7 +7,7 @@ import { useDeckStore } from '../../store/deckStore';
 import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData';
 import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTables';
 import './Scene3D.css';
-import { getSubObjectOffset } from '../../utils/polygonUtils';
+import { getSubObjectOffset, isPointInPolygon } from '../../utils/polygonUtils';
 
 const IN = 1 / 12; // inches to scene units (feet)
 
@@ -1858,14 +1858,14 @@ export default function Scene3D() {
               )}
               {visibleLayers.framing && (
                 <>
-                  <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+                  <Joists positions={calcs.joists.positions} width={sec.width} depth={sec.depth} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} vertices={sec.vertices} secX={sec.x} secY={sec.y} />
                   <Blocking blocking={calcs.joists.blocking} joistSize={materials.joistSize} />
-                  <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} />
+                  <Beams beamPositions={calcs.beams.positions} width={sec.width} depth={sec.depth} beamConfig={materials.beamConfig} joistSize={materials.joistSize} joistOrientation={sec.joistOrientation} vertices={sec.vertices} secX={sec.x} secY={sec.y} />
                 </>
               )}
               {visibleLayers.foundation && (
                 <>
-                  <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} />
+                  <Posts posts={calcs.posts.posts} postSize={materials.postSize} joistSize={materials.joistSize} beamConfig={materials.beamConfig} vertices={sec.vertices} secX={sec.x} secY={sec.y} />
                   {heightAxis < 0 && (
                     <Footers 
                       beamPositions={calcs.beams.positions} 
@@ -1874,6 +1874,10 @@ export default function Scene3D() {
                       joistOrientation={sec.joistOrientation} 
                       footerWidth={sec.footerWidth}
                       height={sec.height}
+                      vertices={sec.vertices}
+                      secX={sec.x}
+                      secY={sec.y}
+                      posts={calcs.posts.posts}
                     />
                   )}
                 </>
@@ -1888,6 +1892,10 @@ export default function Scene3D() {
                     species={materials.species}
                     deckMaterial={materials.deckMaterial}
                     deckColor={materials.deckColor}
+                    vertices={sec.vertices}
+                    secX={sec.x}
+                    secY={sec.y}
+                    joistSize={materials.joistSize}
                   />
                   <Stairs 
                     section={sec}
