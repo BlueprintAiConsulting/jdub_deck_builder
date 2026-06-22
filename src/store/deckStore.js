@@ -879,7 +879,7 @@ export const useDeckStore = create((set, get) => ({
       }
     }
 
-    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing', 'pictureFrame', 'divider', 'deckingFlipped', 'deckingLayout', 'dividerCount', 'boardsPerDivider', 'deckBoardOverhang', 'deckBoardGap'];
+    const dimensionKeys = ['width', 'depth', 'height', 'ledgerAttached', 'joistOrientation', 'deckingOrientation', 'beamCount', 'beamSetback', 'beamPlies', 'beamSize', 'beamSpecies', 'beamGrade', 'postOffset', 'footerWidth', 'blocking', 'blockingSpacing', 'pictureFrame', 'divider', 'deckingFlipped', 'deckingLayout', 'dividerCount', 'boardsPerDivider', 'deckBoardOverhang', 'deckBoardGap', 'stairs', 'ramp'];
     const sectionUpdates = {};
     const materialUpdates = {};
 
@@ -899,6 +899,13 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.map((s) => {
       if (s.id !== state.selectedSectionId) return s;
       const updated = { ...s, ...sectionUpdates };
+      
+      // Flush manual structural overrides if dimensions change
+      if (updates.width !== undefined || updates.depth !== undefined) {
+        updated.customBeams = null;
+        updated.customBlocking = null;
+      }
+
       if (updated.ledgerAttached === true) {
         updated.railings = { ...updated.railings, n: false };
         if (updated.stairs && (updated.stairs === 'n' || updated.stairs.direction === 'n')) {

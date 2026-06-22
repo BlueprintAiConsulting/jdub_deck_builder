@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDeckStore } from '../../store/deckStore';
+import { generateDeckSpecsPDF } from '../../utils/pdfExport';
 import './BomBar.css';
 
 export default function BomBar({ isMobile, expanded: forceExpanded }) {
@@ -9,6 +10,12 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
   const materials = useDeckStore((s) => s.materials || { wasteFactor: 10 });
   const updateDeck = useDeckStore((s) => s.updateDeck);
   const [expanded, setExpanded] = useState(false);
+
+  const handleExportPDF = (e) => {
+    e.stopPropagation();
+    const state = useDeckStore.getState();
+    generateDeckSpecsPDF(state);
+  };
 
   const isExpanded = forceExpanded || expanded;
   const wasteFactor = materials.wasteFactor ?? 10;
@@ -50,6 +57,15 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
           <span className="badge badge--green font-mono">${grandTotalCost.toLocaleString(undefined, { maximumFractionDigits: 0 })} est.</span>
           <span className="bom-bar__sqft font-mono">{sqft} sq ft</span>
           <span className="bom-bar__total-cost font-mono" style={{ color: 'var(--accent-green)', fontWeight: 'bold', marginLeft: 'auto' }}>${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </div>
+
+        <div style={{ padding: '0 16px 12px', display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn btn--primary btn--sm" onClick={handleExportPDF}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export PDF Specs
+          </button>
         </div>
 
         <div className="bom-mobile__chips">
@@ -134,6 +150,16 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
         </div>
 
         <div className="bom-bar__right">
+          <button 
+            className="btn btn--secondary btn--sm" 
+            style={{ marginRight: '16px', display: 'flex', alignItems: 'center' }}
+            onClick={handleExportPDF}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export PDF Specs
+          </button>
           <span className="bom-bar__total-cost font-mono" style={{ color: 'var(--accent-green)', fontWeight: 'bold', marginRight: '16px', fontSize: '14px' }}>Total: ${grandTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           <span className="bom-bar__sqft font-mono">{sqft} sq ft</span>
           <button
