@@ -379,51 +379,6 @@ export function getMaterialVisuals(deckMaterial, species) {
   return { color, type };
 }
 
-export function getHorizontalIntersections(y, vertices) {
-  const intersections = [];
-  for (let i = 0; i < vertices.length; i++) {
-    const a = vertices[i];
-    const b = vertices[(i + 1) % vertices.length];
-    
-    const minY = Math.min(a.y, b.y);
-    const maxY = Math.max(a.y, b.y);
-    
-    if (y >= minY && y < maxY) {
-      const x = a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y);
-      intersections.push(x);
-    }
-  }
-  
-  const sorted = intersections.sort((a, b) => a - b);
-  const segments = [];
-  for (let i = 0; i < sorted.length - 1; i += 2) {
-    segments.push({ startX: sorted[i], endX: sorted[i + 1] });
-  }
-  return segments;
-}
-
-export function getVerticalIntersections(x, vertices) {
-  const intersections = [];
-  for (let i = 0; i < vertices.length; i++) {
-    const a = vertices[i];
-    const b = vertices[(i + 1) % vertices.length];
-    
-    const minX = Math.min(a.x, b.x);
-    const maxX = Math.max(a.x, b.x);
-    
-    if (x >= minX && x < maxX) {
-      const y = a.y + ((x - a.x) * (b.y - a.y)) / (b.x - a.x);
-      intersections.push(y);
-    }
-  }
-  
-  const sorted = intersections.sort((a, b) => a - b);
-  const segments = [];
-  for (let i = 0; i < sorted.length - 1; i += 2) {
-    segments.push({ startY: sorted[i], endY: sorted[i + 1] });
-  }
-  return segments;
-}
 
 function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, deckBoardSize, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth }) {
   const getBoardColor = () => {
@@ -1234,84 +1189,6 @@ function Railings({ railings, width, depth, height, species, deckMaterial, deckC
   );
 }
 
-function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objectWidth, fallbackWidth, fallbackDepth) {
-  if (!vertices || vertices.length < 3) {
-    let centerX, centerZ, rotY = 0;
-    if (targetEdge === 's' || targetEdge === 'n') {
-      centerX = offset + objectWidth / 2;
-      centerZ = targetEdge === 's' ? fallbackDepth : 0;
-      rotY = targetEdge === 's' ? 0 : Math.PI;
-    } else {
-      centerX = targetEdge === 'e' ? fallbackWidth : 0;
-      centerZ = offset + objectWidth / 2;
-      rotY = targetEdge === 'e' ? -Math.PI / 2 : Math.PI / 2;
-    }
-    return { centerX, centerZ, rotY };
-  }
-
-  const localVertices = vertices.map(v => ({ x: v.x - secX, y: v.y - secY }));
-  let targetSegments = [];
-
-  for (let i = 0; i < localVertices.length; i++) {
-    const v1 = localVertices[i];
-    const v2 = localVertices[(i + 1) % localVertices.length];
-    const dx = v2.x - v1.x;
-    const dz = v2.y - v1.y;
-    const nx = -dz;
-    const nz = dx;
-    let edgeLabel = '';
-    if (Math.abs(nx) > Math.abs(nz)) {
-      edgeLabel = nx < 0 ? 'w' : 'e';
-    } else {
-      edgeLabel = nz < 0 ? 'n' : 's';
-    }
-    if (edgeLabel === targetEdge) {
-      targetSegments.push({ v1, v2, dx, dz, len: Math.sqrt(dx*dx + dz*dz) });
-    }
-  }
-
-  if (targetSegments.length === 0) {
-     return getEdgeTransform(null, 0, 0, targetEdge, offset, objectWidth, fallbackWidth, fallbackDepth);
-  }
-
-  let selectedSeg = targetSegments[0];
-
-  if (targetEdge === 's' || targetEdge === 'n') {
-    const targetX = offset + objectWidth / 2;
-    selectedSeg = targetSegments.find(s => 
-      (targetX >= Math.min(s.v1.x, s.v2.x) && targetX <= Math.max(s.v1.x, s.v2.x))
-    ) || targetSegments[0];
-    
-    if (Math.abs(selectedSeg.dx) > 0.001) {
-       const t = (targetX - selectedSeg.v1.x) / selectedSeg.dx;
-       const z = selectedSeg.v1.y + t * selectedSeg.dz;
-       return { 
-         centerX: targetX, 
-         centerZ: z, 
-         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
-       };
-    } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
-    }
-  } else {
-    const targetZ = offset + objectWidth / 2;
-    selectedSeg = targetSegments.find(s => 
-      (targetZ >= Math.min(s.v1.y, s.v2.y) && targetZ <= Math.max(s.v1.y, s.v2.y))
-    ) || targetSegments[0];
-
-    if (Math.abs(selectedSeg.dz) > 0.001) {
-       const t = (targetZ - selectedSeg.v1.y) / selectedSeg.dz;
-       const x = selectedSeg.v1.x + t * selectedSeg.dx;
-       return { 
-         centerX: x, 
-         centerZ: targetZ, 
-         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
-       };
-    } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
-    }
-  }
-}
 
 function Stairs({ section, stairEdge, stairCalcs, width, depth, species, deckMaterial, deckColor, vertices, secX, secY }) {
   if (!stairEdge || !stairCalcs || !section) return null;

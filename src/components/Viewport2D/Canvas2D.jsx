@@ -13,8 +13,7 @@ import {
   SOIL_CAPACITIES 
 } from '../Materials/materialData.js';
 import { drawDimensionLine } from '../../utils/blueprintRenderer.js';
-import {
-  isPointInPolygon,
+import { isPointInPolygon, getHorizontalIntersections, getVerticalIntersections, getEdgeTransform,
   hitTestSection,
   getDistanceToSegment,
   findEdgeSplitIndex,
@@ -1300,17 +1299,34 @@ export default function Canvas2D({ isMobile }) {
       if (visibleLayers.framing) {
         ctx.strokeStyle = legendColors.joists;
         ctx.lineWidth = 1.5;
+        
+        const localVertices = (sec.vertices && sec.vertices.length >= 3) ? sec.vertices.map(v => ({ x: v.x - sec.x, y: v.y - sec.y })) : null;
+
         if (joistsVertical) {
           calcs.joists.positions.forEach((xIn) => {
             const x = sx + xIn * S;
             if (x > sx + sw + 1) return;
-            ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
+            if (localVertices) {
+               const spans = getVerticalIntersections(xIn, localVertices);
+               spans.forEach(span => {
+                 ctx.beginPath(); ctx.moveTo(x, sy + span.minY * S); ctx.lineTo(x, sy + span.maxY * S); ctx.stroke();
+               });
+            } else {
+               ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy + sd); ctx.stroke();
+            }
           });
         } else {
           calcs.joists.positions.forEach((yIn) => {
             const y = sy + yIn * S;
             if (y > sy + sd + 1) return;
-            ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx + sw, y); ctx.stroke();
+            if (localVertices) {
+               const spans = getHorizontalIntersections(yIn, localVertices);
+               spans.forEach(span => {
+                 ctx.beginPath(); ctx.moveTo(sx + span.minX * S, y); ctx.lineTo(sx + span.maxX * S, y); ctx.stroke();
+               });
+            } else {
+               ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx + sw, y); ctx.stroke();
+            }
           });
         }
 
@@ -1319,6 +1335,10 @@ export default function Canvas2D({ isMobile }) {
           ctx.strokeStyle = legendColors.joists;
           ctx.lineWidth = 1.5;
           calcs.joists.blocking.segments.forEach((seg) => {
+            const midX = (seg.x1 + seg.x2) / 2;
+            const midY = (seg.y1 + seg.y2) / 2;
+            if (localVertices && !isPointInPolygon(midX, midY, localVertices)) return;
+            
             ctx.beginPath();
             ctx.moveTo(sx + seg.x1 * S, sy + seg.y1 * S);
             ctx.lineTo(sx + seg.x2 * S, sy + seg.y2 * S);
@@ -1329,22 +1349,40 @@ export default function Canvas2D({ isMobile }) {
         // Beams
         ctx.strokeStyle = legendColors.beams;
         ctx.lineWidth = 3;
-        if (joistsVertical) {
+        const localV = (sec.vertices && sec.vertices.length >= 3) ? sec.vertices.map(v => ({ x: v.x - sec.x, y: v.y - sec.y })) : null;
+
+        if (joistsVertical) { // Beams are horizontal
           calcs.beams.positions.forEach((yIn) => {
             const y = sy + yIn * S;
-            ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
+            if (localV) {
+               const spans = getHorizontalIntersections(yIn, localV);
+               spans.forEach(span => {
+                 ctx.beginPath(); ctx.moveTo(sx + span.minX * S - 6, y); ctx.lineTo(sx + span.maxX * S + 6, y); ctx.stroke();
+               });
+            } else {
+               ctx.beginPath(); ctx.moveTo(sx - 6, y); ctx.lineTo(sx + sw + 6, y); ctx.stroke();
+            }
           });
-        } else {
+        } else { // Beams are vertical
           calcs.beams.positions.forEach((xIn) => {
             const x = sx + xIn * S;
-            ctx.beginPath(); ctx.moveTo(x, sy - 6); ctx.lineTo(x, sy + sd - 6); ctx.stroke();
+            if (localV) {
+               const spans = getVerticalIntersections(xIn, localV);
+               spans.forEach(span => {
+                 ctx.beginPath(); ctx.moveTo(x, sy + span.minY * S - 6); ctx.lineTo(x, sy + span.maxY * S + 6); ctx.stroke();
+               });
+            } else {
+               ctx.beginPath(); ctx.moveTo(x, sy - 6); ctx.lineTo(x, sy + sd - 6); ctx.stroke();
+            }
           });
         }
       }
 
       // Posts
       if (visibleLayers.foundation) {
+        const localV = (sec.vertices && sec.vertices.length >= 3) ? sec.vertices.map(v => ({ x: v.x - sec.x, y: v.y - sec.y })) : null;
         calcs.posts.posts.forEach((post) => {
+          if (localV && !isPointInPolygon(post.x, post.y, localV)) return;
           const px = sx + post.x * S, py = sy + post.y * S;
           ctx.fillStyle = legendColors.posts + '33'; // ~20% alpha
           ctx.beginPath(); ctx.arc(px, py, 10, 0, Math.PI * 2); ctx.fill();
@@ -1355,17 +1393,39 @@ export default function Canvas2D({ isMobile }) {
 
       // Railings
       if (visibleLayers.accessories) {
-        Object.entries(sec.railings).forEach(([edge, on]) => {
-          if (!on) return;
-          ctx.strokeStyle = legendColors.railings;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
-          if (edge === 's') { ctx.moveTo(sx, sy + sd); ctx.lineTo(sx + sw, sy + sd); }
-          if (edge === 'w') { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + sd); }
-          if (edge === 'e') { ctx.moveTo(sx + sw, sy); ctx.lineTo(sx + sw, sy + sd); }
-          ctx.stroke();
-        });
+        ctx.strokeStyle = legendColors.railings;
+        ctx.lineWidth = 3;
+        
+        if (sec.vertices && sec.vertices.length >= 3) {
+          // Polygon railings
+          for (let i = 0; i < sec.vertices.length; i++) {
+             const v1 = sec.vertices[i];
+             const v2 = sec.vertices[(i+1)%sec.vertices.length];
+             const dx = v2.x - v1.x;
+             const dz = v2.y - v1.y;
+             let edgeLabel = '';
+             if (Math.abs(-dz) > Math.abs(dx)) { edgeLabel = -dz < 0 ? 'w' : 'e'; } 
+             else { edgeLabel = dx < 0 ? 'n' : 's'; }
+             
+             if (sec.railings[edgeLabel]) {
+               ctx.beginPath();
+               ctx.moveTo(v1.x * S + ox, v1.y * S + oy);
+               ctx.lineTo(v2.x * S + ox, v2.y * S + oy);
+               ctx.stroke();
+             }
+          }
+        } else {
+          // Bounding box fallback
+          Object.entries(sec.railings).forEach(([edge, on]) => {
+            if (!on) return;
+            ctx.beginPath();
+            if (edge === 'n') { ctx.moveTo(sx, sy); ctx.lineTo(sx + sw, sy); }
+            if (edge === 's') { ctx.moveTo(sx, sy + sd); ctx.lineTo(sx + sw, sy + sd); }
+            if (edge === 'w') { ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + sd); }
+            if (edge === 'e') { ctx.moveTo(sx + sw, sy); ctx.lineTo(sx + sw, sy + sd); }
+            ctx.stroke();
+          });
+        }
       }
 
       // Stairs
@@ -1374,46 +1434,35 @@ export default function Canvas2D({ isMobile }) {
         const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
         const stairW = st.width * S;
         const stairD = st.totalRun * S;
+        const offset = getSubObjectOffset(sec, 'stairs');
         
         const isStairsSelected = isSelected && selectedSubObjectType === 'stairs';
         ctx.fillStyle = isStairsSelected 
           ? (isLightTheme ? 'rgba(29, 78, 216, 0.1)' : 'rgba(59, 130, 246, 0.15)')
-          : legendColors.stairs + '26'; // ~15% alpha
-        ctx.strokeStyle = isStairsSelected 
-          ? '#1d4ed8' 
-          : legendColors.stairs;
+          : legendColors.stairs + '26';
+        ctx.strokeStyle = isStairsSelected ? '#1d4ed8' : legendColors.stairs;
         ctx.lineWidth = isStairsSelected ? 3.0 : 1.5;
         
-        let stX, stY;
-        const offset = getSubObjectOffset(sec, 'stairs');
-        if (stairDir === 's') {
-          stX = sx + offset * S;
-          stY = sy + sd;
-        } else if (stairDir === 'n') {
-          stX = sx + offset * S;
-          stY = sy - stairD;
-        } else if (stairDir === 'e') {
-          stX = sx + sw;
-          stY = sy + offset * S;
-        } else {
-          stX = sx - stairD;
-          stY = sy + offset * S;
-        }
+        const { centerX, centerZ, rotY } = getEdgeTransform(sec.vertices, sec.x, sec.y, stairDir, offset, st.width, sec.width, sec.depth);
+        const cx = (centerX + sec.x) * S + ox;
+        const cy = (centerZ + sec.y) * S + oy;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-rotY); // -rotY because canvas +Y is down, 3D +Z is out
+
+        ctx.fillRect(-stairW / 2, 0, stairW, stairD);
+        ctx.strokeRect(-stairW / 2, 0, stairW, stairD);
         
-        const isVert = stairDir === 'n' || stairDir === 's';
-        const sW = isVert ? stairW : stairD;
-        const sD = isVert ? stairD : stairW;
-        ctx.fillRect(stX, stY, sW, sD);
-        ctx.strokeRect(stX, stY, sW, sD);
-        // Treads
         const treadCount = st.numTreads;
         for (let i = 1; i < treadCount; i++) {
           const frac = i / treadCount;
           ctx.beginPath();
-          if (isVert) { ctx.moveTo(stX, stY + sD * frac); ctx.lineTo(stX + sW, stY + sD * frac); }
-          else { ctx.moveTo(stX + sW * frac, stY); ctx.lineTo(stX + sW * frac, stY + sD); }
+          ctx.moveTo(-stairW / 2, stairD * frac);
+          ctx.lineTo(stairW / 2, stairD * frac);
           ctx.stroke();
         }
+        ctx.restore();
       }
 
       // Ramps

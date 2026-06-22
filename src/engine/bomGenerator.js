@@ -4,6 +4,7 @@
  */
 import { LUMBER_ACTUAL, BOARD_LENGTHS } from './spanTables.js';
 import { polygonArea } from '../utils/geometry.js';
+import { getHorizontalIntersections, getVerticalIntersections, isPointInPolygon } from '../utils/polygonUtils.js';
 import { DECK_MATERIAL_OPTIONS, DECK_COLOR_OPTIONS } from '../components/Materials/materialData.js';
 
 /** Find the optimal board length to minimize waste */
@@ -110,14 +111,36 @@ export function generateBOM(config, calcs) {
   const wasteMultiplier = 1 + (config.wasteFactor ?? 10) / 100;
 
   // --- Joists ---
-  const joistBoardLen = optimalBoardLength(joists.length);
+  const isVerticalJoists = joistOrientation === 'vertical';
+  let totalJoistLengthIn = 0;
+  
+  const localV = config.vertices ? config.vertices.map(v => ({ x: v.x - (config.x || 0), y: v.y - (config.y || 0) })) : null;
+  if (localV && localV.length >= 3) {
+    if (isVerticalJoists) {
+      joists.positions.forEach(x => {
+        const spans = getVerticalIntersections(x, localV);
+        spans.forEach(span => { totalJoistLengthIn += (span.maxY - span.minY); });
+      });
+    } else {
+      joists.positions.forEach(y => {
+        const spans = getHorizontalIntersections(y, localV);
+        spans.forEach(span => { totalJoistLengthIn += (span.maxX - span.minX); });
+      });
+    }
+  } else {
+    totalJoistLengthIn = joists.count * joists.length;
+  }
+  
+  const joistBoardsNeeded = Math.ceil(totalJoistLengthIn / 144); // Assume 12' boards (144")
+  const joistBoardLen = 12; // Standardizing to 12' boards for accurate costing of linear feet
+  
   const joistItem = {
     id: 'joists',
     category: 'Framing',
     description: `${config.joistSize} × ${joistBoardLen}' Joist`,
     size: config.joistSize,
     length: joistBoardLen,
-    quantity: Math.ceil(joists.count * wasteMultiplier),
+    quantity: Math.ceil(joistBoardsNeeded * wasteMultiplier),
     unit: 'ea',
     material: config.species,
   };
@@ -125,16 +148,27 @@ export function generateBOM(config, calcs) {
   joistItem.totalPrice = joistItem.unitPrice * joistItem.quantity;
   items.push(joistItem);
 
-  // --- Rim Joists (2 sides) ---
-  const rimSpan = joistOrientation === 'horizontal' ? depth : width;
-  const rimLen = optimalBoardLength(rimSpan);
+  // --- Rim Joists (Perimeter) ---
+  let perimeterLenIn = 0;
+  if (config.vertices && config.vertices.length >= 3) {
+    for (let i = 0; i < config.vertices.length; i++) {
+       const v1 = config.vertices[i];
+       const v2 = config.vertices[(i+1)%config.vertices.length];
+       perimeterLenIn += Math.sqrt(Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2));
+    }
+  } else {
+    perimeterLenIn = 2 * (width + depth);
+  }
+  
+  const rimBoardsNeeded = Math.ceil(perimeterLenIn / 144);
+  const rimLen = 12;
   const rimItem = {
     id: 'rim-joists',
     category: 'Framing',
     description: `${config.joistSize} × ${rimLen}' Rim Joist`,
     size: config.joistSize,
     length: rimLen,
-    quantity: Math.ceil(2 * wasteMultiplier),
+    quantity: Math.ceil(rimBoardsNeeded * wasteMultiplier),
     unit: 'ea',
     material: config.species,
   };
@@ -144,11 +178,19 @@ export function generateBOM(config, calcs) {
 
   // --- Blocking ---
   if (joists.blocking && joists.blocking.enabled && joists.blocking.segments && joists.blocking.segments.length > 0) {
-    const segmentLengthIn = joists.spacing || 16;
-    const totalSegments = joists.blocking.segments.length;
+    let totalBlockingLenIn = 0;
+    joists.blocking.segments.forEach(seg => {
+      // In 2D/3D we can actually check if blocking segments fall inside the polygon, but the BOM estimates linear feet roughly.
+      // Better yet, just sum the lengths of segments whose midpoint is inside the polygon!
+      const midX = (seg.x1 + seg.x2) / 2;
+      const midY = (seg.y1 + seg.y2) / 2;
+      if (!config.vertices || config.vertices.length < 3 || isPointInPolygon(midX, midY, localV)) {
+         totalBlockingLenIn += Math.sqrt(Math.pow(seg.x2 - seg.x1, 2) + Math.pow(seg.y2 - seg.y1, 2));
+      }
+    });
+    
     const blockingBoardLen = 12; // 12' boards as standard for blocking
-    const piecesPerBoard = Math.floor((blockingBoardLen * 12) / segmentLengthIn);
-    const boardsNeeded = piecesPerBoard > 0 ? Math.ceil(totalSegments / piecesPerBoard) : 0;
+    const boardsNeeded = Math.ceil(totalBlockingLenIn / 144);
     
     if (boardsNeeded > 0) {
       const blockingItem = {
@@ -168,10 +210,26 @@ export function generateBOM(config, calcs) {
   }
 
   // --- Beams ---
-  // approximate for non-rectangular — bounding box layout
-  const beamSpan = joistOrientation === 'horizontal' ? depth : width;
-  const beamLen = optimalBoardLength(beamSpan);
+  let totalBeamLengthIn = 0;
+  if (localV && localV.length >= 3) {
+    if (isVerticalJoists) { // Beams run horizontal
+      beams.positions.forEach(y => {
+        const spans = getHorizontalIntersections(y, localV);
+        spans.forEach(span => { totalBeamLengthIn += (span.maxX - span.minX); });
+      });
+    } else { // Beams run vertical
+      beams.positions.forEach(x => {
+        const spans = getVerticalIntersections(x, localV);
+        spans.forEach(span => { totalBeamLengthIn += (span.maxY - span.minY); });
+      });
+    }
+  } else {
+    totalBeamLengthIn = beams.count * beams.length;
+  }
+  
   const beamPly = parseInt(beams.config.split('-')[0]) || 2;
+  const beamBoardsNeeded = Math.ceil(totalBeamLengthIn / 144) * beamPly;
+  const beamLen = 12;
   const beamSize = beams.config.split('-').slice(1).join('-') || '2x10';
   const beamItem = {
     id: 'beams',
@@ -179,7 +237,7 @@ export function generateBOM(config, calcs) {
     description: `${beamSize} × ${beamLen}' Beam Ply`,
     size: beamSize,
     length: beamLen,
-    quantity: Math.ceil(beams.count * beamPly * wasteMultiplier),
+    quantity: Math.ceil(beamBoardsNeeded * wasteMultiplier),
     unit: 'ea',
     material: config.species,
   };
@@ -188,21 +246,29 @@ export function generateBOM(config, calcs) {
   items.push(beamItem);
 
   // --- Posts ---
-  // approximate for non-rectangular — bounding box layout
-  const postLen = optimalBoardLength(height);
-  const postItem = {
-    id: 'posts',
-    category: 'Framing',
-    description: `${config.postSize} × ${postLen}' Post`,
-    size: config.postSize,
-    length: postLen,
-    quantity: posts.posts.length, // posts are structural elements, ordered exact count
-    unit: 'ea',
-    material: config.species,
-  };
-  postItem.unitPrice = estimateUnitPrice(postItem, config.species, config.deckMaterial);
-  postItem.totalPrice = postItem.unitPrice * postItem.quantity;
-  items.push(postItem);
+  let validPostCount = 0;
+  posts.posts.forEach(post => {
+    if (!config.vertices || config.vertices.length < 3 || isPointInPolygon(post.x, post.y, localV)) {
+      validPostCount++;
+    }
+  });
+  
+  if (validPostCount > 0) {
+    const postLen = optimalBoardLength(height);
+    const postItem = {
+      id: 'posts',
+      category: 'Framing',
+      description: `${config.postSize} × ${postLen}' Post`,
+      size: config.postSize,
+      length: postLen,
+      quantity: validPostCount, // exact count, no waste multiplier needed for posts
+      unit: 'ea',
+      material: config.species,
+    };
+    postItem.unitPrice = estimateUnitPrice(postItem, config.species, config.deckMaterial);
+    postItem.totalPrice = postItem.unitPrice * postItem.quantity;
+    items.push(postItem);
+  }
 
   // --- Deck Boards ---
   const deckBoardWidth = LUMBER_ACTUAL[config.deckBoardSize || '5/4x6']?.depth || 5.5;
