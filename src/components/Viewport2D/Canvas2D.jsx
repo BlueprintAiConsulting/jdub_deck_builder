@@ -1283,14 +1283,32 @@ export default function Canvas2D({ isMobile }) {
         ctx.fillStyle = isLightTheme ? '#cbd5e1' : '#334155';
         const wallThickness = 6 * S; // 6 inches thick
         const wallExtend = 24 * S; // extend 24 inches on each side
-        ctx.fillRect(sx - wallExtend, sy - wallThickness, sw + wallExtend * 2, wallThickness);
         
-        ctx.fillStyle = isLightTheme ? '#475569' : '#94a3b8';
-        ctx.font = '600 12px Inter';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('HOUSE WALL', sx + sw / 2, sy - wallThickness / 2);
-        ctx.textBaseline = 'alphabetic';
+        const localV = (sec.vertices && sec.vertices.length >= 3) ? sec.vertices.map(v => ({ x: v.x - sec.x, y: v.y - sec.y })) : null;
+        if (localV) {
+           const spans = getHorizontalIntersections(0.1, localV); // check top edge
+           spans.forEach(span => {
+             const spanX = sx + span.minX * S;
+             const spanW = (span.maxX - span.minX) * S;
+             ctx.fillRect(spanX - wallExtend, sy - wallThickness, spanW + wallExtend * 2, wallThickness);
+             
+             ctx.fillStyle = isLightTheme ? '#475569' : '#94a3b8';
+             ctx.font = '600 12px Inter';
+             ctx.textAlign = 'center';
+             ctx.textBaseline = 'middle';
+             ctx.fillText('HOUSE WALL', spanX + spanW / 2, sy - wallThickness / 2);
+             ctx.textBaseline = 'alphabetic';
+             ctx.fillStyle = isLightTheme ? '#cbd5e1' : '#334155'; // reset for next span
+           });
+        } else {
+           ctx.fillRect(sx - wallExtend, sy - wallThickness, sw + wallExtend * 2, wallThickness);
+           ctx.fillStyle = isLightTheme ? '#475569' : '#94a3b8';
+           ctx.font = '600 12px Inter';
+           ctx.textAlign = 'center';
+           ctx.textBaseline = 'middle';
+           ctx.fillText('HOUSE WALL', sx + sw / 2, sy - wallThickness / 2);
+           ctx.textBaseline = 'alphabetic';
+        }
       }
 
       const joistsVertical = (sec.joistOrientation !== 'horizontal');

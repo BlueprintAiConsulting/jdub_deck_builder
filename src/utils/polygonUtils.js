@@ -24,6 +24,38 @@ export function isPointInPolygon(px, py, vertices) {
 /**
  * Hit-test to find which section was clicked under point (mx, my) in canvas coordinates.
  */
+
+export function getAccessoryPolygon(sec, accessoryDir, width, depth, offset, align = 'center') {
+  if (offset == null) {
+    const isVert = (accessoryDir === 'n' || accessoryDir === 's');
+    const edgeLen = isVert ? sec.width : sec.depth;
+    if (align === 'left') offset = 0;
+    else if (align === 'right') offset = edgeLen - width;
+    else offset = (edgeLen / 2) - (width / 2);
+  }
+  const { centerX, centerZ, rotY } = getEdgeTransform(
+    sec.vertices, sec.x, sec.y, accessoryDir, offset, width, sec.width, sec.depth
+  );
+  
+  const cx = centerX + sec.x;
+  const cy = centerZ + sec.y;
+  const r = -rotY;
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  
+  const points = [
+    { x: -width/2, y: 0 },
+    { x: width/2, y: 0 },
+    { x: width/2, y: depth },
+    { x: -width/2, y: depth }
+  ];
+  
+  return points.map(p => ({
+    x: cx + p.x * cos - p.y * sin,
+    y: cy + p.x * sin + p.y * cos
+  }));
+}
+
 export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch, sectionCalcs = {}) {
   const ox = (cw / 2) + panX, oy = (ch / 2) + panY;
   const lx = (mx - ox) / S;
@@ -33,96 +65,26 @@ export function hitTestSection(mx, my, sections, S, panX, panY, cw, ch, sectionC
     // 1. Check main boundary
     if (isPointInPolygon(lx, ly, sec.vertices)) return sec.id;
     
-    // 2. Check attached stairs bounding box
+    // 2. Check attached stairs
     const calcs = sectionCalcs[sec.id];
     if (sec.stairs && calcs && calcs.stairs) {
       const st = calcs.stairs;
       const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
-      const stairW = st.width;
-      const stairD = st.totalRun;
-      let stX, stY;
-      const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
       const offset = (typeof sec.stairs === 'object' && typeof sec.stairs.offset === 'number') ? sec.stairs.offset : null;
-      
-      if (stairDir === 's') {
-        if (offset !== null) stX = sec.x + offset;
-        else if (align === 'left') stX = sec.x;
-        else if (align === 'right') stX = sec.x + sec.width - stairW;
-        else stX = sec.x + sec.width / 2 - stairW / 2;
-        stY = sec.y + sec.depth;
-      } else if (stairDir === 'n') {
-        if (offset !== null) stX = sec.x + offset;
-        else if (align === 'left') stX = sec.x;
-        else if (align === 'right') stX = sec.x + sec.width - stairW;
-        else stX = sec.x + sec.width / 2 - stairW / 2;
-        stY = sec.y - stairD;
-      } else if (stairDir === 'e') {
-        stX = sec.x + sec.width;
-        if (offset !== null) stY = sec.y + offset;
-        else if (align === 'left') stY = sec.y;
-        else if (align === 'right') stY = sec.y + sec.depth - stairW;
-        else stY = sec.y + sec.depth / 2 - stairW / 2;
-      } else {
-        stX = sec.x - stairD;
-        if (offset !== null) stY = sec.y + offset;
-        else if (align === 'left') stY = sec.y;
-        else if (align === 'right') stY = sec.y + sec.depth - stairW;
-        else stY = sec.y + sec.depth / 2 - stairW / 2;
-      }
-      
-      const isVert = stairDir === 'n' || stairDir === 's';
-      const sW = isVert ? stairW : stairD;
-      const sD = isVert ? stairD : stairW;
-      
-      if (lx >= stX && lx <= stX + sW && ly >= stY && ly <= stY + sD) {
-        return sec.id;
-      }
+      const align = (typeof sec.stairs === 'object' && sec.stairs.align) ? sec.stairs.align : 'center';
+      const poly = getAccessoryPolygon(sec, stairDir, st.width, st.totalRun, offset, align);
+      if (isPointInPolygon(lx, ly, poly)) return sec.id;
     }
     
-    // 3. Check attached ramp bounding box
+    // 3. Check attached ramp
     if (sec.ramp && calcs && calcs.ramp) {
       const rm = calcs.ramp;
       const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
-      const rampW = rm.width;
       const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
-      const rampD = footprintRun;
-      let rmX, rmY;
-      const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
       const offset = (typeof sec.ramp === 'object' && typeof sec.ramp.offset === 'number') ? sec.ramp.offset : null;
-      
-      if (rampDir === 's') {
-        if (offset !== null) rmX = sec.x + offset;
-        else if (align === 'left') rmX = sec.x;
-        else if (align === 'right') rmX = sec.x + sec.width - rampW;
-        else rmX = sec.x + sec.width / 2 - rampW / 2;
-        rmY = sec.y + sec.depth;
-      } else if (rampDir === 'n') {
-        if (offset !== null) rmX = sec.x + offset;
-        else if (align === 'left') rmX = sec.x;
-        else if (align === 'right') rmX = sec.x + sec.width - rampW;
-        else rmX = sec.x + sec.width / 2 - rampW / 2;
-        rmY = sec.y - rampD;
-      } else if (rampDir === 'e') {
-        rmX = sec.x + sec.width;
-        if (offset !== null) rmY = sec.y + offset;
-        else if (align === 'left') rmY = sec.y;
-        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
-        else rmY = sec.y + sec.depth / 2 - rampW / 2;
-      } else {
-        rmX = sec.x - rampD;
-        if (offset !== null) rmY = sec.y + offset;
-        else if (align === 'left') rmY = sec.y;
-        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
-        else rmY = sec.y + sec.depth / 2 - rampW / 2;
-      }
-      
-      const isVert = rampDir === 'n' || rampDir === 's';
-      const rW = isVert ? rampW : rampD;
-      const rD = isVert ? rampD : rampW;
-      
-      if (lx >= rmX && lx <= rmX + rW && ly >= rmY && ly <= rmY + rD) {
-        return sec.id;
-      }
+      const align = (typeof sec.ramp === 'object' && sec.ramp.align) ? sec.ramp.align : 'center';
+      const poly = getAccessoryPolygon(sec, rampDir, rm.width, footprintRun, offset, align);
+      if (isPointInPolygon(lx, ly, poly)) return sec.id;
     }
   }
   return null;
@@ -144,91 +106,21 @@ export function hitTestSubObject(mx, my, sections, S, panX, panY, cw, ch, sectio
     if (sec.stairs && calcs && calcs.stairs) {
       const st = calcs.stairs;
       const stairDir = typeof sec.stairs === 'string' ? sec.stairs : (sec.stairs.direction || 's');
-      const stairW = st.width;
-      const stairD = st.totalRun;
-      let stX, stY;
-      const align = (typeof sec.stairs === 'object' && sec.stairs?.align) || 'center';
       const offset = (typeof sec.stairs === 'object' && typeof sec.stairs.offset === 'number') ? sec.stairs.offset : null;
-      
-      if (stairDir === 's') {
-        if (offset !== null) stX = sec.x + offset;
-        else if (align === 'left') stX = sec.x;
-        else if (align === 'right') stX = sec.x + sec.width - stairW;
-        else stX = sec.x + sec.width / 2 - stairW / 2;
-        stY = sec.y + sec.depth;
-      } else if (stairDir === 'n') {
-        if (offset !== null) stX = sec.x + offset;
-        else if (align === 'left') stX = sec.x;
-        else if (align === 'right') stX = sec.x + sec.width - stairW;
-        else stX = sec.x + sec.width / 2 - stairW / 2;
-        stY = sec.y - stairD;
-      } else if (stairDir === 'e') {
-        stX = sec.x + sec.width;
-        if (offset !== null) stY = sec.y + offset;
-        else if (align === 'left') stY = sec.y;
-        else if (align === 'right') stY = sec.y + sec.depth - stairW;
-        else stY = sec.y + sec.depth / 2 - stairW / 2;
-      } else {
-        stX = sec.x - stairD;
-        if (offset !== null) stY = sec.y + offset;
-        else if (align === 'left') stY = sec.y;
-        else if (align === 'right') stY = sec.y + sec.depth - stairW;
-        else stY = sec.y + sec.depth / 2 - stairW / 2;
-      }
-      
-      const isVert = stairDir === 'n' || stairDir === 's';
-      const sW = isVert ? stairW : stairD;
-      const sD = isVert ? stairD : stairW;
-      
-      if (lx >= stX && lx <= stX + sW && ly >= stY && ly <= stY + sD) {
-        return { id: sec.id, type: 'stairs' };
-      }
+      const align = (typeof sec.stairs === 'object' && sec.stairs.align) ? sec.stairs.align : 'center';
+      const poly = getAccessoryPolygon(sec, stairDir, st.width, st.totalRun, offset, align);
+      if (isPointInPolygon(lx, ly, poly)) return { id: sec.id, type: 'stairs' };
     }
     
     // Check attached ramp next
     if (sec.ramp && calcs && calcs.ramp) {
       const rm = calcs.ramp;
       const rampDir = typeof sec.ramp === 'string' ? sec.ramp : (sec.ramp.direction || 's');
-      const rampW = rm.width;
       const footprintRun = rm.run + 60 * (rm.intermediateLandings || 0);
-      const rampD = footprintRun;
-      let rmX, rmY;
-      const align = (typeof sec.ramp === 'object' && sec.ramp?.align) || 'center';
       const offset = (typeof sec.ramp === 'object' && typeof sec.ramp.offset === 'number') ? sec.ramp.offset : null;
-      
-      if (rampDir === 's') {
-        if (offset !== null) rmX = sec.x + offset;
-        else if (align === 'left') rmX = sec.x;
-        else if (align === 'right') rmX = sec.x + sec.width - rampW;
-        else rmX = sec.x + sec.width / 2 - rampW / 2;
-        rmY = sec.y + sec.depth;
-      } else if (rampDir === 'n') {
-        if (offset !== null) rmX = sec.x + offset;
-        else if (align === 'left') rmX = sec.x;
-        else if (align === 'right') rmX = sec.x + sec.width - rampW;
-        else rmX = sec.x + sec.width / 2 - rampW / 2;
-        rmY = sec.y - rampD;
-      } else if (rampDir === 'e') {
-        rmX = sec.x + sec.width;
-        if (offset !== null) rmY = sec.y + offset;
-        else if (align === 'left') rmY = sec.y;
-        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
-        else rmY = sec.y + sec.depth / 2 - rampW / 2;
-      } else {
-        rmX = sec.x - rampD;
-        if (offset !== null) rmY = sec.y + offset;
-        else if (align === 'left') rmY = sec.y;
-        else if (align === 'right') rmY = sec.y + sec.depth - rampW;
-        else rmY = sec.y + sec.depth / 2 - rampW / 2;
-      }
-      
-      const isVert = rampDir === 'n' || rampDir === 's';
-      const rW = isVert ? rampW : rampD;
-      const rD = isVert ? rampD : rampW;
-      
-      if (lx >= rmX && lx <= rmX + rW && ly >= rmY && ly <= rmY + rD) {
-        return { id: sec.id, type: 'ramp' };
-      }
+      const align = (typeof sec.ramp === 'object' && sec.ramp.align) ? sec.ramp.align : 'center';
+      const poly = getAccessoryPolygon(sec, rampDir, rm.width, footprintRun, offset, align);
+      if (isPointInPolygon(lx, ly, poly)) return { id: sec.id, type: 'ramp' };
     }
     
     // Check if point is inside or close to any boundary edge of the deck section
@@ -249,72 +141,15 @@ export function hitTestSubObject(mx, my, sections, S, panX, panY, cw, ch, sectio
       // Check posts (tolerance: 12 inches)
       if (calcs && calcs.posts && calcs.posts.posts) {
         for (const post of calcs.posts.posts) {
-          const px = sec.x + post.x;
-          const py = sec.y + post.y;
-          const dist = Math.sqrt((lx - px) ** 2 + (ly - py) ** 2);
-          if (dist < 12) {
-            return { id: sec.id, type: 'post' };
+          const dx = lx - (sec.x + post.x);
+          const dy = ly - (sec.y + post.y);
+          if (Math.sqrt(dx * dx + dy * dy) <= 12) {
+            return { id: sec.id, type: 'post', postId: post.id };
           }
         }
       }
-
-      // Check beams (tolerance: 10 inches)
-      if (calcs && calcs.beams && calcs.beams.positions) {
-        const joistsVertical = (sec.joistOrientation !== 'horizontal');
-        if (joistsVertical) {
-          for (const yIn of calcs.beams.positions) {
-            const by = sec.y + yIn;
-            if (lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - by) < 10) {
-              return { id: sec.id, type: 'beam' };
-            }
-          }
-        } else {
-          for (const xIn of calcs.beams.positions) {
-            const bx = sec.x + xIn;
-            if (ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - bx) < 10) {
-              return { id: sec.id, type: 'beam' };
-            }
-          }
-        }
-      }
-
-      // Check railings (tolerance: 12 inches)
-      if (sec.railings) {
-        if (sec.railings.n && lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - sec.y) < 12) {
-          return { id: sec.id, type: 'railing-n' };
-        }
-        if (sec.railings.s && lx >= sec.x - 12 && lx <= sec.x + sec.width + 12 && Math.abs(ly - (sec.y + sec.depth)) < 12) {
-          return { id: sec.id, type: 'railing-s' };
-        }
-        if (sec.railings.e && ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - (sec.x + sec.width)) < 12) {
-          return { id: sec.id, type: 'railing-e' };
-        }
-        if (sec.railings.w && ly >= sec.y - 12 && ly <= sec.y + sec.depth + 12 && Math.abs(lx - sec.x) < 12) {
-          return { id: sec.id, type: 'railing-w' };
-        }
-      }
-
-      // Check joists (tolerance: 6 inches)
-      if (calcs && calcs.joists && calcs.joists.positions) {
-        const joistsVertical = (sec.joistOrientation !== 'horizontal');
-        if (joistsVertical) {
-          for (const xIn of calcs.joists.positions) {
-            const jx = sec.x + xIn;
-            if (ly >= sec.y - 8 && ly <= sec.y + sec.depth + 8 && Math.abs(lx - jx) < 6) {
-              return { id: sec.id, type: 'joist' };
-            }
-          }
-        } else {
-          for (const yIn of calcs.joists.positions) {
-            const jy = sec.y + yIn;
-            if (lx >= sec.x - 8 && lx <= sec.x + sec.width + 8 && Math.abs(ly - jy) < 6) {
-              return { id: sec.id, type: 'joist' };
-            }
-          }
-        }
-      }
-
-      return { id: sec.id, type: 'deck' };
+      
+      if (isInside) return { id: sec.id, type: 'deck' };
     }
   }
   return null;
@@ -464,8 +299,8 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
     const v2 = localVertices[(i + 1) % localVertices.length];
     const dx = v2.x - v1.x;
     const dz = v2.y - v1.y;
-    const nx = -dz;
-    const nz = dx;
+    const nx = dz;
+    const nz = -dx;
     let edgeLabel = '';
     if (Math.abs(nx) > Math.abs(nz)) {
       edgeLabel = nx < 0 ? 'w' : 'e';
@@ -495,10 +330,10 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
        return { 
          centerX: targetX, 
          centerZ: z, 
-         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
+         rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx)
        };
     } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx) };
     }
   } else {
     const targetZ = offset + objectWidth / 2;
@@ -512,10 +347,10 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
        return { 
          centerX: x, 
          centerZ: targetZ, 
-         rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx)
+         rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx)
        };
     } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(-selectedSeg.dz, selectedSeg.dx) };
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx) };
     }
   }
 }

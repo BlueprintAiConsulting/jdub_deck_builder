@@ -5,62 +5,28 @@
 import { create } from 'zustand';
 import { calculateAll } from '../engine/structuralCalc.js';
 import { generateBOM, calculateSquareFootage, mergeBOMs } from '../engine/bomGenerator.js';
-import { validateSectionsState } from '../utils/geometry.js';
+import { validateSectionsState, doPolygonsOverlap } from '../utils/geometry.js';
+import { getAccessoryPolygon } from '../utils/polygonUtils.js';
 import { DECK_COLOR_OPTIONS } from '../components/Materials/materialData.js';
 
 function doesRampOverlap(sec, rampCalcs, sections) {
   if (!sec.ramp || !rampCalcs) return false;
   const rampDir = typeof sec.ramp === 'string' ? sec.ramp : sec.ramp.direction;
-  if (!['n', 's', 'e', 'w'].includes(rampDir)) return false;
   const rampW = typeof rampCalcs.width === 'number' && !isNaN(rampCalcs.width) ? rampCalcs.width : 36;
   const slopedRun = typeof rampCalcs.run === 'number' && !isNaN(rampCalcs.run) ? rampCalcs.run : 0;
   const intermediateLandings = typeof rampCalcs.intermediateLandings === 'number' && !isNaN(rampCalcs.intermediateLandings) && rampCalcs.intermediateLandings > 0
     ? Math.floor(rampCalcs.intermediateLandings)
     : 0;
   const rampD = slopedRun + 60 * intermediateLandings;
-  const align = ['left', 'center', 'right'].includes(sec.ramp.align) ? sec.ramp.align : 'center';
-  
-  let rx, ry, rw, rd;
-  
-  if (rampDir === 's') {
-    if (align === 'left') rx = sec.x;
-    else if (align === 'right') rx = sec.x + sec.width - rampW;
-    else rx = sec.x + sec.width / 2 - rampW / 2;
-    ry = sec.y + sec.depth;
-    rw = rampW;
-    rd = rampD;
-  } else if (rampDir === 'n') {
-    if (align === 'left') rx = sec.x;
-    else if (align === 'right') rx = sec.x + sec.width - rampW;
-    else rx = sec.x + sec.width / 2 - rampW / 2;
-    ry = sec.y - rampD;
-    rw = rampW;
-    rd = rampD;
-  } else if (rampDir === 'e') {
-    rx = sec.x + sec.width;
-    if (align === 'left') ry = sec.y;
-    else if (align === 'right') ry = sec.y + sec.depth - rampW;
-    else ry = sec.y + sec.depth / 2 - rampW / 2;
-    rw = rampD;
-    rd = rampW;
-  } else {
-    rx = sec.x - rampD;
-    if (align === 'left') ry = sec.y;
-    else if (align === 'right') ry = sec.y + sec.depth - rampW;
-    else ry = sec.y + sec.depth / 2 - rampW / 2;
-    rw = rampD;
-    rd = rampW;
-  }
+  const offset = (typeof sec.ramp === 'object' && typeof sec.ramp.offset === 'number') ? sec.ramp.offset : null;
+  const align = (typeof sec.ramp === 'object' && sec.ramp.align) ? sec.ramp.align : 'center';
+  if (!sec.vertices || sec.vertices.length < 3) return false;
+  const poly = getAccessoryPolygon(sec, rampDir, rampW, rampD, offset, align);
 
-  // Check overlap with all other sections' bounding boxes
   for (const other of sections) {
     if (other.id === sec.id) continue;
-    
-    // Check bounding box overlap between (rx, ry, rw, rd) and other section (other.x, other.y, other.width, other.depth)
-    const xOverlap = rx < other.x + other.width && rx + rw > other.x;
-    const yOverlap = ry < other.y + other.depth && ry + rd > other.y;
-    if (xOverlap && yOverlap) {
-      return true; // Overlaps!
+    if (other.vertices && other.vertices.length >= 3) {
+      if (doPolygonsOverlap(poly, other.vertices)) return true;
     }
   }
   return false;
@@ -149,30 +115,6 @@ function createSection(overrides = {}) {
   return merged;
 }
 
-function findAdjacentSection(sec, edge, allSections) {
-  for (const other of allSections) {
-    if (other.id === sec.id) continue;
-    if (edge === 'e') {
-      const touch = Math.abs((sec.x + sec.width) - other.x) <= 2;
-      const overlap = Math.max(sec.y, other.y) < Math.min(sec.y + sec.depth, other.y + other.depth);
-      if (touch && overlap) return other;
-    } else if (edge === 'w') {
-      const touch = Math.abs(sec.x - (other.x + other.width)) <= 2;
-      const overlap = Math.max(sec.y, other.y) < Math.min(sec.y + sec.depth, other.y + other.depth);
-      if (touch && overlap) return other;
-    } else if (edge === 's') {
-      const touch = Math.abs((sec.y + sec.depth) - other.y) <= 2;
-      const overlap = Math.max(sec.x, other.x) < Math.min(sec.x + sec.width, other.x + other.width);
-      if (touch && overlap) return other;
-    } else if (edge === 'n') {
-      const touch = Math.abs(sec.y - (other.y + other.depth)) <= 2;
-      const overlap = Math.max(sec.x, other.x) < Math.min(sec.x + sec.width, other.x + other.width);
-      if (touch && overlap) return other;
-    }
-  }
-  return null;
-}
-
 function recalculateSection(section, materials, allSections = []) {
   let stairObj = section.stairs;
   if (typeof stairObj === 'string') {
@@ -187,8 +129,9 @@ function recalculateSection(section, materials, allSections = []) {
     };
   }
   let stairRiseHeight = section.height;
-  if (stairObj && stairObj.direction && allSections.length > 0) {
-    const adjacent = findAdjacentSection(section, stairObj.direction, allSections);
+  if (stairObj && stairObj.direction && allSections.length > 0 && section.vertices) {
+    const poly = getAccessoryPolygon(section, stairObj.direction, stairObj.width || 36, stairObj.run || 10, stairObj.offset || null, stairObj.align || 'center');
+    const adjacent = allSections.find(other => other.id !== section.id && other.vertices && doPolygonsOverlap(poly, other.vertices));
     if (adjacent && section.height > adjacent.height) {
       stairRiseHeight = section.height - adjacent.height;
     }
@@ -205,8 +148,9 @@ function recalculateSection(section, materials, allSections = []) {
     };
   }
   let rampRiseHeight = section.height;
-  if (rampObj && rampObj.direction && allSections.length > 0) {
-    const adjacent = findAdjacentSection(section, rampObj.direction, allSections);
+  if (rampObj && rampObj.direction && allSections.length > 0 && section.vertices) {
+    const poly = getAccessoryPolygon(section, rampObj.direction, rampObj.width || 36, rampObj.run || 10, rampObj.offset || null, rampObj.align || 'center');
+    const adjacent = allSections.find(other => other.id !== section.id && other.vertices && doPolygonsOverlap(poly, other.vertices));
     if (adjacent && section.height > adjacent.height) {
       rampRiseHeight = section.height - adjacent.height;
     }

@@ -369,7 +369,14 @@ export function generateBOM(config, calcs) {
 
   // --- Ledger Board ---
   if (config.ledgerAttached) {
-    const ledgerLen = optimalBoardLength(width);
+    let ledgerLenInches = width;
+    const localV = config.vertices ? config.vertices.map(v => ({ x: v.x - (config.x || 0), y: v.y - (config.y || 0) })) : null;
+    if (localV && localV.length >= 3) {
+      ledgerLenInches = 0;
+      const spans = getHorizontalIntersections(0.1, localV);
+      spans.forEach(span => { ledgerLenInches += (span.maxX - span.minX); });
+    }
+    const ledgerLen = optimalBoardLength(ledgerLenInches);
     const ledgerItem = {
       id: 'ledger',
       category: 'Framing',

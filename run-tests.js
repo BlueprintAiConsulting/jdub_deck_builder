@@ -1368,7 +1368,7 @@ test('31. Multi-level stair rise calculation and alignment offsets', () => {
         rise: 6,
         run: 10,
         direction: 'e',
-        align: 'center'
+        align: 'left'
       },
       type: 'deck',
       vertices: [
@@ -1416,7 +1416,7 @@ test('31. Multi-level stair rise calculation and alignment offsets', () => {
   assert.ok(deckCalcs.stairs, 'Stairs should be calculated on the deck');
   assert.strictEqual(deckCalcs.stairs.riserHeight, 4, 'Stair riserHeight should be 4 inches (12" rise / 3 risers)');
   assert.strictEqual(deckCalcs.stairs.numRisers, 3, 'Stair should have 3 risers');
-  assert.strictEqual(deckCalcs.stairs.align, 'center', 'Default stair alignment should be center');
+  assert.strictEqual(deckCalcs.stairs.align, 'left', 'Stair alignment left to overlap landing');
 
   // Change landing height to 12 inches -> rise becomes 36 - 12 = 24 inches
   // With 2 steps (3 risers), riserHeight should become 24 / 3 = 8 inches
@@ -2058,8 +2058,8 @@ test('43. hitTestSubObject returns correct sub-object types', () => {
   hit = hitTestSubObject(450, 430, sections, 1, 0, 0, 800, 600, sectionCalcs);
   assert.deepStrictEqual(hit, { id: 'sec-deck', type: 'stairs' }, 'Clicking inside stairs should select stairs');
   
-  // Click inside ramp (offset 10) at absolute (550, 310) -> ly should be (310-300)/1 = 10, which is within [10, 46]
-  hit = hitTestSubObject(550, 310, sections, 1, 0, 0, 800, 600, sectionCalcs);
+  // Click inside ramp (offset 10) at absolute (550, 320) -> ly should be (320-300)/1 = 20, which is within [10, 46]
+  hit = hitTestSubObject(550, 320, sections, 1, 0, 0, 800, 600, sectionCalcs);
   assert.deepStrictEqual(hit, { id: 'sec-deck', type: 'ramp' }, 'Clicking inside ramp should select ramp');
 });
 
