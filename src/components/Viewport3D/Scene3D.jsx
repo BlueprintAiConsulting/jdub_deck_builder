@@ -7,8 +7,7 @@ import { useDeckStore } from '../../store/deckStore';
 import { WOOD_COLORS, DECK_MATERIAL_COLORS, DECK_COLOR_OPTIONS } from '../Materials/materialData';
 import { LUMBER_ACTUAL, RAILING_RULES, STAIR_RULES } from '../../engine/spanTables';
 import './Scene3D.css';
-import { getSubObjectOffset, isPointInPolygon } from '../../utils/polygonUtils';
-
+import { getSubObjectOffset, isPointInPolygon, getEdgeTransform, getHorizontalIntersections, getVerticalIntersections } from '../../utils/polygonUtils';
 const IN = 1 / 12; // inches to scene units (feet)
 
 const textureCache = {};
