@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -378,6 +378,38 @@ export function getMaterialVisuals(deckMaterial, species) {
   return { color, type };
 }
 
+const InstancedLumber = ({ items, texture, bump, color, type, isComposite, castShadow = true, receiveShadow = true }) => {
+  const meshRef = useRef();
+
+  useLayoutEffect(() => {
+    if (meshRef.current && items.length > 0) {
+      const dummy = new THREE.Object3D();
+      items.forEach((item, i) => {
+        dummy.position.set(item.posX * IN, item.posY * IN, item.posZ * IN);
+        dummy.rotation.set(0, item.rotY || 0, 0);
+        dummy.scale.set(item.sizeX * IN, item.sizeY * IN, item.sizeZ * IN);
+        dummy.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummy.matrix);
+      });
+      meshRef.current.instanceMatrix.needsUpdate = true;
+    }
+  }, [items]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[null, null, items.length]} castShadow={castShadow} receiveShadow={receiveShadow}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial 
+        map={texture} color={texture?.customColor || color || '#ffffff'} 
+        bumpMap={bump}
+        bumpScale={0.015}
+        roughness={isComposite ? 0.8 : 0.65} 
+        metalness={0.02} 
+      />
+    </instancedMesh>
+  );
+};
 
 function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, deckBoardSize, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth }) {
   const getBoardColor = () => {
@@ -693,25 +725,35 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
     return arr;
   }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth]);
 
-  const bumpTexture = getProceduralBumpTexture(type);
+  const instancesByMaterial = useMemo(() => {
+    const groups = [[], [], [], [], []];
+    boards.forEach((b, i) => {
+      groups[i % 5].push({
+        posX: b.posX, posY: boardH / 2, posZ: b.posZ,
+        sizeX: b.sizeX, sizeY: boardH, sizeZ: b.sizeZ,
+        rotY: b.rotY
+      });
+    });
+    return groups;
+  }, [boards, boardH]);
 
   return (
     <group>
-      {boards.map(({ id, posX, posZ, sizeX, sizeZ, rotY }, i) => {
+      {instancesByMaterial.map((items, i) => {
+        if (items.length === 0) return null;
         const boardType = `${type}-${i % 5}`;
         const boardTexture = getProceduralTexture(color, boardType);
         const boardBump = getProceduralBumpTexture(boardType);
         return (
-          <mesh key={`board-${id}`} position={[posX * IN, boardH / 2 * IN, posZ * IN]} rotation={[0, rotY, 0]} castShadow receiveShadow>
-            <boxGeometry args={[sizeX * IN, boardH * IN, sizeZ * IN]} />
-            <meshStandardMaterial 
-              map={boardTexture} color={boardTexture?.customColor || '#ffffff'} 
-              bumpMap={boardBump}
-              bumpScale={0.015}
-              roughness={type === 'composite' ? 0.8 : 0.65} 
-              metalness={0.02} 
-            />
-          </mesh>
+          <InstancedLumber 
+            key={`deckboards-${i}`} 
+            items={items} 
+            texture={boardTexture} 
+            bump={boardBump} 
+            color={color} 
+            type={boardType}
+            isComposite={type === 'composite'} 
+          />
         );
       })}
     </group>
@@ -726,47 +768,52 @@ function Joists({ positions, width, depth, joistSize, joistOrientation, vertices
 
   const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
 
-  return (
-    <group>
-      {positions.map((coordIn, i) => {
-        let segments = [];
-        if (localVertices && localVertices.length >= 3) {
-          if (isHorizontal) {
-            const hSegs = getHorizontalIntersections(coordIn, localVertices);
-            hSegs.forEach(seg => {
-              if (seg.endX - seg.startX > 0.5) segments.push(seg);
-            });
-          } else {
-            const vSegs = getVerticalIntersections(coordIn, localVertices);
-            vSegs.forEach(seg => {
-              if (seg.endY - seg.startY > 0.5) segments.push(seg);
-            });
-          }
+  const items = useMemo(() => {
+    const list = [];
+    positions.forEach((coordIn, i) => {
+      let segments = [];
+      if (localVertices && localVertices.length >= 3) {
+        if (isHorizontal) {
+          const hSegs = getHorizontalIntersections(coordIn, localVertices);
+          hSegs.forEach(seg => {
+            if (seg.endX - seg.startX > 0.5) segments.push(seg);
+          });
         } else {
-          if (isHorizontal) segments.push({ startX: 0, endX: width });
-          else segments.push({ startY: 0, endY: depth });
+          const vSegs = getVerticalIntersections(coordIn, localVertices);
+          vSegs.forEach(seg => {
+            if (seg.endY - seg.startY > 0.5) segments.push(seg);
+          });
         }
+      } else {
+        if (isHorizontal) segments.push({ startX: 0, endX: width });
+        else segments.push({ startY: 0, endY: depth });
+      }
 
-        return segments.map((seg, sIdx) => {
-          const posX = isHorizontal ? (seg.startX + seg.endX) / 2 : coordIn;
-          const posZ = isHorizontal ? coordIn : (seg.startY + seg.endY) / 2;
-          const sizeX = isHorizontal ? (seg.endX - seg.startX) : actual.width;
-          const sizeZ = isHorizontal ? actual.width : (seg.endY - seg.startY);
-          
-          return (
-            <mesh key={`joist-${i}-${sIdx}`} position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} castShadow receiveShadow>
-              <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
-              <meshStandardMaterial 
-                map={joistTexture} color={joistTexture?.customColor || '#ffffff'} 
-                roughness={0.8} 
-                bumpMap={joistBump}
-                bumpScale={0.012}
-              />
-            </mesh>
-          );
+      segments.forEach((seg, sIdx) => {
+        const posX = isHorizontal ? (seg.startX + seg.endX) / 2 : coordIn;
+        const posZ = isHorizontal ? coordIn : (seg.startY + seg.endY) / 2;
+        const sizeX = isHorizontal ? (seg.endX - seg.startX) : actual.width;
+        const sizeZ = isHorizontal ? actual.width : (seg.endY - seg.startY);
+        
+        list.push({
+          posX, posY: -actual.depth / 2, posZ,
+          sizeX, sizeY: actual.depth, sizeZ,
+          rotY: 0
         });
-      })}
-    </group>
+      });
+    });
+    return list;
+  }, [positions, width, depth, actual, isHorizontal, localVertices]);
+
+  return (
+    <InstancedLumber 
+      items={items} 
+      texture={joistTexture} 
+      bump={joistBump} 
+      color="#ffffff" 
+      type="wood-0"
+      isComposite={false} 
+    />
   );
 }
 
@@ -782,58 +829,53 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
 
   const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
 
-  return (
-    <group>
-      {beamPositions.map((coordIn, i) => {
-        let segments = [];
-        if (localVertices && localVertices.length >= 3) {
-          if (isHorizontal) {
-            // If joists are horizontal, beams run vertical
-            const vSegs = getVerticalIntersections(coordIn, localVertices);
-            vSegs.forEach(seg => { if (seg.endY - seg.startY > 0.5) segments.push(seg); });
-          } else {
-            // If joists are vertical, beams run horizontal
-            const hSegs = getHorizontalIntersections(coordIn, localVertices);
-            hSegs.forEach(seg => { if (seg.endX - seg.startX > 0.5) segments.push(seg); });
-          }
+  const items = useMemo(() => {
+    const list = [];
+    beamPositions.forEach((coordIn, i) => {
+      let segments = [];
+      if (localVertices && localVertices.length >= 3) {
+        if (isHorizontal) {
+          // If joists are horizontal, beams run vertical
+          const vSegs = getVerticalIntersections(coordIn, localVertices);
+          vSegs.forEach(seg => { if (seg.endY - seg.startY > 0.5) segments.push(seg); });
         } else {
-          if (isHorizontal) segments.push({ startY: 0, endY: depth });
-          else segments.push({ startX: 0, endX: width });
+          // If joists are vertical, beams run horizontal
+          const hSegs = getHorizontalIntersections(coordIn, localVertices);
+          hSegs.forEach(seg => { if (seg.endX - seg.startX > 0.5) segments.push(seg); });
         }
+      } else {
+        if (isHorizontal) segments.push({ startY: 0, endY: depth });
+        else segments.push({ startX: 0, endX: width });
+      }
 
-        return segments.map((seg, sIdx) => (
-          <group key={`beam-${i}-${sIdx}`}>
-            {Array.from({ length: ply }, (_, p) => {
-              const offset = (p - (ply - 1) / 2) * actual.width;
-              const posX = isHorizontal ? coordIn + offset : (seg.startX + seg.endX) / 2;
-              const posZ = isHorizontal ? (seg.startY + seg.endY) / 2 : coordIn + offset;
-              const sizeX = isHorizontal ? actual.width : (seg.endX - seg.startX);
-              const sizeZ = isHorizontal ? (seg.endY - seg.startY) : actual.width;
-              return (
-                <mesh
-                  key={`beam-${i}-${sIdx}-${p}`}
-                  position={[
-                    posX * IN,
-                    (beamTopY - actual.depth / 2) * IN,
-                    posZ * IN,
-                  ]}
-                  castShadow
-                  receiveShadow
-                >
-                  <boxGeometry args={[sizeX * IN, actual.depth * IN, sizeZ * IN]} />
-                  <meshStandardMaterial 
-                    map={beamTexture} color={beamTexture?.customColor || '#ffffff'} 
-                    roughness={0.78} 
-                    bumpMap={beamBump}
-                    bumpScale={0.015}
-                  />
-                </mesh>
-              );
-            })}
-          </group>
-        ));
-      })}
-    </group>
+      segments.forEach((seg, sIdx) => {
+        for (let p = 0; p < ply; p++) {
+          const offset = (p - (ply - 1) / 2) * actual.width;
+          const posX = isHorizontal ? coordIn + offset : (seg.startX + seg.endX) / 2;
+          const posZ = isHorizontal ? (seg.startY + seg.endY) / 2 : coordIn + offset;
+          const sizeX = isHorizontal ? actual.width : (seg.endX - seg.startX);
+          const sizeZ = isHorizontal ? (seg.endY - seg.startY) : actual.width;
+          
+          list.push({
+            posX, posY: beamTopY - actual.depth / 2, posZ,
+            sizeX, sizeY: actual.depth, sizeZ,
+            rotY: 0
+          });
+        }
+      });
+    });
+    return list;
+  }, [beamPositions, width, depth, actual, isHorizontal, localVertices, ply, beamTopY]);
+
+  return (
+    <InstancedLumber 
+      items={items} 
+      texture={beamTexture} 
+      bump={beamBump} 
+      color="#ffffff" 
+      type="wood-1"
+      isComposite={false} 
+    />
   );
 }
 
@@ -845,53 +887,49 @@ function Blocking({ blocking, joistSize, vertices, secX, secY, width, depth }) {
   if (!blocking || !blocking.enabled) return null;
 
   const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
-  const segments = [];
 
-  if (localVertices && localVertices.length >= 3) {
-    for (let i = 0; i < localVertices.length; i++) {
-      const v1 = localVertices[i];
-      const v2 = localVertices[(i + 1) % localVertices.length];
-      segments.push({ x1: v1.x, y1: v1.y, x2: v2.x, y2: v2.y });
+  const items = useMemo(() => {
+    const segments = [];
+    if (localVertices && localVertices.length >= 3) {
+      for (let i = 0; i < localVertices.length; i++) {
+        const v1 = localVertices[i];
+        const v2 = localVertices[(i + 1) % localVertices.length];
+        segments.push({ x1: v1.x, y1: v1.y, x2: v2.x, y2: v2.y });
+      }
+    } else if (blocking.segments) {
+      segments.push(...blocking.segments);
     }
-  } else if (blocking.segments) {
-    segments.push(...blocking.segments);
-  }
+    
+    return segments.map((seg, i) => {
+      const x1 = typeof seg.x1 === 'number' && !isNaN(seg.x1) ? seg.x1 : 0;
+      const x2 = typeof seg.x2 === 'number' && !isNaN(seg.x2) ? seg.x2 : 0;
+      const y1 = typeof seg.y1 === 'number' && !isNaN(seg.y1) ? seg.y1 : 0;
+      const y2 = typeof seg.y2 === 'number' && !isNaN(seg.y2) ? seg.y2 : 0;
+
+      const dx = x2 - x1;
+      const dz = y2 - y1;
+      const len = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
+      const posX = (x1 + x2) / 2;
+      const posZ = (y1 + y2) / 2;
+      const rotY = Math.atan2(dz, dx);
+      
+      return {
+        posX, posY: -actual.depth / 2, posZ,
+        sizeX: len, sizeY: actual.depth, sizeZ: actual.width,
+        rotY: -rotY
+      };
+    });
+  }, [blocking, actual, localVertices]);
 
   return (
-    <group>
-      {segments.map((seg, i) => {
-        const x1 = typeof seg.x1 === 'number' && !isNaN(seg.x1) ? seg.x1 : 0;
-        const x2 = typeof seg.x2 === 'number' && !isNaN(seg.x2) ? seg.x2 : 0;
-        const y1 = typeof seg.y1 === 'number' && !isNaN(seg.y1) ? seg.y1 : 0;
-        const y2 = typeof seg.y2 === 'number' && !isNaN(seg.y2) ? seg.y2 : 0;
-
-        const dx = x2 - x1;
-        const dz = y2 - y1;
-        const len = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
-        const posX = (x1 + x2) / 2;
-        const posZ = (y1 + y2) / 2;
-
-        const rotY = Math.atan2(dz, dx);
-        
-        return (
-          <mesh 
-            key={`block-${i}`} 
-            position={[posX * IN, -actual.depth / 2 * IN, posZ * IN]} 
-            rotation={[0, -rotY, 0]}
-            castShadow 
-            receiveShadow
-          >
-            <boxGeometry args={[len * IN, actual.depth * IN, actual.width * IN]} />
-            <meshStandardMaterial 
-              map={woodTexture} color={woodTexture?.customColor || '#ffffff'} 
-              roughness={0.8} 
-              bumpMap={blockingBump}
-              bumpScale={0.01}
-            />
-          </mesh>
-        );
-      })}
-    </group>
+    <InstancedLumber 
+      items={items} 
+      texture={woodTexture} 
+      bump={blockingBump} 
+      color="#ffffff" 
+      type="wood-2"
+      isComposite={false} 
+    />
   );
 }
 
@@ -967,37 +1005,33 @@ function Posts({ posts, postSize, joistSize, beamConfig, vertices, secX, secY })
 
   const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
 
-  return (
-    <group>
-      {posts.map((post, i) => {
-        if (localVertices && localVertices.length >= 3) {
-          if (!pointInPolygon(post.x, post.y, localVertices)) {
-            return null; // Skip posts outside the custom polygon
-          }
+  const items = useMemo(() => {
+    const list = [];
+    posts.forEach((post) => {
+      if (localVertices && localVertices.length >= 3) {
+        if (!pointInPolygon(post.x, post.y, localVertices)) {
+          return; // Skip posts outside the custom polygon
         }
-        const postHeight = Math.max(0.1, post.height + topOfPost + 12);
-        return (
-          <mesh
-            key={`post-${i}`}
-            position={[
-              post.x * IN,
-              (topOfPost - postHeight / 2) * IN,
-              post.y * IN,
-            ]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[nominalWidth * IN, postHeight * IN, nominalWidth * IN]} />
-            <meshStandardMaterial 
-              map={postTexture} color={postTexture?.customColor || '#ffffff'} 
-              roughness={0.82} 
-              bumpMap={postBump}
-              bumpScale={0.015}
-            />
-          </mesh>
-        );
-      })}
-    </group>
+      }
+      const postHeight = Math.max(0.1, post.height + topOfPost + 12);
+      list.push({
+        posX: post.x, posY: topOfPost - postHeight / 2, posZ: post.y,
+        sizeX: nominalWidth, sizeY: postHeight, sizeZ: nominalWidth,
+        rotY: 0
+      });
+    });
+    return list;
+  }, [posts, topOfPost, nominalWidth, localVertices]);
+
+  return (
+    <InstancedLumber 
+      items={items} 
+      texture={postTexture} 
+      bump={postBump} 
+      color="#ffffff" 
+      type="wood-3"
+      isComposite={false} 
+    />
   );
 }
 

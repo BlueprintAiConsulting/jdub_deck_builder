@@ -1103,19 +1103,28 @@ export const useDeckStore = create((set, get) => ({
       return;
     }
 
-    const results = recalculateAll(newSections, state.materials);
     set({
       sections: newSections,
-      ...results,
       isDirty: true,
     });
+    
+    // Debounce heavy structural recalculation
+    if (window._recalcTimeout) clearTimeout(window._recalcTimeout);
+    window._recalcTimeout = setTimeout(() => {
+      const latestState = get();
+      const results = recalculateAll(latestState.sections, latestState.materials);
+      set({ ...results });
+    }, 200);
   },
 
   finishVertexDrag: () => {
+    if (window._recalcTimeout) clearTimeout(window._recalcTimeout);
     const state = get();
+    const results = recalculateAll(state.sections, state.materials);
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push({ sections: state.sections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({
+      ...results,
       interaction: {
         ...state.interaction,
         mode: 'idle',

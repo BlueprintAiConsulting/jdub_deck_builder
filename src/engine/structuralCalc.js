@@ -122,7 +122,7 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
 
 /** Calculate beam layout */
 // approximate for non-rectangular — bounding box layout
-export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical', beamCountOverride = 'auto', beamSetback = 12) {
+export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical', beamCountOverride = 'auto', beamSetback = 12, vertices = null, secX = 0, secY = 0) {
   const isHorizontal = joistOrientation === 'horizontal';
   const rawW = isHorizontal ? deckDepthIn : deckWidthIn;
   const rawD = isHorizontal ? deckWidthIn : deckDepthIn;
@@ -145,14 +145,43 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
 
   const safeSetback = Math.max(0, Math.min(depth - 24, beamSetback !== undefined ? beamSetback : 12));
 
-  const positions = [];
+  let positions = [];
   for (let i = 1; i <= beamCount; i++) {
     positions.push(((depth - safeSetback) / beamCount) * i);
   }
 
+  if (vertices && vertices.length >= 3) {
+    try {
+      positions = positions.filter((coordIn) => {
+        let x1, y1, x2, y2;
+        if (isHorizontal) {
+          x1 = secX + coordIn;
+          y1 = secY;
+          x2 = secX + coordIn;
+          y2 = secY + deckDepthIn;
+        } else {
+          x1 = secX;
+          y1 = secY + coordIn;
+          x2 = secX + deckWidthIn;
+          y2 = secY + coordIn;
+        }
+        for (let k = 0; k <= 20; k++) {
+          const px = x1 + (k / 20) * (x2 - x1);
+          const py = y1 + (k / 20) * (y2 - y1);
+          if (isPointInPolygon(px, py, vertices) || isPointOnPolygonBoundary({ x: px, y: py }, vertices)) {
+            return true;
+          }
+        }
+        return false;
+      });
+    } catch (err) {
+      // fallback
+    }
+  }
+
   return {
     config,
-    count: beamCount,
+    count: positions.length,
     maxSpan: maxBeamSpan,
     length: width,
     positions,
@@ -161,10 +190,10 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
 
 /** Calculate post layout */
 // approximate for non-rectangular — bounding box layout
-export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation = 'vertical', postOffset = 6) {
+export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation = 'vertical', postOffset = 6, vertices = null, secX = 0, secY = 0) {
   const isHorizontal = joistOrientation === 'horizontal';
   const post = POST_SIZES[postSize] || POST_SIZES['6x6'];
-  const posts = [];
+  let posts = [];
   
   const length = typeof beams?.length === 'number' && !isNaN(beams.length) ? Math.max(0, beams.length) : 0;
   const postOffsetNum = typeof postOffset === 'number' && !isNaN(postOffset) ? postOffset : 6;
@@ -187,15 +216,55 @@ export function calculatePosts(beams, deckHeightIn, postSize, joistOrientation =
       }
     }
   });
+
+  if (vertices && vertices.length >= 3) {
+    posts = posts.filter(p => {
+      const globalX = secX + p.x;
+      const globalY = secY + p.y;
+      return isPointInPolygon(globalX, globalY, vertices) || isPointOnPolygonBoundary({ x: globalX, y: globalY }, vertices);
+    });
+  }
+
   return { posts, size: postSize, nominalWidth: post.nominalWidth };
 }
 
 /** Calculate footing requirements */
-// approximate for non-rectangular — bounding box layout
-export function calculateFootings(posts, joistSpacing, beamMaxSpan, soilCapacity) {
+export function calculateFootings(posts, beamsInfo, joistOrientation, deckWidthIn, deckDepthIn, soilCapacity) {
   const cap = soilCapacity || 2000;
-  const safeSpacing = (typeof joistSpacing === 'number' && joistSpacing > 0) ? joistSpacing : 16;
-  const tributaryArea = (safeSpacing / 12) * ((beamMaxSpan || 96) / 12);
+  
+  const isHorizontal = joistOrientation === 'horizontal';
+  const perpDimension = isHorizontal ? deckWidthIn : deckDepthIn;
+  
+  let maxTribWidthIn = 0;
+  const positions = beamsInfo.positions || [];
+  
+  if (positions.length === 0) {
+    maxTribWidthIn = 0;
+  } else if (positions.length === 1) {
+    maxTribWidthIn = perpDimension;
+  } else {
+    for (let i = 0; i < positions.length; i++) {
+      let leftTrib = 0;
+      let rightTrib = 0;
+      
+      if (i === 0) {
+        leftTrib = positions[i]; 
+        rightTrib = (positions[i+1] - positions[i]) / 2;
+      } else if (i === positions.length - 1) {
+        leftTrib = (positions[i] - positions[i-1]) / 2;
+        rightTrib = perpDimension - positions[i];
+      } else {
+        leftTrib = (positions[i] - positions[i-1]) / 2;
+        rightTrib = (positions[i+1] - positions[i]) / 2;
+      }
+      
+      const trib = leftTrib + rightTrib;
+      if (trib > maxTribWidthIn) maxTribWidthIn = trib;
+    }
+  }
+  
+  const tributaryArea = (maxTribWidthIn / 12) * ((beamsInfo.maxSpan || 96) / 12);
+  
   const footingSizes = FOOTING_SIZES[cap] || FOOTING_SIZES[2000];
   let diameter = 12;
   const areas = Object.keys(footingSizes).map(Number).sort((a, b) => a - b);
@@ -203,8 +272,9 @@ export function calculateFootings(posts, joistSpacing, beamMaxSpan, soilCapacity
     if (tributaryArea <= area) { diameter = footingSizes[area]; break; }
     diameter = footingSizes[area];
   }
+  
   return {
-    count: posts.posts.length,
+    count: posts.posts ? posts.posts.length : (Array.isArray(posts) ? posts.length : 0),
     diameter,
     soilCapacity: cap,
     tributaryArea: Math.round(tributaryArea * 10) / 10,
@@ -311,10 +381,10 @@ export function calculateAll(config) {
   const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient, vertices, x, y, blockingEnabled, blockingSp);
   
   const actualBeamSpecies = beamSpecies || species;
-  const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback);
+  const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback, vertices, x, y);
   
-  const posts = calculatePosts(beams, height, postSize, joistOrient, postOffset);
-  const footings = calculateFootings(posts, joistSpacing, beams.maxSpan, soilCapacity);
+  const posts = calculatePosts(beams, height, postSize, joistOrient, postOffset, vertices, x, y);
+  const footings = calculateFootings(posts, beams, joistOrient, width, depth, soilCapacity);
   const stairsRise = stairRiseHeight !== undefined ? stairRiseHeight : height;
   const stairs = stairsRise > 0 ? calculateStairs(stairsRise, stairOpt) : null;
   const rampRise = rampRiseHeight !== undefined ? rampRiseHeight : height;

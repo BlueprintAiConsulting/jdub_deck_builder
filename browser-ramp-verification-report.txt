@@ -1,6 +1,6 @@
 DeckForge Ramp Browser Verification Report
 ==================================================
-Date: 2026-05-29T02:35:40.066Z
+Date: 2026-07-09T20:16:46.304Z
 
 Ramp Verification Results:
 [PASS] 2D: Canvas2D element exists
@@ -8,7 +8,7 @@ Ramp Verification Results:
   - Expected: Exists
 
 [PASS] 2D: Canvas2D element has non-zero size
-  - Measured: 898x846
+  - Measured: 864x846
   - Expected: non-zero width & height
 
 [PASS] 2D: Ramp UI controls DOM element exists
