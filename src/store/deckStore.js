@@ -65,6 +65,8 @@ const DEFAULT_MATERIALS = {
     'joist-hangers': 1.50,
     'post-bases': 7.50,
     'screws': 0.08,
+    'ledger-loks': 1.25,
+    'z-flashing': 8.50,
   },
   wasteFactor: 10,
 };
@@ -183,6 +185,7 @@ function recalculateSection(section, materials, allSections = []) {
     beamSpecies: section.beamSpecies || materials.species || 'SYP',
     blocking: section.blocking !== false,
     blockingSpacing: section.blockingSpacing || 72,
+    ledgerAttached: section.ledgerAttached !== false,
   });
   if (calcs.ramp && rampObj) {
     calcs.ramp.doesNotFit = doesRampOverlap(section, calcs.ramp, allSections);

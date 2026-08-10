@@ -388,6 +388,36 @@ export function generateBOM(config, calcs) {
     ledgerItem.unitPrice = estimateUnitPrice(ledgerItem, config);
     ledgerItem.totalPrice = ledgerItem.unitPrice * ledgerItem.quantity;
     items.push(ledgerItem);
+
+    const lokCount = Math.ceil((ledgerLenInches / 16) * 2);
+    const lokItem = {
+      id: 'ledger-loks',
+      category: 'Hardware',
+      description: 'LedgerLOK Structural Wood Screws',
+      size: '3-5/8"',
+      length: null,
+      quantity: lokCount,
+      unit: 'ea',
+      material: 'Epoxy Coated Steel',
+    };
+    lokItem.unitPrice = estimateUnitPrice(lokItem, config);
+    lokItem.totalPrice = lokItem.unitPrice * lokItem.quantity;
+    items.push(lokItem);
+
+    const flashingRolls = Math.ceil(ledgerLen / 10);
+    const flashingItem = {
+      id: 'z-flashing',
+      category: 'Hardware',
+      description: 'Aluminum Z-Flashing (10ft roll)',
+      size: '1-1/2"',
+      length: 10,
+      quantity: flashingRolls,
+      unit: 'roll',
+      material: 'Aluminum',
+    };
+    flashingItem.unitPrice = estimateUnitPrice(flashingItem, config);
+    flashingItem.totalPrice = flashingItem.unitPrice * flashingItem.quantity;
+    items.push(flashingItem);
   }
 
   // --- Concrete (Footings) ---

@@ -122,7 +122,7 @@ export function calculateJoists(deckWidthIn, deckDepthIn, joistSize, joistSpacin
 
 /** Calculate beam layout */
 // approximate for non-rectangular — bounding box layout
-export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical', beamCountOverride = 'auto', beamSetback = 12, vertices = null, secX = 0, secY = 0) {
+export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing, species, beamConfig, joistOrientation = 'vertical', beamCountOverride = 'auto', beamSetback = 12, vertices = null, secX = 0, secY = 0, ledgerAttached = true) {
   const isHorizontal = joistOrientation === 'horizontal';
   const rawW = isHorizontal ? deckDepthIn : deckWidthIn;
   const rawD = isHorizontal ? deckWidthIn : deckDepthIn;
@@ -137,17 +137,30 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
   
   let beamCount = 1;
   if (typeof beamCountOverride === 'number') {
-    beamCount = Math.max(1, beamCountOverride);
+    beamCount = Math.max(ledgerAttached ? 1 : 2, beamCountOverride);
   } else {
     // 12-ft rule: joists cannot span more than 12 feet (144 inches) between supports.
     beamCount = Math.ceil(depth / 144);
+    if (!ledgerAttached) beamCount += 1; // Freestanding needs support near the house side
   }
 
   const safeSetback = Math.max(0, Math.min(depth - 24, beamSetback !== undefined ? beamSetback : 12));
 
   let positions = [];
-  for (let i = 1; i <= beamCount; i++) {
-    positions.push(((depth - safeSetback) / beamCount) * i);
+  if (ledgerAttached) {
+    for (let i = 1; i <= beamCount; i++) {
+      positions.push(((depth - safeSetback) / beamCount) * i);
+    }
+  } else {
+    const startY = safeSetback;
+    const endY = depth - safeSetback;
+    if (beamCount <= 1) {
+      positions.push(endY);
+    } else {
+      for (let i = 0; i < beamCount; i++) {
+        positions.push(startY + (endY - startY) * (i / (beamCount - 1)));
+      }
+    }
   }
 
   if (vertices && vertices.length >= 3) {
@@ -374,14 +387,15 @@ export function calculateRamp(totalRiseIn, rampOpt) {
 
 /** Run all structural calculations for a deck config */
 export function calculateAll(config) {
-  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback, postOffset, beamSpecies, blocking, blockingSpacing } = config;
+  const { width, depth, height, stairRiseHeight, rampRiseHeight, joistSize, joistSpacing, species, beamConfig, postSize, soilCapacity, stairs: stairOpt, ramp: rampOpt, joistOrientation, vertices, x, y, beamCount, beamSetback, postOffset, beamSpecies, blocking, blockingSpacing, ledgerAttached } = config;
   const joistOrient = joistOrientation || 'vertical';
   const blockingEnabled = blocking !== false;
   const blockingSp = blockingSpacing || 72;
+  const isLedgerAttached = ledgerAttached !== false;
   const joists = calculateJoists(width, depth, joistSize, joistSpacing, species, joistOrient, vertices, x, y, blockingEnabled, blockingSp);
   
   const actualBeamSpecies = beamSpecies || species;
-  const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback, vertices, x, y);
+  const beams = calculateBeams(width, depth, joistSize, joistSpacing, actualBeamSpecies, beamConfig, joistOrient, beamCount, beamSetback, vertices, x, y, isLedgerAttached);
   
   const posts = calculatePosts(beams, height, postSize, joistOrient, postOffset, vertices, x, y);
   const footings = calculateFootings(posts, beams, joistOrient, width, depth, soilCapacity);
