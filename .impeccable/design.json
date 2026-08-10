@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T21:20:00.000Z",
+  "title": "Design System: DeckBuilder",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Blueprint Blue", "canonical": "#4e8ef7", "tonalRamp": ["#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#4e8ef7", "#6da3ff", "#93c5fd", "#bfdbfe"] },
+      "neutral-bg": { "role": "neutral", "displayName": "Deep Space", "canonical": "#060a14", "tonalRamp": ["#02040a", "#060a14", "#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headers and major tool states." }
+    },
+    "shadows": [
+      { "name": "Float", "value": "0 8px 32px rgba(0,0,0,0.55)", "purpose": "Modal dialogs and central overlays." },
+      { "name": "Action Glow", "value": "0 0 24px rgba(78,142,247,0.2)", "purpose": "Used on primary actions and selections to emphasize interactivity." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Used for main actions like generating plans or saving.",
+      "html": "<button class=\"ds-btn-primary\">VALIDATE</button>",
+      "css": ".ds-btn-primary { background: linear-gradient(135deg, #2563eb, #4e8ef7); color: #fff; padding: 6px 16px; border: 1px solid #4e8ef7; border-radius: 6px; font-family: Inter, sans-serif; font-size: 0.8125rem; font-weight: 500; cursor: pointer; transition: all 180ms ease; box-shadow: 0 0 24px rgba(78, 142, 247, 0.2), inset 0 1px 0 rgba(255,255,255,0.04); } .ds-btn-primary:hover { background: linear-gradient(135deg, #4e8ef7, #6da3ff); transform: translateY(-1px); box-shadow: 0 0 32px rgba(78, 142, 247, 0.35), inset 0 1px 0 rgba(255,255,255,0.04); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Expert Blueprint",
+    "overview": "The design system exudes technical precision, reliability, and expert confidence. It's built for functionality, centering the 3D visualizer while maintaining an interface that feels robust and structural. It explicitly avoids feeling like an overwhelming CAD tool or a cartoonish toy.",
+    "keyCharacteristics": [
+      "Strict functional layout",
+      "Expert typographic hierarchy",
+      "Layered surfaces using glassmorphism for depth",
+      "Authoritative but accessible tone"
+    ],
+    "rules": [
+      { "name": "The Expert Restraint Rule", "body": "Color is functional, never purely decorative. Use semantic colors (amber, green, red) strictly for their meaning, not for generic branding.", "section": "colors" },
+      { "name": "The Glass Canvas Rule", "body": "UI panels floating over the 3D viewport must use glassmorphism (translucency + background blur) to maintain the user's spatial awareness of the structure underneath.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do rely on structural borders and precise spacing to group information.",
+      "Do keep error messages educational and focused on safety."
+    ],
+    "donts": [
+      "Don't use overly playful or cartoonish interfaces.",
+      "Don't create overwhelming, dense CAD-like panels that crowd the screen.",
+      "Don't obscure the 3D visualizer completely; it is the hero."
+    ]
+  }
+}

@@ -393,17 +393,17 @@ export default function Toolbar({ isMobile }) {
           <svg width="26" height="26" viewBox="0 0 64 64" fill="none">
             <defs>
               <linearGradient id="tg" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#4e8ef7"/>
-                <stop offset="100%" stopColor="#9b6dff"/>
+                <stop offset="0%" stopColor="var(--accent-primary)"/>
+                <stop offset="100%" stopColor="var(--accent-purple)"/>
               </linearGradient>
             </defs>
             <rect x="4" y="28" width="56" height="6" rx="2" fill="url(#tg)"/>
-            <rect x="8" y="36" width="4" height="20" rx="1" fill="#4e8ef7" opacity="0.8"/>
-            <rect x="26" y="36" width="4" height="24" rx="1" fill="#4e8ef7" opacity="0.8"/>
-            <rect x="52" y="36" width="4" height="20" rx="1" fill="#4e8ef7" opacity="0.8"/>
-            <rect x="6" y="22" width="52" height="4" rx="1" fill="#f5a623" opacity="0.9"/>
-            <rect x="6" y="16" width="52" height="4" rx="1" fill="#f5a623" opacity="0.7"/>
-            <rect x="6" y="10" width="52" height="4" rx="1" fill="#f5a623" opacity="0.5"/>
+            <rect x="8" y="36" width="4" height="20" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
+            <rect x="26" y="36" width="4" height="24" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
+            <rect x="52" y="36" width="4" height="20" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
+            <rect x="6" y="22" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.9"/>
+            <rect x="6" y="16" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.7"/>
+            <rect x="6" y="10" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.5"/>
           </svg>
         </div>
         <span className="toolbar__title">

@@ -723,7 +723,7 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
       }
     }
     return arr;
-  }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, width, depth]);
+  }, [vertices, secX, secY, boardW, joistOrientation, deckingOrientation, pictureFrame, dividerCount, boardsPerDivider, deckingFlipped, deckingLayout, deckBoardGap, boardSpacing, gap, width, depth]);
 
   const instancesByMaterial = useMemo(() => {
     const groups = [[], [], [], [], []];
