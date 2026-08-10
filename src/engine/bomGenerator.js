@@ -17,60 +17,58 @@ function optimalBoardLength(requiredLengthIn) {
 }
 
 /** Estimate unit price for a given BOM item */
-function estimateUnitPrice(item, species, deckMaterial) {
+function estimateUnitPrice(item, config) {
+  const prices = config.unitPrices || {};
   let rate = 0;
   
   if (item.category === 'Framing') {
     // Lumber species modifier
     let speciesMultiplier = 1.0;
+    const species = config.species;
     if (species === 'Douglas Fir' || species === 'DF') speciesMultiplier = 1.25;
     else if (species === 'Hem-Fir') speciesMultiplier = 1.15;
     else if (species === 'Spruce-Pine-Fir') speciesMultiplier = 1.1;
     else if (species === 'Western Red Cedar' || species === 'Cedar') speciesMultiplier = 2.0;
     else if (species === 'Redwood') speciesMultiplier = 2.5;
 
-    if (item.size === '2x6') rate = 1.20;
-    else if (item.size === '2x8') rate = 1.50;
-    else if (item.size === '2x10') rate = 1.90;
-    else if (item.size === '2x12') rate = 2.40;
-    else if (item.size === '4x4') rate = 2.50;
-    else if (item.size === '6x6') rate = 4.50;
-    else rate = 1.50;
+    rate = prices[item.size] || 1.50;
 
     return rate * (item.length || 1) * speciesMultiplier;
   }
   
   if (item.category === 'Decking') {
+    const deckMaterial = config.deckMaterial;
     if (deckMaterial === 'PT-SYP') rate = 2.00;
     else if (deckMaterial === 'Cedar') rate = 4.00;
     else if (deckMaterial === 'Redwood') rate = 5.00;
     else if (deckMaterial === 'Timbertech Composite') rate = 8.00;
     else if (deckMaterial === 'Azek PVC') rate = 11.00;
-    else rate = 3.50;
+    else rate = prices[item.size] || 3.50;
 
     return rate * (item.length || 1);
   }
 
   if (item.category === 'Foundation') {
-    if (item.size === '60lb') return 6.50; // $6.50 per bag
-    return 6.50;
+    return prices['concrete'] || 6.50;
   }
 
   if (item.category === 'Hardware') {
-    if (item.id === 'joist-hangers') return 2.80; // $2.80 each
-    if (item.id === 'post-bases') return 9.50; // $9.50 each
-    if (item.id === 'screws') return 0.12; // $0.12 per screw
+    if (item.id === 'joist-hangers') return prices['joist-hangers'] || 2.80;
+    if (item.id === 'post-bases') return prices['post-bases'] || 9.50;
+    if (item.id === 'screws') return prices['screws'] || 0.12;
     return 1.50;
   }
 
   if (item.category === 'Stairs') {
     let speciesMultiplier = 1.0;
+    const species = config.species;
+    const deckMaterial = config.deckMaterial;
     if (species === 'Douglas Fir' || species === 'DF') speciesMultiplier = 1.25;
     else if (species === 'Western Red Cedar' || species === 'Cedar') speciesMultiplier = 2.0;
     else if (species === 'Redwood') speciesMultiplier = 2.5;
 
     if (item.id === 'stair-stringers') {
-      return 2.40 * (item.length || 1) * speciesMultiplier;
+      return (prices['2x12'] || 2.40) * (item.length || 1) * speciesMultiplier;
     }
     if (item.id === 'stair-treads') {
       if (deckMaterial === 'PT-SYP') rate = 2.00;
@@ -78,7 +76,7 @@ function estimateUnitPrice(item, species, deckMaterial) {
       else if (deckMaterial === 'Redwood') rate = 5.00;
       else if (deckMaterial === 'Timbertech Composite') rate = 8.00;
       else if (deckMaterial === 'Azek PVC') rate = 11.00;
-      else rate = 3.50;
+      else rate = prices['5/4x6'] || 3.50;
       return rate * (item.length || 1);
     }
   }
@@ -144,7 +142,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: config.species,
   };
-  joistItem.unitPrice = estimateUnitPrice(joistItem, config.species, config.deckMaterial);
+  joistItem.unitPrice = estimateUnitPrice(joistItem, config);
   joistItem.totalPrice = joistItem.unitPrice * joistItem.quantity;
   items.push(joistItem);
 
@@ -172,7 +170,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: config.species,
   };
-  rimItem.unitPrice = estimateUnitPrice(rimItem, config.species, config.deckMaterial);
+  rimItem.unitPrice = estimateUnitPrice(rimItem, config);
   rimItem.totalPrice = rimItem.unitPrice * rimItem.quantity;
   items.push(rimItem);
 
@@ -203,7 +201,7 @@ export function generateBOM(config, calcs) {
         unit: 'ea',
         material: config.species,
       };
-      blockingItem.unitPrice = estimateUnitPrice(blockingItem, config.species, config.deckMaterial);
+      blockingItem.unitPrice = estimateUnitPrice(blockingItem, config);
       blockingItem.totalPrice = blockingItem.unitPrice * blockingItem.quantity;
       items.push(blockingItem);
     }
@@ -241,7 +239,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: config.species,
   };
-  beamItem.unitPrice = estimateUnitPrice(beamItem, config.species, config.deckMaterial);
+  beamItem.unitPrice = estimateUnitPrice(beamItem, config);
   beamItem.totalPrice = beamItem.unitPrice * beamItem.quantity;
   items.push(beamItem);
 
@@ -265,7 +263,7 @@ export function generateBOM(config, calcs) {
       unit: 'ea',
       material: config.species,
     };
-    postItem.unitPrice = estimateUnitPrice(postItem, config.species, config.deckMaterial);
+    postItem.unitPrice = estimateUnitPrice(postItem, config);
     postItem.totalPrice = postItem.unitPrice * postItem.quantity;
     items.push(postItem);
   }
@@ -363,7 +361,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: matLabel,
   };
-  deckingItem.unitPrice = estimateUnitPrice(deckingItem, config.species, config.deckMaterial);
+  deckingItem.unitPrice = estimateUnitPrice(deckingItem, config);
   deckingItem.totalPrice = deckingItem.unitPrice * deckingItem.quantity;
   items.push(deckingItem);
 
@@ -387,7 +385,7 @@ export function generateBOM(config, calcs) {
       unit: 'ea',
       material: config.species,
     };
-    ledgerItem.unitPrice = estimateUnitPrice(ledgerItem, config.species, config.deckMaterial);
+    ledgerItem.unitPrice = estimateUnitPrice(ledgerItem, config);
     ledgerItem.totalPrice = ledgerItem.unitPrice * ledgerItem.quantity;
     items.push(ledgerItem);
   }
@@ -408,7 +406,7 @@ export function generateBOM(config, calcs) {
     unit: 'bags',
     material: 'Concrete',
   };
-  concreteItem.unitPrice = estimateUnitPrice(concreteItem, config.species, config.deckMaterial);
+  concreteItem.unitPrice = estimateUnitPrice(concreteItem, config);
   concreteItem.totalPrice = concreteItem.unitPrice * concreteItem.quantity;
   items.push(concreteItem);
 
@@ -423,7 +421,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: 'Galvanized Steel',
   };
-  hangerItem.unitPrice = estimateUnitPrice(hangerItem, config.species, config.deckMaterial);
+  hangerItem.unitPrice = estimateUnitPrice(hangerItem, config);
   hangerItem.totalPrice = hangerItem.unitPrice * hangerItem.quantity;
   items.push(hangerItem);
 
@@ -438,7 +436,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: 'Galvanized Steel',
   };
-  baseItem.unitPrice = estimateUnitPrice(baseItem, config.species, config.deckMaterial);
+  baseItem.unitPrice = estimateUnitPrice(baseItem, config);
   baseItem.totalPrice = baseItem.unitPrice * baseItem.quantity;
   items.push(baseItem);
 
@@ -454,7 +452,7 @@ export function generateBOM(config, calcs) {
     unit: 'ea',
     material: 'Stainless Steel',
   };
-  screwItem.unitPrice = estimateUnitPrice(screwItem, config.species, config.deckMaterial);
+  screwItem.unitPrice = estimateUnitPrice(screwItem, config);
   screwItem.totalPrice = screwItem.unitPrice * screwItem.quantity;
   items.push(screwItem);
 
@@ -471,7 +469,7 @@ export function generateBOM(config, calcs) {
       unit: 'ea',
       material: config.species,
     };
-    stringerItem.unitPrice = estimateUnitPrice(stringerItem, config.species, config.deckMaterial);
+    stringerItem.unitPrice = estimateUnitPrice(stringerItem, config);
     stringerItem.totalPrice = stringerItem.unitPrice * stringerItem.quantity;
     items.push(stringerItem);
 
@@ -486,7 +484,7 @@ export function generateBOM(config, calcs) {
       unit: 'ea',
       material: matLabel,
     };
-    treadItem.unitPrice = estimateUnitPrice(treadItem, config.species, config.deckMaterial);
+    treadItem.unitPrice = estimateUnitPrice(treadItem, config);
     treadItem.totalPrice = treadItem.unitPrice * treadItem.quantity;
     items.push(treadItem);
   }

@@ -684,6 +684,23 @@ export default function Canvas2D({ isMobile }) {
         return;
       }
       if (selectedTool === 'select') {
+        if (selectedSectionId && (!selectedSubObjectType || selectedSubObjectType === 'deck')) {
+          const sel = sections.find((s) => s.id === selectedSectionId);
+          if (sel) {
+            const vIdx = hitTestVertices(mx, my, sel.vertices, S, panOffset.x, panOffset.y, size.w, size.h);
+            if (vIdx !== -1) {
+              setActionPopup({ x: e.touches[0].clientX, y: e.touches[0].clientY, id: sel.id, type: 'vertex', vertexIndex: vIdx });
+              setInteraction({
+                mode: 'dragging_vertex',
+                vertexIndex: vIdx,
+                dragStart: { x: mx, y: my },
+                selectedVertexIndex: vIdx
+              });
+              return;
+            }
+          }
+        }
+        
         const hit = hitTestSubObject(mx, my, sections, S, panOffset.x, panOffset.y, size.w, size.h, sectionCalcs);
         if (hit) {
           selectSection(hit.id, hit.type !== 'deck' ? hit.type : null);
@@ -820,6 +837,14 @@ export default function Canvas2D({ isMobile }) {
             }
           }
         }
+      } else if (interaction.mode === 'dragging_vertex' && selectedSectionId) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mx = e.touches[0].clientX - rect.left, my = e.touches[0].clientY - rect.top;
+        const ox = size.w / 2 + panOffset.x;
+        const oy = size.h / 2 + panOffset.y;
+        const lx = (mx - ox) / S;
+        const ly = (my - oy) / S;
+        dragVertex(selectedSectionId, interaction.selectedVertexIndex, lx, ly);
       } else if (isPanning) {
         const dx = e.touches[0].clientX - lastMouseRef.current.x, dy = e.touches[0].clientY - lastMouseRef.current.y;
         setPanOffset((p) => ({ x: p.x + dx, y: p.y + dy }));

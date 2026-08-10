@@ -10,7 +10,7 @@ function formatDimension(inches) {
   return `${ft}' ${inn}"`;
 }
 
-export function generateDeckSpecsPDF(deckState) {
+export function generateDeckSpecsPDF(deckState, imageDataUrl) {
   const { sections, sectionCalcs, materials, bom, sqft, projectName } = deckState;
 
   const doc = new jsPDF();
@@ -28,6 +28,18 @@ export function generateDeckSpecsPDF(deckState) {
   doc.text(`Generated on: ${dateStr}`, 14, cursorY);
   doc.text(`Total Area: ${sqft} sq ft`, pageWidth - 14, cursorY, { align: 'right' });
   cursorY += 14;
+
+  if (imageDataUrl) {
+    // Add layout image
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text("Deck Layout", 14, cursorY);
+    cursorY += 6;
+    
+    // Scale image to fit width (max 180mm wide, max 100mm high)
+    doc.addImage(imageDataUrl, 'PNG', 14, cursorY, 180, 100, undefined, 'FAST');
+    cursorY += 105;
+  }
 
   // --- Global Specs ---
   doc.setFontSize(16);
@@ -57,6 +69,7 @@ export function generateDeckSpecsPDF(deckState) {
   });
 
   cursorY = doc.lastAutoTable.finalY + 12;
+
 
   // --- Section Details ---
   doc.setFontSize(16);

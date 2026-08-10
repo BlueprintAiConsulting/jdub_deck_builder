@@ -11,10 +11,22 @@ export default function BomBar({ isMobile, expanded: forceExpanded }) {
   const updateDeck = useDeckStore((s) => s.updateDeck);
   const [expanded, setExpanded] = useState(false);
 
-  const handleExportPDF = (e) => {
+  const handleExportPDF = async (e) => {
     e.stopPropagation();
     const state = useDeckStore.getState();
-    generateDeckSpecsPDF(state);
+    
+    // Capture the 2D layout canvas if available
+    let imageDataUrl = null;
+    try {
+      const canvas = document.querySelector('.canvas-2d__canvas');
+      if (canvas) {
+        imageDataUrl = canvas.toDataURL('image/png', 1.0);
+      }
+    } catch (err) {
+      console.warn("Could not capture canvas for PDF export", err);
+    }
+
+    await generateDeckSpecsPDF(state, imageDataUrl);
   };
 
   const isExpanded = forceExpanded || expanded;

@@ -880,15 +880,14 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
 }
 
 function Blocking({ blocking, joistSize, vertices, secX, secY, width, depth }) {
-  const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
   const woodTexture = getProceduralTexture('#6e5f4d', 'wood-2');
   const blockingBump = getProceduralBumpTexture('wood-2');
 
-  if (!blocking || !blocking.enabled) return null;
-
-  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
-
   const items = useMemo(() => {
+    if (!blocking || !blocking.enabled) return [];
+    const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
+    const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+    
     const segments = [];
     if (localVertices && localVertices.length >= 3) {
       for (let i = 0; i < localVertices.length; i++) {
