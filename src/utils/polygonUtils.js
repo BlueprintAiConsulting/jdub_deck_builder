@@ -286,7 +286,7 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
     } else {
       centerX = targetEdge === 'e' ? fallbackWidth : 0;
       centerZ = offset + objectWidth / 2;
-      rotY = targetEdge === 'e' ? -Math.PI / 2 : Math.PI / 2;
+      rotY = targetEdge === 'e' ? Math.PI / 2 : -Math.PI / 2;
     }
     return { centerX, centerZ, rotY };
   }
@@ -318,22 +318,33 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
 
   let selectedSeg = targetSegments[0];
 
+  const getOutwardRotY = (seg) => {
+    let nx = seg.dz;
+    let nz = -seg.dx;
+    if (targetEdge === 's' && nz < 0) { nx = -nx; nz = -nz; }
+    else if (targetEdge === 'n' && nz > 0) { nx = -nx; nz = -nz; }
+    else if (targetEdge === 'e' && nx < 0) { nx = -nx; nz = -nz; }
+    else if (targetEdge === 'w' && nx > 0) { nx = -nx; nz = -nz; }
+    return Math.atan2(nx, nz);
+  };
+
   if (targetEdge === 's' || targetEdge === 'n') {
     const targetX = offset + objectWidth / 2;
     selectedSeg = targetSegments.find(s => 
       (targetX >= Math.min(s.v1.x, s.v2.x) && targetX <= Math.max(s.v1.x, s.v2.x))
     ) || targetSegments[0];
     
+    const rotY = getOutwardRotY(selectedSeg);
     if (Math.abs(selectedSeg.dx) > 0.001) {
        const t = (targetX - selectedSeg.v1.x) / selectedSeg.dx;
        const z = selectedSeg.v1.y + t * selectedSeg.dz;
        return { 
          centerX: targetX, 
          centerZ: z, 
-         rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx)
+         rotY
        };
     } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx) };
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY };
     }
   } else {
     const targetZ = offset + objectWidth / 2;
@@ -341,16 +352,17 @@ export function getEdgeTransform(vertices, secX, secY, targetEdge, offset, objec
       (targetZ >= Math.min(s.v1.y, s.v2.y) && targetZ <= Math.max(s.v1.y, s.v2.y))
     ) || targetSegments[0];
 
+    const rotY = getOutwardRotY(selectedSeg);
     if (Math.abs(selectedSeg.dz) > 0.001) {
        const t = (targetZ - selectedSeg.v1.y) / selectedSeg.dz;
        const x = selectedSeg.v1.x + t * selectedSeg.dx;
        return { 
          centerX: x, 
          centerZ: targetZ, 
-         rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx)
+         rotY
        };
     } else {
-       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY: Math.atan2(selectedSeg.dz, -selectedSeg.dx) };
+       return { centerX: selectedSeg.v1.x, centerZ: selectedSeg.v1.y, rotY };
     }
   }
 }
