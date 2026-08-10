@@ -1,0 +1,59 @@
+.settings-modal__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: var(--space-2);
+}
+
+.settings-modal__grid::-webkit-scrollbar {
+  width: 6px;
+}
+.settings-modal__grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.settings-modal__grid::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+.settings-modal__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-modal__input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-modal__currency {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.settings-modal__input {
+  width: 100%;
+  padding-left: 28px !important;
+  font-family: var(--font-mono);
+}
+
+.settings-modal__section-title {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: var(--space-1);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+.settings-modal__section-title:first-child {
+  margin-top: 0;
+}

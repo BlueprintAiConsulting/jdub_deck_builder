@@ -12,6 +12,7 @@ import {
   parseDeckFile
 } from '../../lib/projectIO';
 import { renderBlueprint } from '../../utils/blueprintRenderer';
+import SettingsModal from './SettingsModal';
 import './Toolbar.css';
 
 function exportPDF() {
@@ -258,6 +259,7 @@ export default function Toolbar({ isMobile }) {
   const clearDeck = useDeckStore((s) => s.clearDeck);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
   const fileInputRef = useRef(null);
@@ -460,6 +462,8 @@ export default function Toolbar({ isMobile }) {
             </div>
           </div>
         )}
+        
+        <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
       </>,
       document.body
     );
@@ -533,6 +537,17 @@ export default function Toolbar({ isMobile }) {
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="7 10 12 15 17 10"/>
             <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+
+        <button
+          className="btn btn--ghost btn--icon"
+          onClick={() => setShowSettingsModal(true)}
+          aria-label="Pricing Settings"
+          title="Pricing Configurator"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </button>
 
@@ -671,6 +686,12 @@ export default function Toolbar({ isMobile }) {
       <div style={{ flex: 1 }} />
 
       <div className="toolbar__group">
+        <button className="btn btn--secondary btn--icon" onClick={() => setShowSettingsModal(true)} aria-label="Pricing Settings" data-tooltip="Pricing Configurator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          Prices
+        </button>
         {/* Save, Load & Export controls */}
         <button className="btn btn--secondary btn--icon" onClick={handleNewClick} aria-label="Start new project" data-tooltip="Start New Project" id="btn-new-project">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
