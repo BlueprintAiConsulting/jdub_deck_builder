@@ -761,14 +761,13 @@ function DeckBoards({ vertices, secX, secY, species, deckMaterial, deckColor, de
 }
 
 function Joists({ positions, width, depth, joistSize, joistOrientation, vertices, secX, secY }) {
-  const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
   const isHorizontal = joistOrientation === 'horizontal';
   const joistTexture = getProceduralTexture('#6e5f4d', 'wood-0');
   const joistBump = getProceduralBumpTexture('wood-0');
 
-  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
-
   const items = useMemo(() => {
+    const actual = LUMBER_ACTUAL[joistSize] || { width: 1.5, depth: 7.25 };
+    const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
     const list = [];
     positions.forEach((coordIn, i) => {
       let segments = [];
@@ -803,7 +802,7 @@ function Joists({ positions, width, depth, joistSize, joistOrientation, vertices
       });
     });
     return list;
-  }, [positions, width, depth, actual, isHorizontal, localVertices]);
+  }, [positions, width, depth, isHorizontal, joistSize, vertices, secX, secY]);
 
   return (
     <InstancedLumber 
@@ -820,16 +819,16 @@ function Joists({ positions, width, depth, joistSize, joistOrientation, vertices
 function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrientation, vertices, secX, secY }) {
   const isHorizontal = joistOrientation === 'horizontal';
   const beamSize = beamConfig.split('-').slice(1).join('-') || '2x10';
-  const actual = LUMBER_ACTUAL[beamSize] || { width: 1.5, depth: 9.25 };
-  const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
   const ply = parseInt(beamConfig.split('-')[0]) || 2;
-  const beamTopY = -joistActual.depth;
   const beamTexture = getProceduralTexture('#564736', 'wood-1');
   const beamBump = getProceduralBumpTexture('wood-1');
 
-  const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
-
   const items = useMemo(() => {
+    const actual = LUMBER_ACTUAL[beamSize] || { width: 1.5, depth: 9.25 };
+    const joistActual = LUMBER_ACTUAL[joistSize] || { depth: 7.25 };
+    const beamTopY = -joistActual.depth;
+    const localVertices = vertices ? vertices.map(v => ({ x: v.x - secX, y: v.y - secY })) : null;
+    
     const list = [];
     beamPositions.forEach((coordIn, i) => {
       let segments = [];
@@ -865,7 +864,7 @@ function Beams({ beamPositions, width, depth, beamConfig, joistSize, joistOrient
       });
     });
     return list;
-  }, [beamPositions, width, depth, actual, isHorizontal, localVertices, ply, beamTopY]);
+  }, [beamPositions, width, depth, isHorizontal, beamSize, joistSize, vertices, secX, secY, ply]);
 
   return (
     <InstancedLumber 
@@ -918,7 +917,7 @@ function Blocking({ blocking, joistSize, vertices, secX, secY, width, depth }) {
         rotY: -rotY
       };
     });
-  }, [blocking, actual, localVertices]);
+  }, [blocking, joistSize, vertices, secX, secY]);
 
   return (
     <InstancedLumber 

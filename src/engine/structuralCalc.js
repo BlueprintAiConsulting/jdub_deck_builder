@@ -277,7 +277,14 @@ export function calculateFootings(posts, beamsInfo, joistOrientation, deckWidthI
     }
   }
   
-  const tributaryArea = (maxTribWidthIn / 12) * ((beamsInfo.maxSpan || 96) / 12);
+  const length = beamsInfo.length || 0;
+  const rawCount = Math.ceil(length / (beamsInfo.maxSpan || 96)) + 1;
+  const safeCount = Math.max(2, typeof rawCount === 'number' && !isNaN(rawCount) ? rawCount : 2);
+  const spanLength = Math.max(0, length - 12); // Assuming standard 6" offset on both sides
+  const postSpacingIn = safeCount > 1 ? spanLength / (safeCount - 1) : 0;
+  const actualPostSpacing = postSpacingIn > 0 ? postSpacingIn : (beamsInfo.maxSpan || 96);
+  
+  const tributaryArea = (maxTribWidthIn / 12) * (actualPostSpacing / 12);
   
   const footingSizes = FOOTING_SIZES[cap] || FOOTING_SIZES[2000];
   let diameter = 12;
