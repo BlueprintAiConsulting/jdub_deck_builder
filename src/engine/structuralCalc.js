@@ -144,7 +144,8 @@ export function calculateBeams(deckWidthIn, deckDepthIn, joistSize, joistSpacing
     if (!ledgerAttached) beamCount += 1; // Freestanding needs support near the house side
   }
 
-  const safeSetback = Math.max(0, Math.min(depth - 24, beamSetback !== undefined ? beamSetback : 12));
+  const maxCantilever = (depth / beamCount) / 4;
+  const safeSetback = Math.max(0, Math.min(maxCantilever, depth - 24, beamSetback !== undefined ? beamSetback : 12));
 
   let positions = [];
   if (ledgerAttached) {

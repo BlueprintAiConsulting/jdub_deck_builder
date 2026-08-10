@@ -471,7 +471,7 @@ export const useDeckStore = create((set, get) => ({
     }
 
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
 
     set({
@@ -491,7 +491,7 @@ export const useDeckStore = create((set, get) => ({
     const newSections = state.sections.filter((s) => s.id !== id);
     const newSelected = newSections.length > 0 ? (state.selectedSectionId === id ? newSections[0].id : state.selectedSectionId) : null;
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
 
     set({
@@ -539,7 +539,7 @@ export const useDeckStore = create((set, get) => ({
 
   finishMove: () => {
     const state = get();
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: state.sections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({
       interaction: { mode: 'idle', dragStart: null, ghostRect: null, resizeHandle: null },
@@ -579,7 +579,7 @@ export const useDeckStore = create((set, get) => ({
     }
 
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
 
     set({
@@ -608,7 +608,7 @@ export const useDeckStore = create((set, get) => ({
       return;
     }
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
@@ -643,7 +643,7 @@ export const useDeckStore = create((set, get) => ({
       return;
     }
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({
       sections: newSections,
@@ -676,7 +676,7 @@ export const useDeckStore = create((set, get) => ({
       return { ...s, stairs: { ...stairObj, ...updates } };
     });
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
@@ -719,7 +719,7 @@ export const useDeckStore = create((set, get) => ({
         state.showToast("ADA Ramp does not fit in the available space!", "warning");
       }
     }
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({
       sections: newSections,
@@ -777,7 +777,7 @@ export const useDeckStore = create((set, get) => ({
         state.showToast("ADA Ramp does not fit in the available space!", "warning");
       }
     }
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({ sections: newSections, ...results, history: newHistory, historyIndex: newHistory.length - 1, isDirty: true });
   },
@@ -872,7 +872,7 @@ export const useDeckStore = create((set, get) => ({
     });
 
     const results = recalculateAll(newSections, newMaterials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...newMaterials } });
 
     set({
@@ -1124,7 +1124,7 @@ export const useDeckStore = create((set, get) => ({
     if (window._recalcTimeout) clearTimeout(window._recalcTimeout);
     const state = get();
     const results = recalculateAll(state.sections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: state.sections.map((s) => ({ ...s })), materials: { ...state.materials } });
     set({
       ...results,
@@ -1162,7 +1162,7 @@ export const useDeckStore = create((set, get) => ({
     }
 
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
 
     set({
@@ -1198,7 +1198,7 @@ export const useDeckStore = create((set, get) => ({
     });
 
     const results = recalculateAll(newSections, state.materials);
-    const newHistory = state.history.slice(0, state.historyIndex + 1);
+    const newHistory = state.history.slice(Math.max(0, state.historyIndex + 1 - 50), state.historyIndex + 1);
     newHistory.push({ sections: newSections.map((s) => ({ ...s })), materials: { ...state.materials } });
 
     set({
