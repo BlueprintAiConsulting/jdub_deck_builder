@@ -1621,19 +1621,33 @@ function House() {
   const safeW = 480; // 40 feet wide
   const safeH = 36;
   const wallHeightAboveDeck = 216; // 18 feet for a 2-story house
-  const atticHeight = 48; // 4 feet of wall above the second story to hide roof gap
-  const totalWallHeight = safeH + wallHeightAboveDeck + atticHeight;
-  const wallThick = 6;
+  const totalWallHeight = safeH + wallHeightAboveDeck;
+  
+  const houseWidth = safeW + 36; // 516 inches
+  const houseDepth = 240; // 20 feet deep
+  const roofRise = 96; // 8 feet of attic/roof rise
+  const overhang = 16;
+  
+  // Roof geometry math
+  const roofRun = (houseDepth / 2) + overhang; // 136
+  const roofDrop = (roofRise / (houseDepth / 2)) * roofRun; // 108.8
+  const roofPlaneLength = Math.sqrt(roofRun ** 2 + roofDrop ** 2); // ~174.14
+  const roofAngle = Math.atan2(roofRise, houseDepth / 2); 
+  const roofWidth = houseWidth + (overhang * 2);
+  
+  const frontRoofCenterY = wallHeightAboveDeck + roofRise - (roofDrop / 2);
+  const frontRoofCenterZ = -(houseDepth / 2) + (roofRun / 2); // -52
+  const backRoofCenterZ = -(houseDepth / 2) - (roofRun / 2); // -188
   
   const sidingTexture = getProceduralTexture('#cbd5e1', 'siding');
   const shingleTexture = getProceduralTexture('#2f3640', 'shingles');
   const concreteTexture = getProceduralTexture('#b2bec3', 'concrete');
   
   if (sidingTexture && sidingTexture.repeat) {
-    sidingTexture.repeat.set(4, totalWallHeight / 64);
+    sidingTexture.repeat.set(houseWidth / 64, totalWallHeight / 64);
   }
   if (shingleTexture && shingleTexture.repeat) {
-    shingleTexture.repeat.set(4, 1);
+    shingleTexture.repeat.set(8, 4);
   }
 
   // Realistic materials
@@ -1642,28 +1656,46 @@ function House() {
   const mullionMaterial = <meshStandardMaterial color="#cbd5e1" roughness={0.5} />;
   const handleMaterial = <meshStandardMaterial color="#334155" roughness={0.2} metalness={0.8} />;
   const darkInteriorMaterial = <meshStandardMaterial color="#0f172a" roughness={1} />;
+
+  // Attic gable shape
+  const atticShape = React.useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-(houseDepth / 2) * IN, 0); 
+    shape.lineTo((houseDepth / 2) * IN, 0);
+    shape.lineTo(0, roofRise * IN);
+    shape.lineTo(-(houseDepth / 2) * IN, 0);
+    return shape;
+  }, [houseDepth, roofRise]);
   
   return (
     <group position={[0, 0, 0]}>
-      {/* 1. Main Siding Wall (Extended up to hide roof gap) */}
-      <mesh position={[0, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
-        <boxGeometry args={[(safeW + 36) * IN, totalWallHeight * IN, wallThick * IN]} />
+      {/* 1. Main House Solid (Full Depth) */}
+      <mesh position={[0, (wallHeightAboveDeck - safeH) / 2 * IN, -(houseDepth / 2) * IN]} castShadow receiveShadow>
+        <boxGeometry args={[houseWidth * IN, totalWallHeight * IN, houseDepth * IN]} />
         <meshStandardMaterial map={sidingTexture} color={sidingTexture?.customColor || '#ffffff'} roughness={0.8} />
       </mesh>
 
-      {/* 2. Concrete Foundation Base */}
-      <mesh position={[0, -(safeH + 60) / 2 * IN, -(wallThick - 0.5) / 2 * IN]} castShadow receiveShadow>
-        <boxGeometry args={[(safeW + 36) * IN, (safeH + 60) * IN, (wallThick - 0.5) * IN]} />
+      {/* 2. Concrete Foundation Base (Full Depth) */}
+      <mesh position={[0, -(safeH + 60) / 2 * IN, -(houseDepth / 2) * IN]} castShadow receiveShadow>
+        <boxGeometry args={[houseWidth * IN, (safeH + 60) * IN, houseDepth * IN]} />
         <meshStandardMaterial map={concreteTexture} color={concreteTexture?.customColor || '#ffffff'} roughness={0.9} />
       </mesh>
 
-      {/* 3. Vertical White Corner Trim */}
-      <mesh position={[-(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -2.5 * IN]} castShadow>
-        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
+      {/* 3. Vertical White Corner Trims (Front and Back) */}
+      <mesh position={[-(houseWidth + 0.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, 0.5 * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
-      <mesh position={[(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -2.5 * IN]} castShadow>
-        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
+      <mesh position={[(houseWidth + 0.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, 0.5 * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4 * IN]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} />
+      </mesh>
+      <mesh position={[-(houseWidth + 0.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -(houseDepth + 0.5) * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4 * IN]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.5} />
+      </mesh>
+      <mesh position={[(houseWidth + 0.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -(houseDepth + 0.5) * IN]} castShadow>
+        <boxGeometry args={[4 * IN, totalWallHeight * IN, 4 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
 
@@ -1676,7 +1708,7 @@ function House() {
         </mesh>
         
         {/* Interior Darkness (simulates room behind glass) */}
-        <mesh position={[0, 0, 0.1 * IN]}>
+        <mesh position={[0, 0, -0.5 * IN]}>
           <boxGeometry args={[70 * IN, 78 * IN, 0.5 * IN]} />
           {darkInteriorMaterial}
         </mesh>
@@ -1722,7 +1754,7 @@ function House() {
             {frameMaterial}
           </mesh>
           {/* Interior Dark */}
-          <mesh position={[0, 0, 0.2 * IN]}>
+          <mesh position={[0, 0, -0.5 * IN]}>
             <boxGeometry args={[42 * IN, 54 * IN, 0.5 * IN]} />
             {darkInteriorMaterial}
           </mesh>
@@ -1753,7 +1785,7 @@ function House() {
             {frameMaterial}
           </mesh>
           {/* Interior Dark */}
-          <mesh position={[0, 0, 0.2 * IN]}>
+          <mesh position={[0, 0, -0.5 * IN]}>
             <boxGeometry args={[42 * IN, 54 * IN, 0.5 * IN]} />
             {darkInteriorMaterial}
           </mesh>
@@ -1775,19 +1807,24 @@ function House() {
         </group>
       ))}
 
-      {/* 7. Gabled Roof Overhang */}
-      <group position={[0, wallHeightAboveDeck * IN, 0]}>
-        <mesh position={[0, 12 * IN, -30 * IN]} rotation={[-18 * Math.PI / 180, 0, 0]} castShadow>
-          <boxGeometry args={[(safeW + 42) * IN, 1 * IN, 84 * IN]} />
+      {/* 7. Realistic Gable Roof */}
+      <group>
+        {/* Gable End Walls (Attic) */}
+        <mesh position={[-(houseWidth / 2) * IN, wallHeightAboveDeck * IN, -(houseDepth / 2) * IN]} rotation={[0, Math.PI / 2, 0]} castShadow>
+          <extrudeGeometry args={[atticShape, { depth: houseWidth * IN, bevelEnabled: false }]} />
+          <meshStandardMaterial map={sidingTexture} color={sidingTexture?.customColor || '#ffffff'} roughness={0.8} />
+        </mesh>
+        
+        {/* Front Roof Plane */}
+        <mesh position={[0, frontRoofCenterY * IN, frontRoofCenterZ * IN]} rotation={[-Math.PI / 2 + roofAngle, 0, 0]} castShadow>
+          <boxGeometry args={[roofWidth * IN, roofPlaneLength * IN, 1.5 * IN]} />
           <meshStandardMaterial map={shingleTexture} color={shingleTexture?.customColor || '#ffffff'} roughness={0.95} />
         </mesh>
-        <mesh position={[0, -0.5 * IN, 6 * IN]} castShadow>
-          <boxGeometry args={[(safeW + 40) * IN, 1 * IN, 12 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.6} />
-        </mesh>
-        <mesh position={[0, -1.5 * IN, 12.2 * IN]} castShadow>
-          <boxGeometry args={[(safeW + 40.5) * IN, 4 * IN, 0.5 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.5} />
+        
+        {/* Back Roof Plane */}
+        <mesh position={[0, frontRoofCenterY * IN, backRoofCenterZ * IN]} rotation={[-Math.PI / 2 - roofAngle, 0, 0]} castShadow>
+          <boxGeometry args={[roofWidth * IN, roofPlaneLength * IN, 1.5 * IN]} />
+          <meshStandardMaterial map={shingleTexture} color={shingleTexture?.customColor || '#ffffff'} roughness={0.95} />
         </mesh>
       </group>
     </group>
