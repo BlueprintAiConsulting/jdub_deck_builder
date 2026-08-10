@@ -1,5 +1,5 @@
 ---
-name: DeckBuilder
+name: BlueprintDeckEngine
 description: 3D deck building software for DIY homeowners
 colors:
   primary: "#4e8ef7"
@@ -46,7 +46,7 @@ components:
     padding: "6px 12px"
 ---
 
-# Design System: DeckBuilder
+# Design System: BlueprintDeckEngine
 
 ## 1. Overview
 

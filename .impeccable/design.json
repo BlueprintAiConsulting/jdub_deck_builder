@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-08-10T21:20:00.000Z",
-  "title": "Design System: DeckBuilder",
+  "title": "Design System: BlueprintDeckEngine",
   "extensions": {
     "colorMeta": {
       "primary": { "role": "primary", "displayName": "Blueprint Blue", "canonical": "#4e8ef7", "tonalRamp": ["#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#4e8ef7", "#6da3ff", "#93c5fd", "#bfdbfe"] },

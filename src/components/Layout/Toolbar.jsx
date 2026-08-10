@@ -259,7 +259,7 @@ export default function Toolbar({ isMobile }) {
       <header className="toolbar toolbar--mobile" id="main-toolbar">
         <div className="toolbar__brand toolbar__brand--mobile">
           <span className="toolbar__title toolbar__title--mobile">
-            DeckForge
+            BlueprintDeckEngine
             {currentProjectName && <span className="toolbar__project-name-mobile"> | {currentProjectName}</span>}
             {isDirty && <span className="toolbar__dirty-dot" data-tooltip="Unsaved changes" />}
           </span>
@@ -407,7 +407,7 @@ export default function Toolbar({ isMobile }) {
           </svg>
         </div>
         <span className="toolbar__title">
-          DeckForge
+          BlueprintDeckEngine
           {currentProjectName && <span className="toolbar__project-name"> | {currentProjectName}</span>}
           {isDirty && <span className="toolbar__dirty-dot" data-tooltip="Unsaved changes" />}
         </span>
