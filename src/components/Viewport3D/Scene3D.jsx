@@ -1620,8 +1620,9 @@ function Ramp({ section, rampEdge, rampCalcs, width, depth, species, deckMateria
 function House() {
   const safeW = 480; // 40 feet wide
   const safeH = 36;
-  const wallHeightAboveDeck = 96; // 8 feet
-  const totalWallHeight = safeH + wallHeightAboveDeck;
+  const wallHeightAboveDeck = 216; // 18 feet for a 2-story house
+  const atticHeight = 48; // 4 feet of wall above the second story to hide roof gap
+  const totalWallHeight = safeH + wallHeightAboveDeck + atticHeight;
   const wallThick = 6;
   
   const sidingTexture = getProceduralTexture('#cbd5e1', 'siding');
@@ -1634,11 +1635,18 @@ function House() {
   if (shingleTexture && shingleTexture.repeat) {
     shingleTexture.repeat.set(4, 1);
   }
+
+  // Realistic materials
+  const glassMaterial = <meshPhysicalMaterial color="#a5b4fc" transmission={0.9} opacity={1} transparent roughness={0.1} metalness={0.1} thickness={0.5} />;
+  const frameMaterial = <meshStandardMaterial color="#f8fafc" roughness={0.4} />;
+  const mullionMaterial = <meshStandardMaterial color="#cbd5e1" roughness={0.5} />;
+  const handleMaterial = <meshStandardMaterial color="#334155" roughness={0.2} metalness={0.8} />;
+  const darkInteriorMaterial = <meshStandardMaterial color="#0f172a" roughness={1} />;
   
   return (
     <group position={[0, 0, 0]}>
-      {/* 1. Main Siding Wall */}
-      <mesh position={[0, (wallHeightAboveDeck - safeH) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
+      {/* 1. Main Siding Wall (Extended up to hide roof gap) */}
+      <mesh position={[0, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -wallThick / 2 * IN]} castShadow receiveShadow>
         <boxGeometry args={[(safeW + 36) * IN, totalWallHeight * IN, wallThick * IN]} />
         <meshStandardMaterial map={sidingTexture} color={sidingTexture?.customColor || '#ffffff'} roughness={0.8} />
       </mesh>
@@ -1650,71 +1658,124 @@ function House() {
       </mesh>
 
       {/* 3. Vertical White Corner Trim */}
-      <mesh position={[-(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -2.5 * IN]} castShadow>
+      <mesh position={[-(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -2.5 * IN]} castShadow>
         <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
-      <mesh position={[(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck - safeH) / 2 * IN, -2.5 * IN]} castShadow>
+      <mesh position={[(safeW + 36.5) / 2 * IN, (wallHeightAboveDeck + atticHeight - safeH) / 2 * IN, -2.5 * IN]} castShadow>
         <boxGeometry args={[4 * IN, totalWallHeight * IN, 4.5 * IN]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
 
-      {/* 4. Sliding Glass Patio Door (Centered at deck level) */}
+      {/* 4. Realistic Sliding Glass Patio Door */}
       <group position={[0, 42 * IN, 0.1 * IN]}>
+        {/* Outer Frame */}
         <mesh castShadow>
-          <boxGeometry args={[74 * IN, 82 * IN, 3 * IN]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
+          <boxGeometry args={[74 * IN, 82 * IN, 2.5 * IN]} />
+          {frameMaterial}
         </mesh>
-        <mesh position={[-16 * IN, 0, 0.5 * IN]}>
-          <boxGeometry args={[32 * IN, 76 * IN, 0.5 * IN]} />
-          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
+        
+        {/* Interior Darkness (simulates room behind glass) */}
+        <mesh position={[0, 0, 0.1 * IN]}>
+          <boxGeometry args={[70 * IN, 78 * IN, 0.5 * IN]} />
+          {darkInteriorMaterial}
         </mesh>
-        <mesh position={[16 * IN, 0, 0.2 * IN]}>
-          <boxGeometry args={[32 * IN, 76 * IN, 0.5 * IN]} />
-          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
-        </mesh>
-        <mesh position={[-16 * IN, 0, 0.8 * IN]}>
-          <boxGeometry args={[32 * IN, 76 * IN, 0.1 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.5} wireframe={true} />
-        </mesh>
-        <mesh position={[16 * IN, 0, 0.5 * IN]}>
-          <boxGeometry args={[32 * IN, 76 * IN, 0.1 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.5} wireframe={true} />
-        </mesh>
+
+        {/* Stationary Glass Panel (Right) */}
+        <group position={[17.5 * IN, 0, 0.6 * IN]}>
+          <mesh>
+            <boxGeometry args={[35 * IN, 78 * IN, 0.2 * IN]} />
+            {glassMaterial}
+          </mesh>
+          <mesh position={[0, 0, 0.1 * IN]}>
+            <boxGeometry args={[35 * IN, 78 * IN, 0.3 * IN]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.5} wireframe={true} transparent opacity={0.1} />
+          </mesh>
+        </group>
+
+        {/* Sliding Glass Panel (Left, slightly forward) */}
+        <group position={[-16.5 * IN, 0, 1.2 * IN]}>
+          {/* Glass */}
+          <mesh>
+            <boxGeometry args={[37 * IN, 78 * IN, 0.2 * IN]} />
+            {glassMaterial}
+          </mesh>
+          {/* Panel Frame */}
+          <mesh>
+             <boxGeometry args={[37 * IN, 78 * IN, 0.3 * IN]} />
+             <meshStandardMaterial color="#e2e8f0" roughness={0.4} wireframe={true} transparent opacity={0.1} />
+          </mesh>
+          {/* Handle */}
+          <mesh position={[14 * IN, 0, 0.5 * IN]}>
+            <boxGeometry args={[1 * IN, 8 * IN, 1 * IN]} />
+            {handleMaterial}
+          </mesh>
+        </group>
       </group>
 
-      {/* 5. Flanking Windows */}
-      <group position={[-120 * IN, 48 * IN, 0.1 * IN]}>
-        <mesh castShadow>
-          <boxGeometry args={[48 * IN, 54 * IN, 2.5 * IN]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
-        </mesh>
-        <mesh position={[0, 0, 0.4 * IN]}>
-          <boxGeometry args={[42 * IN, 48 * IN, 0.5 * IN]} />
-          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
-        </mesh>
-        <mesh position={[0, 0, 0.7 * IN]}>
-          <boxGeometry args={[42 * IN, 2 * IN, 0.2 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.4} />
-        </mesh>
-      </group>
+      {/* 5. First Floor Windows */}
+      {[-180, -120, 120, 180].map((xOffset, idx) => (
+        <group key={`w1-${idx}`} position={[xOffset * IN, 48 * IN, 0.1 * IN]}>
+          {/* Outer Frame */}
+          <mesh castShadow>
+            <boxGeometry args={[48 * IN, 60 * IN, 2.5 * IN]} />
+            {frameMaterial}
+          </mesh>
+          {/* Interior Dark */}
+          <mesh position={[0, 0, 0.2 * IN]}>
+            <boxGeometry args={[42 * IN, 54 * IN, 0.5 * IN]} />
+            {darkInteriorMaterial}
+          </mesh>
+          {/* Glass */}
+          <mesh position={[0, 0, 0.6 * IN]}>
+            <boxGeometry args={[42 * IN, 54 * IN, 0.2 * IN]} />
+            {glassMaterial}
+          </mesh>
+          {/* Horizontal Mullion */}
+          <mesh position={[0, 0, 0.7 * IN]}>
+            <boxGeometry args={[42 * IN, 2 * IN, 0.4 * IN]} />
+            {mullionMaterial}
+          </mesh>
+          {/* Vertical Mullion */}
+          <mesh position={[0, 0, 0.7 * IN]}>
+            <boxGeometry args={[2 * IN, 54 * IN, 0.4 * IN]} />
+            {mullionMaterial}
+          </mesh>
+        </group>
+      ))}
 
-      <group position={[120 * IN, 48 * IN, 0.1 * IN]}>
-        <mesh castShadow>
-          <boxGeometry args={[48 * IN, 54 * IN, 2.5 * IN]} />
-          <meshStandardMaterial color="#f8fafc" roughness={0.4} />
-        </mesh>
-        <mesh position={[0, 0, 0.4 * IN]}>
-          <boxGeometry args={[42 * IN, 48 * IN, 0.5 * IN]} />
-          <meshStandardMaterial color="#111827" roughness={0.1} metalness={0.9} />
-        </mesh>
-        <mesh position={[0, 0, 0.7 * IN]}>
-          <boxGeometry args={[42 * IN, 2 * IN, 0.2 * IN]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.4} />
-        </mesh>
-      </group>
+      {/* 6. Second Floor Windows */}
+      {[-180, -120, -60, 0, 60, 120, 180].map((xOffset, idx) => (
+        <group key={`w2-${idx}`} position={[xOffset * IN, 144 * IN, 0.1 * IN]}>
+          {/* Outer Frame */}
+          <mesh castShadow>
+            <boxGeometry args={[48 * IN, 60 * IN, 2.5 * IN]} />
+            {frameMaterial}
+          </mesh>
+          {/* Interior Dark */}
+          <mesh position={[0, 0, 0.2 * IN]}>
+            <boxGeometry args={[42 * IN, 54 * IN, 0.5 * IN]} />
+            {darkInteriorMaterial}
+          </mesh>
+          {/* Glass */}
+          <mesh position={[0, 0, 0.6 * IN]}>
+            <boxGeometry args={[42 * IN, 54 * IN, 0.2 * IN]} />
+            {glassMaterial}
+          </mesh>
+          {/* Horizontal Mullion */}
+          <mesh position={[0, 0, 0.7 * IN]}>
+            <boxGeometry args={[42 * IN, 2 * IN, 0.4 * IN]} />
+            {mullionMaterial}
+          </mesh>
+          {/* Vertical Mullion */}
+          <mesh position={[0, 0, 0.7 * IN]}>
+            <boxGeometry args={[2 * IN, 54 * IN, 0.4 * IN]} />
+            {mullionMaterial}
+          </mesh>
+        </group>
+      ))}
 
-      {/* 6. Gabled Roof Overhang */}
+      {/* 7. Gabled Roof Overhang */}
       <group position={[0, wallHeightAboveDeck * IN, 0]}>
         <mesh position={[0, 12 * IN, -30 * IN]} rotation={[-18 * Math.PI / 180, 0, 0]} castShadow>
           <boxGeometry args={[(safeW + 42) * IN, 1 * IN, 84 * IN]} />
