@@ -45,6 +45,7 @@ export default function Toolbar({ isMobile }) {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [tempProjectName, setTempProjectName] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
   const fileInputRef = useRef(null);
@@ -152,9 +153,15 @@ export default function Toolbar({ isMobile }) {
     if (isMeta && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
     if (isMeta && e.key === 'y') { e.preventDefault(); redo(); }
     if (isMeta && e.key === 's') { e.preventDefault(); handleSaveClick(); }
-    if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('2d');
-    if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('3d');
-    if (e.key === '4' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select')) setViewMode('split');
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      if (!e.target.closest('input, select, textarea')) {
+        e.preventDefault();
+        setShowShortcutsModal(prev => !prev);
+      }
+    }
+    if (e.key === '2' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select, textarea')) setViewMode('2d');
+    if (e.key === '3' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select, textarea')) setViewMode('3d');
+    if (e.key === '4' && !e.metaKey && !e.ctrlKey && !e.target.closest('input, select, textarea')) setViewMode('split');
   }, [undo, redo, setViewMode, handleSaveClick]);
 
   useEffect(() => {
@@ -249,6 +256,78 @@ export default function Toolbar({ isMobile }) {
         )}
         
         <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+
+        {/* Keyboard Shortcuts Modal */}
+        {showShortcutsModal && (
+          <div className="toolbar-modal__backdrop" onClick={() => setShowShortcutsModal(false)}>
+            <div className="toolbar-modal__card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+              <h3 className="toolbar-modal__title">Keyboard Shortcuts</h3>
+              <p className="toolbar-modal__subtitle" style={{ margin: '0 0 16px 0' }}>Speed up your deck design workflow with hotkeys</p>
+              
+              <div className="shortcuts-modal__grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px', marginBottom: '20px' }}>
+                <div className="shortcuts-modal__group">
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px', letterSpacing: '0.05em' }}>Viewports</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Blueprint View (2D)</span>
+                    <kbd className="kbd-chip">2</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>3D Preview</span>
+                    <kbd className="kbd-chip">3</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Split View</span>
+                    <kbd className="kbd-chip">4</kbd>
+                  </div>
+                </div>
+
+                <div className="shortcuts-modal__group">
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px', letterSpacing: '0.05em' }}>History & File</div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Undo</span>
+                    <kbd className="kbd-chip">⌘Z</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Redo</span>
+                    <kbd className="kbd-chip">⌘⇧Z</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Save Project</span>
+                    <kbd className="kbd-chip">⌘S</kbd>
+                  </div>
+                </div>
+
+                <div className="shortcuts-modal__group">
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px', letterSpacing: '0.05em' }}>Editing</div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Delete Selection</span>
+                    <kbd className="kbd-chip">Delete</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Toggle Dimensions</span>
+                    <kbd className="kbd-chip">D</kbd>
+                  </div>
+                </div>
+
+                <div className="shortcuts-modal__group">
+                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', marginBottom: '8px', letterSpacing: '0.05em' }}>System</div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Shortcuts Legend</span>
+                    <kbd className="kbd-chip">?</kbd>
+                  </div>
+                  <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', margin: '4px 0', fontSize: '13px' }}>
+                    <span>Close / Deselect</span>
+                    <kbd className="kbd-chip">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+
+              <div className="toolbar-modal__actions">
+                <button className="btn btn--primary" onClick={() => setShowShortcutsModal(false)}>Got It</button>
+              </div>
+            </div>
+          </div>
+        )}
       </>,
       document.body
     );
@@ -519,6 +598,25 @@ export default function Toolbar({ isMobile }) {
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M5 3v18M19 3v18M5 12h14"/>
+          </svg>
+        </button>
+
+        <button
+          className={`btn btn--ghost btn--icon ${showShortcutsModal ? 'btn--active' : ''}`}
+          onClick={() => setShowShortcutsModal(true)}
+          aria-label="Keyboard Shortcuts"
+          data-tooltip="Keyboard Shortcuts [?]"
+          id="btn-shortcuts-toggle"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2" y="4" width="20" height="16" rx="2.5"/>
+            <line x1="6" y1="8" x2="6.01" y2="8" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="10" y1="8" x2="10.01" y2="8" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="14" y1="8" x2="14.01" y2="8" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="18" y1="8" x2="18.01" y2="8" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="6" y1="12" x2="6.01" y2="12" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="18" y1="12" x2="18.01" y2="12" strokeWidth="3" strokeLinecap="round"/>
+            <line x1="8" y1="16" x2="16" y2="16" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
         </button>
 
