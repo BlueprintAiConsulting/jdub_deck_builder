@@ -6,7 +6,7 @@ import BomBar from './BomBar';
 import Canvas2D from '../Viewport2D/Canvas2D';
 import Scene3D from '../Viewport3D/Scene3D';
 import { useDeckStore } from '../../store/deckStore';
-import { listRecentProjects, loadProjectFromLocalStorage } from '../../lib/projectIO';
+import { listRecentProjects, loadProjectFromLocalStorage, getStorageItem, setStorageItem } from '../../lib/projectIO';
 import './AppShell.css';
 
 const MOBILE_BREAKPOINT = 768;
@@ -74,7 +74,7 @@ export default function AppShell() {
     }
 
     try {
-      const rawDraft = localStorage.getItem('deckforge_autosave_draft');
+      const rawDraft = getStorageItem('autosave_draft');
       if (rawDraft) {
         const draft = JSON.parse(rawDraft);
         if (draft && draft.sections && draft.materials && draft.timestamp) {
@@ -115,7 +115,7 @@ export default function AppShell() {
           legendColors,
           timestamp: new Date().toISOString()
         };
-        localStorage.setItem('deckforge_autosave_draft', JSON.stringify(draft));
+        setStorageItem('autosave_draft', JSON.stringify(draft));
       } catch (err) {
         console.error('Autosave failed:', err);
       }

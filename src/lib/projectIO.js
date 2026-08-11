@@ -1,9 +1,38 @@
 /**
- * DeckForge Project IO Library
- * Handles serialization, file download (.deck), validation, and localStorage storage.
+ * BlueprintDeckEngine Project IO Library
+ * Handles serialization, file download (.deck), validation, dual-key localStorage storage, and autosave draft recovery.
  */
 
 export const SCHEMA_VERSION = 2;
+
+/**
+ * Storage key helpers for dual brand compatibility (blueprintdeckengine_* primary, deckforge_* fallback)
+ */
+export function getStorageItem(key) {
+  try {
+    const bpVal = localStorage.getItem(`blueprintdeckengine_${key}`);
+    if (bpVal !== null) return bpVal;
+    return localStorage.getItem(`deckforge_${key}`);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setStorageItem(key, value) {
+  try {
+    localStorage.setItem(`blueprintdeckengine_${key}`, value);
+    localStorage.setItem(`deckforge_${key}`, value);
+  } catch (e) {
+    throw e;
+  }
+}
+
+export function removeStorageItem(key) {
+  try {
+    localStorage.removeItem(`blueprintdeckengine_${key}`);
+    localStorage.removeItem(`deckforge_${key}`);
+  } catch (e) {}
+}
 
 /**
  * Serialize a project state to a standard JS object.
@@ -13,7 +42,10 @@ export function serializeProject(projectName, sections, materials, legendColors 
     schemaVersion: SCHEMA_VERSION,
     projectName,
     sections,
-    materials,
+    materials: {
+      ...materials,
+      unitPrices: (materials && materials.unitPrices) ? { ...materials.unitPrices } : {}
+    },
     legendColors,
     timestamp: new Date().toISOString()
   };
@@ -29,7 +61,6 @@ export function downloadProjectFile(projectName, sections, materials, legendColo
   const url = URL.createObjectURL(blob);
   
   const a = document.createElement('a');
-  // Replace unsafe characters in filename
   const safeName = projectName.replace(/[^a-z0-9_-]/gi, '_') || 'untitled';
   a.href = url;
   a.download = `${safeName}.deck`;
@@ -45,29 +76,26 @@ export function downloadProjectFile(projectName, sections, materials, legendColo
 export function saveProjectToLocalStorage(projectName, sections, materials, legendColors = null) {
   try {
     const data = serializeProject(projectName, sections, materials, legendColors);
-    const key = `deckforge_project_${projectName}`;
-    localStorage.setItem(key, JSON.stringify(data));
+    const key = `project_${projectName}`;
+    setStorageItem(key, JSON.stringify(data));
 
-    // Update list of recent projects
     let recent = [];
     try {
-      const raw = localStorage.getItem('deckforge_recent_projects');
+      const raw = getStorageItem('recent_projects');
       recent = raw ? JSON.parse(raw) : [];
     } catch (e) {
       console.error('Failed to parse recent projects:', e);
     }
 
-    // Remove existing entry to move it to the front
     recent = recent.filter(name => name !== projectName);
     recent.unshift(projectName);
 
-    // Limit to most recent 20 projects
     if (recent.length > 20) {
       recent = recent.slice(0, 20);
     }
 
-    localStorage.setItem('deckforge_recent_projects', JSON.stringify(recent));
-    localStorage.removeItem('deckforge_autosave_draft');
+    setStorageItem('recent_projects', JSON.stringify(recent));
+    removeStorageItem('autosave_draft');
   } catch (error) {
     console.error('Failed to save project to localStorage:', error);
     if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
@@ -82,8 +110,8 @@ export function saveProjectToLocalStorage(projectName, sections, materials, lege
  * Loads a project state from browser localStorage.
  */
 export function loadProjectFromLocalStorage(projectName) {
-  const key = `deckforge_project_${projectName}`;
-  const raw = localStorage.getItem(key);
+  const key = `project_${projectName}`;
+  const raw = getStorageItem(key);
   if (!raw) {
     throw new Error(`Project "${projectName}" was not found in storage.`);
   }
@@ -96,17 +124,16 @@ export function loadProjectFromLocalStorage(projectName) {
  * Deletes a project from localStorage.
  */
 export function deleteProjectFromLocalStorage(projectName) {
-  const key = `deckforge_project_${projectName}`;
-  localStorage.removeItem(key);
+  removeStorageItem(`project_${projectName}`);
 
   let recent = [];
   try {
-    const raw = localStorage.getItem('deckforge_recent_projects');
+    const raw = getStorageItem('recent_projects');
     recent = raw ? JSON.parse(raw) : [];
   } catch (e) {}
 
   recent = recent.filter(name => name !== projectName);
-  localStorage.setItem('deckforge_recent_projects', JSON.stringify(recent));
+  setStorageItem('recent_projects', JSON.stringify(recent));
 }
 
 /**
@@ -114,7 +141,7 @@ export function deleteProjectFromLocalStorage(projectName) {
  */
 export function listRecentProjects() {
   try {
-    const raw = localStorage.getItem('deckforge_recent_projects');
+    const raw = getStorageItem('recent_projects');
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
@@ -122,7 +149,7 @@ export function listRecentProjects() {
 }
 
 /**
- * Validates a parsed project object against schemaVersion requirements.
+ * Validates and auto-heals a parsed project object against schemaVersion requirements.
  */
 export function validateProjectData(data) {
   if (!data || typeof data !== 'object') {
@@ -170,19 +197,25 @@ export function validateProjectData(data) {
     if (sec.x === undefined || isNaN(sec.x)) sec.x = 0;
     if (sec.y === undefined || isNaN(sec.y)) sec.y = 0;
     
+    const defaultRect = [
+      { x: sec.x, y: sec.y },
+      { x: sec.x + sec.width, y: sec.y },
+      { x: sec.x + sec.width, y: sec.y + sec.depth },
+      { x: sec.x, y: sec.y + sec.depth }
+    ];
+
     if (!Array.isArray(sec.vertices) || sec.vertices.length < 3) {
-      sec.vertices = [
-        { x: sec.x, y: sec.y },
-        { x: sec.x + sec.width, y: sec.y },
-        { x: sec.x + sec.width, y: sec.y + sec.depth },
-        { x: sec.x, y: sec.y + sec.depth }
-      ];
+      sec.vertices = defaultRect;
     } else {
-      sec.vertices.forEach((v, vIdx) => {
+      let hasInvalidVertex = false;
+      sec.vertices.forEach((v) => {
         if (!v || typeof v !== 'object' || typeof v.x !== 'number' || typeof v.y !== 'number' || isNaN(v.x) || isNaN(v.y)) {
-          throw new Error(`Invalid vertex coordinates at section ${sec.id} index ${vIdx}.`);
+          hasInvalidVertex = true;
         }
       });
+      if (hasInvalidVertex) {
+        sec.vertices = defaultRect;
+      }
     }
   });
 
@@ -225,12 +258,12 @@ export function saveTemplateToLocalStorage(templateName, sections, materials) {
       materials,
       timestamp: new Date().toISOString()
     };
-    const key = `deckforge_template_${templateName}`;
-    localStorage.setItem(key, JSON.stringify(data));
+    const key = `template_${templateName}`;
+    setStorageItem(key, JSON.stringify(data));
 
     let templates = [];
     try {
-      const raw = localStorage.getItem('deckforge_custom_templates');
+      const raw = getStorageItem('custom_templates');
       templates = raw ? JSON.parse(raw) : [];
     } catch (e) {
       console.error('Failed to parse custom templates list:', e);
@@ -240,7 +273,7 @@ export function saveTemplateToLocalStorage(templateName, sections, materials) {
       templates.push(templateName);
     }
 
-    localStorage.setItem('deckforge_custom_templates', JSON.stringify(templates));
+    setStorageItem('custom_templates', JSON.stringify(templates));
   } catch (error) {
     console.error('Failed to save template to localStorage:', error);
     if (error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
@@ -255,8 +288,8 @@ export function saveTemplateToLocalStorage(templateName, sections, materials) {
  * Loads a template state from browser localStorage.
  */
 export function loadTemplateFromLocalStorage(templateName) {
-  const key = `deckforge_template_${templateName}`;
-  const raw = localStorage.getItem(key);
+  const key = `template_${templateName}`;
+  const raw = getStorageItem(key);
   if (!raw) {
     throw new Error(`Template "${templateName}" was not found in storage.`);
   }
@@ -269,17 +302,16 @@ export function loadTemplateFromLocalStorage(templateName) {
  * Deletes a template from localStorage.
  */
 export function deleteTemplateFromLocalStorage(templateName) {
-  const key = `deckforge_template_${templateName}`;
-  localStorage.removeItem(key);
+  removeStorageItem(`template_${templateName}`);
 
   let templates = [];
   try {
-    const raw = localStorage.getItem('deckforge_custom_templates');
+    const raw = getStorageItem('custom_templates');
     templates = raw ? JSON.parse(raw) : [];
   } catch (e) {}
 
   templates = templates.filter(name => name !== templateName);
-  localStorage.setItem('deckforge_custom_templates', JSON.stringify(templates));
+  setStorageItem('custom_templates', JSON.stringify(templates));
 }
 
 /**
@@ -287,7 +319,7 @@ export function deleteTemplateFromLocalStorage(templateName) {
  */
 export function listCustomTemplates() {
   try {
-    const raw = localStorage.getItem('deckforge_custom_templates');
+    const raw = getStorageItem('custom_templates');
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
