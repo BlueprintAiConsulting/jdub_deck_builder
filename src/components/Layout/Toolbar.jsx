@@ -390,20 +390,12 @@ export default function Toolbar({ isMobile }) {
     <header className="toolbar" id="main-toolbar" role="toolbar" aria-label="Main toolbar">
       <div className="toolbar__brand">
         <div className="toolbar__logo">
-          <svg width="26" height="26" viewBox="0 0 64 64" fill="none">
-            <defs>
-              <linearGradient id="tg" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="var(--accent-primary)"/>
-                <stop offset="100%" stopColor="var(--accent-purple)"/>
-              </linearGradient>
-            </defs>
-            <rect x="4" y="28" width="56" height="6" rx="2" fill="url(#tg)"/>
-            <rect x="8" y="36" width="4" height="20" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
-            <rect x="26" y="36" width="4" height="24" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
-            <rect x="52" y="36" width="4" height="20" rx="1" fill="var(--accent-primary)" opacity="0.8"/>
-            <rect x="6" y="22" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.9"/>
-            <rect x="6" y="16" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.7"/>
-            <rect x="6" y="10" width="52" height="4" rx="1" fill="var(--accent-warm)" opacity="0.5"/>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" stroke="var(--accent-primary)" opacity="0.85" />
+            <circle cx="12" cy="7" r="1.5" fill="var(--accent-primary)" stroke="none" />
+            <line x1="12" y1="7" x2="8.5" y2="18" stroke="var(--accent-primary)" />
+            <line x1="12" y1="7" x2="15.5" y2="18" stroke="var(--accent-primary)" />
+            <line x1="9" y1="14" x2="15" y2="14" stroke="var(--accent-warm)" strokeWidth="1.8" />
           </svg>
         </div>
         <span className="toolbar__title">

@@ -1,15 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
-    </linearGradient>
-  </defs>
-  <rect x="4" y="28" width="56" height="6" rx="2" fill="url(#g)"/>
-  <rect x="8" y="36" width="4" height="20" rx="1" fill="#3b82f6" opacity="0.8"/>
-  <rect x="26" y="36" width="4" height="24" rx="1" fill="#3b82f6" opacity="0.8"/>
-  <rect x="52" y="36" width="4" height="20" rx="1" fill="#3b82f6" opacity="0.8"/>
-  <rect x="6" y="22" width="52" height="4" rx="1" fill="#f59e0b" opacity="0.9"/>
-  <rect x="6" y="16" width="52" height="4" rx="1" fill="#f59e0b" opacity="0.7"/>
-  <rect x="6" y="10" width="52" height="4" rx="1" fill="#f59e0b" opacity="0.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4e8ef7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="10" stroke="#4e8ef7" opacity="0.85" />
+  <circle cx="12" cy="7" r="1.5" fill="#4e8ef7" stroke="none" />
+  <line x1="12" y1="7" x2="8.5" y2="18" stroke="#4e8ef7" />
+  <line x1="12" y1="7" x2="15.5" y2="18" stroke="#4e8ef7" />
+  <line x1="9" y1="14" x2="15" y2="14" stroke="#f5a623" stroke-width="1.8" />
 </svg>
